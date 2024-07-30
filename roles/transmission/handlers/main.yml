@@ -1,0 +1,20 @@
+---
+- name: Restart transmission
+  ansible.builtin.service:
+    name: transmission-daemon
+    state: restarted
+
+- name: Restart transmissionbot
+  ansible.builtin.service:
+    name: transmissionbot
+    state: restarted
+
+- name: Restart transmission_exporter
+  ansible.builtin.service:
+    name: transmission_exporter
+    state: restarted
+
+- name: Restart traefik
+  ansible.builtin.service:
+    name: traefik
+    state: restarted

@@ -1,0 +1,9 @@
+---
+raspberry_passwordless_sudo: true
+raspberry_ramdisk_log: true
+raspberry_enable_bluetooth: false
+raspberry_enable_leds: false
+raspberry_disable_wifi: false
+
+raspberry_user_groups: []
+raspberry_user: {}

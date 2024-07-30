@@ -1,0 +1,10 @@
+---
+- name: Restart nodeexporter
+  ansible.builtin.systemd:
+    name: node_exporter
+    state: restarted
+
+- name: Restart traefik
+  ansible.builtin.systemd:
+    name: traefik
+    state: restarted

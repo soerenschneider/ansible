@@ -1,0 +1,32 @@
+---
+- name: Install smartctl
+  ansible.builtin.package:
+    name: smartmontools
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: smartctl-exporter
+    github_repo: soerenschneider/smartctl-exporter
+    service_name: smartctl-exporter
+  # todo
+  when: false
+  tags: [smartctl-exporter, smartctl-exporter-install]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: smartctl-exporter.service.j2
+    dest: /etc/systemd/system/smartctl-exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart smartctl-exporter
+  register: _smartctl_exporter_service
+  tags: [smartctl-exporter, smartctl-exporter-configure]
+
+- name: Enable/disable smartctl-exporter
+  ansible.builtin.service:
+    name: "{{ smartctl_exporter_service_name }}"
+    daemon_reload: "{% if _smartctl_exporter_service is changed %}true{% else %}false{% endif %}"
+    enabled: true
+  tags: [smartctl-exporter, smartctl-exporter-configure]

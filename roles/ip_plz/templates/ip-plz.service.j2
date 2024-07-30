@@ -1,0 +1,43 @@
+# {{ ansible_managed }}
+[Unit]
+Description=ip-plz
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ip-plz
+ReadOnlyPaths=/etc/ip-plz
+ProtectSystem=full
+ProtectHome=yes
+PrivateTmp=true
+NoNewPrivileges=true
+User={{ip_plz_user }}
+Group={{ ip_plz_group }}
+LimitCPU=5%
+LimitMEMLOCK=100M
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FSETID CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SETPCAP
+{% if ip_plz_addr | length > 0 -%}
+Environment=IP_PLZ_ADDR="{{ ip_plz_addr }}"
+{% endif %}
+{% if ip_plz_metrics_addr | length > 0 -%}
+Environment=IP_PLZ_METRICS_ADDR="{{ ip_plz_metrics_addr }}"
+{% endif %}
+{% if ip_plz_tls_cert_file | length > 0 -%}
+Environment=IP_PLZ_TLS_CERT_FILE="{{ ip_plz_tls_cert_file }}"
+{% endif %}
+{% if ip_plz_tls_key_file | length > 0 -%}
+Environment=IP_PLZ_TLS_KEY_FILE="{{ ip_plz_tls_key_file }}"
+{% endif %}
+
+SyslogIdentifier=ip-plz
+
+# restart forever
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

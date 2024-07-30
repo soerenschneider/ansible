@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup timer for {{ item.key }}
+
+[Timer]
+Unit=restic-backup@{{ item.key }}.service
+OnCalendar={{ item.value.timer_schedule | default("daily") }}
+RandomizedDelaySec=7200
+Persistent=true
+
+[Install]
+WantedBy=timers.target

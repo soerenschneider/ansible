@@ -1,0 +1,27 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: authentication.yml
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: hostkeys.yml
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: hardening.yml
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: match_blocks.yml
+  when: match_blocks is defined
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: 2fa-{{ ansible_system | lower }}.yml
+  when: ssh_2fa_enabled | bool
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: update-listener.yaml
+  when: ssh_update_listener_wg_up_ips | default([]) | length > 0
+  tags: always

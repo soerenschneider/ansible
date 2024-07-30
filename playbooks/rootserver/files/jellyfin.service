@@ -1,0 +1,13 @@
+[Unit]
+Description=(Auto) mount fileserver and start jellyfin
+Requires=multi-user.target
+After=multi-user.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecPreStart=/bin/sleep 120
+ExecStart=ls /media/private/shows; ls /media/private/movies; docker start jellyfin
+
+[Install]
+WantedBy=no.target

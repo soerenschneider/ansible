@@ -1,0 +1,19 @@
+wgkey {{ wg_private_keys[wireguard_wg_net_name][inventory_hostname] }} wgport {{ item.port | default(51820) }}
+
+inet {{ item.address | ipaddr('address') }} {{ item.address | ipaddr('netmask') }}
+
+{% for peer in item.peers %}
+{% set ordered_peers = [inventory_hostname, peer.host] | sort %}
+{% set psk_key = "%s_%s" | format(ordered_peers[0], ordered_peers[1]) %}
+# {{ peer.host }}
+wgpeer {{ wg_pub_keys[wireguard_wg_net_name][peer.host] }} {% for ip in peer.allowed_ips %}wgaip {{ ip }} {% endfor %}{%if psk_key is in wg_psks[wireguard_wg_net_name] %}wgpsk {{ wg_psks[wireguard_wg_net_name][psk_key] }} {% endif %}{% if peer.endpoint is defined %}wgendpoint {{ peer.endpoint }} {{ peer.port }}{% endif %}{% if peer.keepalive is defined %} wgpka {{ peer.keepalive }}{% endif %}
+
+
+{% endfor %}
+
+{% for route in item.routes | default([]) %}
+! route add -inet {{ route }} -link -iface {{ item.device }}
+{% endfor %}
+{% if item.mtu is defined %}
+! ifconfig {{ item.device }} mtu {{ item.mtu }}
+{% endif %}

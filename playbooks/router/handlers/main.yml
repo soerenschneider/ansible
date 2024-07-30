@@ -1,0 +1,49 @@
+---
+- name: Reload nftables
+  ansible.builtin.systemd:
+    name: nftables
+    state: restarted
+    daemon_reload: true
+
+- name: Restart dhcpd
+  ansible.builtin.systemd:
+    name: dhcpd
+    state: restarted
+    daemon_reload: true
+
+- name: Restart nodeexporter
+  ansible.builtin.systemd:
+    name: nodeexporter
+    state: restarted
+    daemon_reload: true
+
+- name: Restart sshd
+  ansible.builtin.systemd:
+    name: sshd
+    state: restarted
+    daemon_reload: true
+
+- name: Restart ntpd
+  ansible.builtin.systemd:
+    name: ntpd
+    state: restarted
+    daemon_reload: true
+
+- name: Restart mtail
+  ansible.builtin.systemd:
+    name: mtail
+    state: restarted
+    daemon_reload: true
+  failed_when: false
+
+- name: Restart tunnelguard
+  ansible.builtin.systemd:
+    name: tunnelguard
+    state: restarted
+    daemon_reload: true
+
+- name: Restart haproxy
+  ansible.builtin.systemd:
+    name: haproxy
+    state: restarted
+    daemon_reload: true

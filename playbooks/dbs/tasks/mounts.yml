@@ -1,0 +1,21 @@
+---
+- name: Create mount directories
+  ansible.builtin.file:
+    path: /mnt/ssd/{{ item.dir }}
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+    recurse: true
+  with_items: ["{{ minio_ext_disk }}", "{{ dbs_ext_disk }}"]
+  tags: [mounts]
+
+- name: Add fstab entry
+  ansible.posix.mount:
+    path: /mnt/ssd/{{ item.dir }}
+    src: "{{ item.dev }}"
+    fstype: "{{ item.fs }}"
+    opts: auto,nofail,noatime
+    state: present
+  with_items: ["{{ minio_ext_disk }}", "{{ dbs_ext_disk }}"]
+  tags: [mounts]

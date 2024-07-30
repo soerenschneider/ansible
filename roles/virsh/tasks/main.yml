@@ -1,0 +1,24 @@
+---
+- name: Install
+  ansible.builtin.dnf:
+    name: [qemu-kvm, libvirt, libvirt-python, libguestfs-tools, virt-install]
+  tags: [libvirt, virt]
+
+- name: Add bridge network
+  ansible.builtin.copy:
+    src: ifcfg-br0
+    dest: /etc/sysconfig/network-scripts/ifcfg-br0
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [libvirt, virt]
+
+- name: Add bridge network
+  ansible.builtin.template:
+    src: ifcfg.j2
+    dest: /etc/sysconfig/network-scripts/ifcfg-{{ ansible_default_ipv4.interface }}
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+  tags: [libvirt, virt]

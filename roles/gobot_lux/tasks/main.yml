@@ -1,0 +1,34 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: gobot-lux
+    github_repo: soerenschneider/gobot-lux
+    service_name: gobot-lux
+  tags: [gobot, gobot-lux, gobot-lux-install, deps]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ gobot_lux_config | to_nice_json }}"
+    dest: "{{ gobot_lux_config_file }}"
+    owner: "{{ gobot_lux_user }}"
+    group: "{{ gobot_lux_group }}"
+    mode: "0644"
+  notify: Restart gobot-lux
+  tags: [gobot, gobot-lux, gobot-lux-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: gobot-lux.service.j2
+    dest: /etc/systemd/system/gobot-lux.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart gobot-lux
+  tags: [gobot, gobot-lux, gobot-lux-configure]
+
+- name: Enable/disable gobot-lux
+  ansible.builtin.service:
+    name: gobot-lux
+    enabled: true
+  tags: [gobot, gobot-lux, gobot-lux-configure]

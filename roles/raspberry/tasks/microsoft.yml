@@ -1,0 +1,12 @@
+---
+- name: Delete vscode entry
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/vscode.list
+    state: absent
+  tags: [raspberry, msfix]
+
+- name: Delete microsoft gpg key
+  ansible.builtin.file:
+    path: /etc/apt/trusted.gpg.d/microsoft.gpg
+    state: absent
+  tags: [raspberry, msfix]

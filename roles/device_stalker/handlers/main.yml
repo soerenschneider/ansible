@@ -1,0 +1,6 @@
+---
+- name: Restart device-stalker
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ device_stalker_service_name }}"
+    state: "restarted"

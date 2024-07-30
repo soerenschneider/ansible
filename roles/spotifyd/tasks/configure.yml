@@ -1,0 +1,44 @@
+---
+- name: Set limits for 'audio' group
+  ansible.builtin.blockinfile:
+    path: /etc/security/limits.conf
+    block: |
+      @audio - rtprio 99
+      @audio - memlock unlimited
+      @audio - nice -10
+  tags: [spotifyd, spotifyd-configure]
+
+- name: Create spotifyd dir
+  ansible.builtin.file:
+    path: /etc/spotifyd
+    state: directory
+    owner: "{{ spotifyd_user }}"
+    group: root
+    mode: "0750"
+  tags: [spotifyd, spotifyd-configure]
+
+- name: Write spotifyd config
+  ansible.builtin.template:
+    src: spotifyd.conf.j2
+    dest: /etc/spotifyd/spotifyd.conf
+    owner: "{{ spotifyd_user }}"
+    group: root
+    mode: "0440"
+  notify: Restart spotifyd
+  tags: [spotifyd, spotifyd-configure]
+
+- name: Write systemd config
+  ansible.builtin.template:
+    src: spotifyd.service.j2
+    dest: /etc/systemd/system/spotifyd.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart spotifyd
+  tags: [spotifyd, spotifyd-configure]
+
+- name: Enable spotifyd service
+  ansible.builtin.service:
+    name: spotifyd
+    enabled: true
+  tags: [spotifyd, spotifyd-configure]

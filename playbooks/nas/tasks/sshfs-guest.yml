@@ -1,0 +1,31 @@
+---
+- name: Add the user '{{ sftp_media_user.name }}'
+  ansible.builtin.user:
+    name: "{{ sftp_media_user.name }}"
+    password: "{{ sftp_media_user.pass }}"
+    shell: /sbin/nologin
+    append: true
+  tags: guestuser
+
+- name: Map '{{ sftp_media_user.name }}' login to guest_u user
+  ansible.posix.selogin:
+    login: "{{ sftp_media_user.name }}"
+    seuser: user_u
+    state: present
+  when: ansible_selinux
+  tags: guestuser
+
+- name: Set authorized_keys
+  ansible.posix.authorized_key:
+    key: "{{ authorized_keys }}"
+    exclusive: true
+    user: "{{ sftp_media_user.name }}"
+  tags: guestuser
+
+- name: Permanently enable 'selinuxuser_use_ssh_chroot'
+  ansible.posix.seboolean:
+    name: selinuxuser_use_ssh_chroot
+    state: true
+    persistent: true
+  when: ansible_selinux
+  tags: guestuser

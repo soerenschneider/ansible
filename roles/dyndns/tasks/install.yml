@@ -1,0 +1,27 @@
+---
+- name: Create dyndns system group
+  ansible.builtin.group:
+    name: "{{ dyndns_group }}"
+    system: true
+    state: present
+  when: dyndns_group != "root"
+  tags: [dyndns, dyndns-install]
+
+- name: Create dyndns system user
+  ansible.builtin.user:
+    name: "{{ dyndns_user }}"
+    system: true
+    shell: /sbin/nologin
+    group: "{{ dyndns_user }}"
+    createhome: "{% if dyndns_server_config is defined %}true{% else %}false{% endif %}"
+  when: dyndns_user != "root"
+  tags: [dyndns, dyndns-install]
+
+- name: Create dyndns config dir
+  ansible.builtin.file:
+    path: "{{ dyndns_config_dir }}"
+    state: directory
+    owner: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
+    mode: "0700"
+  tags: [dyndns, dyndns-install]

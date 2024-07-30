@@ -1,0 +1,20 @@
+---
+- name: Including role
+  ansible.builtin.include_tasks: dnf.yml
+  when: ansible_os_family == 'RedHat'
+  tags: always
+
+- name: Including role
+  ansible.builtin.include_tasks: apt.yml
+  when: ansible_os_family == 'Debian'
+  tags: always
+
+- name: Including role
+  ansible.builtin.include_role:
+    name: needrestart
+  tags: always
+
+- name: Including role
+  ansible.builtin.include_role:
+    name: conditional_reboot
+  tags: always

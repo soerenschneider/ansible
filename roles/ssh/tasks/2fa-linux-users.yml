@@ -1,0 +1,43 @@
+---
+- name: Make sure totp secrets dir exists
+  ansible.builtin.file:
+    path: /home/{{ user }}/.ssh
+    state: directory
+    owner: "{{ user }}"
+    group: root
+    mode: "0700"
+  tags: [ssh, base, ssh-2fa]
+
+- name: Check whether totp secret exists for user {{ user }}
+  ansible.builtin.stat:
+    path: /home/{{ user }}/.ssh/google_authenticator
+  register: totp
+  tags: [ssh, base, ssh-2fa]
+
+- name: Create missing totp secrets for user {{ user }} (RHEL)
+  when: [not totp.stat.exists, ansible_os_family == "RedHat"]
+  tags: [ssh, ssh-2fa, base]
+  block:
+    - name: Print debug information
+      ansible.builtin.command: google-authenticator -C -t -f -d -r 3 -R 30 -W -s /home/{{ user }}/.ssh/google_authenticator
+      changed_when: true
+      register: secret
+
+    - name: Print secret for user {{ user }}
+      ansible.builtin.debug:
+        msg: "{{ secret.stdout }}"
+      when: not totp.stat.exists
+
+- name: Create missing totp secrets for user {{ user }} (Debian)
+  when: [not totp.stat.exists, ansible_os_family == "Debian"]
+  tags: [ssh, base, ssh-2fa]
+  block:
+    - name: Print debug information
+      ansible.builtin.command: google-authenticator -t -f -d -r 3 -R 30 -W -s /home/{{ user }}/.ssh/google_authenticator
+      changed_when: true
+      register: secret
+
+    - name: Print secret for user {{ user }}
+      ansible.builtin.debug:
+        msg: "{{ secret.stdout }}"
+      when: not totp.stat.exists

@@ -1,0 +1,54 @@
+[http]
+  [http.routers]
+    [http.routers.nodeexporter]
+      rule = "Host(`{{ node_exporter_traefik.domain | default(traefik_hostname) }}`) && PathPrefix(`/metrics`)"
+      service = "nodeexporter"
+{% if not node_exporter_traefik.disable_auth | default(False) %}
+      middlewares = ["auth", "secureheaders"]
+{% else %}
+      middlewares = ["secureheaders"]
+{% endif %}
+      [http.routers.nodeexporter.tls]
+        certResolver = "{{ node_exporter_traefik_resolver | default('default') }}"
+        options = "default"
+    [http.routers.nodeexporter-1]
+      rule = "Host(`{{ node_exporter_traefik.domain | default(traefik_hostname) }}`) && PathPrefix(`/metrics`)"
+      service = "nodeexporter"
+      middlewares = ["redir"]
+
+  [http.middlewares]
+    [http.middlewares.redir.redirectScheme]
+      scheme = "https"
+      permanent = true
+
+    [http.middlewares.secureheaders.headers]
+      accessControlAllowHeaders = ["X-nodeexporter-Session-Id"]
+      forcestsheader = true
+      sslRedirect = true
+      STSPreload = true
+      ContentTypeNosniff = true
+      BrowserXssFilter = true
+      STSIncludeSubdomains = true
+      STSSeconds = 315360000
+
+{% if not node_exporter_traefik.disable_auth | default(False) %}
+    [http.middlewares.auth.basicAuth]
+      users = [
+        "{{ node_exporter_traefik.auth }}"
+      ]
+{% endif %}
+
+  [http.services]
+    [http.services.nodeexporter]
+      [http.services.nodeexporter.loadBalancer]
+	#passHostHeader = true
+        [[http.services.nodeexporter.loadBalancer.servers]]
+          url = "http://{{ node_exporter_web_listen_address }}"
+
+[tls]
+  [tls.options]
+    [tls.options.default]
+      minVersion = "VersionTLS12"
+      sniStrict = true
+      preferServerCipherSuites = true
+      curvePreferences = ["CurveP521", "CurveP384"]

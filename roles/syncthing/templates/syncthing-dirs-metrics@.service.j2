@@ -1,0 +1,7 @@
+[Unit]
+Description=Syncthing dirs metrics service
+
+[Service]
+Type=oneshot
+ExecStart=python3 /usr/local/bin/syncthing_dirs_metrics
+EnvironmentFile=/etc/syncthing-dirs-metrics-%i.env

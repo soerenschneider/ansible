@@ -1,0 +1,25 @@
+---
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ mosquitto_exporter_user }}"
+    system: true
+  tags: [mosquitto, mosquitto_exporter]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: mosquitto-exporter.service.j2
+    dest: /etc/systemd/system/mosquitto-exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: _mosquitto_exporter_service
+  notify: Restart mosquitto_exporter
+  tags: [mosquitto, mosquitto_exporter]
+
+- name: Enable and start mosquitto_exporter
+  ansible.builtin.systemd:
+    name: mosquitto-exporter
+    enabled: true
+    state: started
+    daemon_reload: "{% if _mosquitto_exporter_service is changed %}true{% else %}false{% endif %}"
+  tags: [mosquitto, mosquitto_exporter]

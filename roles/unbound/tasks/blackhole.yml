@@ -1,0 +1,10 @@
+---
+- name: Create blackhole file
+  ansible.builtin.template:
+    src: blackhole.db.j2
+    dest: "{{ unbound_blackhole_file }}"
+    owner: root
+    group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}root{% endif %}"
+    mode: "0640"
+  notify: Restart unbound
+  tags: [unbound, unbound-configure, unbound-blackhole]

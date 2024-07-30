@@ -1,0 +1,60 @@
+---
+- name: Allow ed25519 host key
+  ansible.builtin.lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: ^HostKey /etc/ssh/ssh_host_ed25519_key
+    line: HostKey /etc/ssh/ssh_host_ed25519_key
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Allow rsa host key
+  ansible.builtin.lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: ^HostKey /etc/ssh/ssh_host_rsa_key
+    line: HostKey /etc/ssh/ssh_host_rsa_key
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Disable ecdsa host key
+  ansible.builtin.lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: ^HostKey /etc/ssh/ssh_host_ecdsa_key
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Disable dsa host key
+  ansible.builtin.lineinfile:
+    dest: /etc/ssh/sshd_config
+    regexp: ^HostKey /etc/ssh/ssh_host_dsa_key
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Delete ecdsa host pub key
+  ansible.builtin.file:
+    dest: /etc/ssh/ssh_host_ecdsa_key.pub
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Delete ecdsa host private key
+  ansible.builtin.file:
+    dest: /etc/ssh/ssh_host_ecdsa_key
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Delete dsa host pub key
+  ansible.builtin.file:
+    dest: /etc/ssh/ssh_host_dsa_key.pub
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]
+
+- name: Delete dsa host private key
+  ansible.builtin.file:
+    dest: /etc/ssh/ssh_host_dsa_key
+    state: absent
+  notify: Restart_sshd
+  tags: [ssh, base]

@@ -1,0 +1,16 @@
+---
+- name: Destroy cockroachdb cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Delete docker container
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+      with_items: ["{{ cockroachdb_container_name }}"]
+
+    - name: Delete data folder
+      ansible.builtin.file:
+        path: /etc/cockroachdb/storage
+        state: absent

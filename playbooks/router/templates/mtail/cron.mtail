@@ -1,0 +1,25 @@
+counter mtail_cron_executions by user
+
+def syslog {
+  /^(?P<date>(?P<legacy_date>\w+\s+\d+\s+\d+:\d+:\d+)|(?P<rfc3339_date>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+[+-]\d{2}:\d{2}))/ +
+  /\s+(?:\w+@)?(?P<hostname>[\w\.-]+)\s+(?P<application>[\w\.-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)/ {
+    # If the legacy_date regexp matched, try this format.
+    len($legacy_date) > 0 {
+      strptime($2, "Jan _2 15:04:05")
+    }
+    # If the RFC3339 style matched, parse it this way.
+    len($rfc3339_date) > 0 {
+      strptime($rfc3339_date, "2006-01-02T03:04:05-0700")
+    }
+    # Call into the decorated block
+    next
+  }
+}
+
+getfilename() =~ /cron/ {
+    @syslog {
+        /\((?P<user>\S+)\) CMD \(.*\)$/ {
+            mtail_cron_executions[$user]++
+	    }
+    }
+}

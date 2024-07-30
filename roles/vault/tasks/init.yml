@@ -1,0 +1,45 @@
+---
+- name: Run block
+  when: vault_storage_files.matched == 0
+  tags: [vault, vault-configure]
+  block:
+    - name: Add gpg keys
+      ansible.builtin.copy:
+        content: "{{ item }}"
+        dest: "{{ vault_dir }}/gpg"
+        owner: vault
+        group: vault
+        mode: "0640"
+      delegate_to: "{{ vault_cluster_first_node }}"
+      run_once: true
+      with_items: "{{ vault_gpg_keys }}"
+
+    - name: Init vault
+      ansible.builtin.command: vault operator init -n=1 -t=1 {% if vault_gpg_keys | default([]) | length > 0 %}-pgp-keys /etc/vault.d/gpg -root-token-pgp-key /etc/vault.d/gpg{% endif %}
+      become: true
+      become_user: vault
+      environment:
+        VAULT_ADDR: "{{ vault_address }}"
+      delegate_to: "{{ vault_cluster_first_node }}"
+      run_once: true
+      changed_when: false
+      register: vault_init
+
+    - name: Download vault init log to /tmp/vault-init.txt
+      ansible.builtin.copy:
+        content: "{{ vault_init.stdout }}"
+        dest: ~/vault-init.txt
+        mode: "0600"
+      delegate_to: "{{ vault_cluster_first_node }}"
+      run_once: true
+      when: vault_gpg_keys | default([]) | length > 0
+
+    - name: Download vault init log to /tmp/vault-init.txt
+      ansible.builtin.copy:
+        content: "{{ vault_init.stdout }}"
+        dest: /tmp/vault-init.txt
+        mode: "0600"
+      when: vault_gpg_keys | default([]) | length > 0
+      delegate_to: localhost
+      run_once: true
+      become: false

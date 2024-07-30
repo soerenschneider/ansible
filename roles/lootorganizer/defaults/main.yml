@@ -1,0 +1,3 @@
+---
+lootorganizer_git_dir: "{{ ansible_user }}/lootorganizer"
+lootorganizer_base_dir: /srv/lootorganizer

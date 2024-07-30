@@ -1,0 +1,3 @@
+---
+metrics_emitter_bins: /var/lib/metrics-emitter
+metrics_emitter_prefix: metrics_emitter

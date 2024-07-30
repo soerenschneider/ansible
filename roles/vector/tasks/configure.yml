@@ -1,0 +1,38 @@
+---
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ vector_config | to_nice_yaml }}"
+    dest: "{{ vector_config_file }}"
+    owner: "{{ vector_user }}"
+    group: root
+    mode: "0640"
+  notify: Restart vector
+  tags: [vector, vector-configure]
+
+- name: Add systemd units
+  ansible.builtin.template:
+    src: vector.service.j2
+    dest: /etc/systemd/system/vector.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart vector
+  tags: [vector, vector-configure]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags: [vector, vector-configure]
+
+- name: Enable vector
+  ansible.builtin.systemd:
+    name: vector
+    enabled: true
+  tags: [vector, vector-configure]
+
+- name: Start vector
+  ansible.builtin.systemd:
+    name: vector
+    state: started
+  failed_when: false
+  tags: [vector, vector-configure]

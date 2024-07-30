@@ -1,0 +1,16 @@
+---
+# renovate: datasource=github-releases depName=soerenschneider/conditional-reboot
+conditional_reboot_version: v1.6.0
+conditional_reboot_config_file: /etc/conditional-reboot.json
+conditional_reboot_journal_file: /var/log/conditional-reboot.log
+conditional_reboot_user: conditional-reboot
+
+conditional_reboot_allow_ping: false
+# conditional_reboot_metrics_dir: /var/lib/node_exporter
+# conditional_reboot_user_additional_groups: []
+conditional_reboot_check_from: 02:00
+conditional_reboot_check_to: 03:00
+
+conditional_reboot_perform_reboot: true
+conditional_reboot_timer: "*-*-* 3:15:00"
+conditional_reboot_timer_random_delay_s: 7200

@@ -1,0 +1,76 @@
+---
+- name: Setup seedbox
+  hosts: seedbox
+  become: true
+  tasks:
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: platform
+      tags: [always]
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: certbot
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: lootorganizer
+      tags: always
+
+    - name: Add group loot
+      ansible.builtin.group:
+        name: loot
+        state: present
+      tags: [transmission, torrent, script]
+
+    - name: Add scripts for transmission
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: /usr/local/bin/{{ item }}
+        owner: root
+        group: root
+        mode: "0755"
+      with_items: [transmission-script-torrent-added.sh, transmission-script-torrent-done.sh]
+      tags: [transmission, torrent, script]
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: transmission
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always
+
+    - name: Allow incoming wireguard
+      community.general.ufw:
+        rule: allow
+        interface: wg0
+        direction: in
+      tags: firewall
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: ip_plz
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/ip-plz.yaml
+      tags: always
+
+  handlers:
+    - name: Restart haproxy
+      ansible.builtin.systemd:
+        state: restarted
+        name: haproxy
+      failed_when: false
+
+    - name: Run ip-plz renewal hook
+      ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
+      changed_when: true

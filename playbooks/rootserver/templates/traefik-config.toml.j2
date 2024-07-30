@@ -1,0 +1,55 @@
+defaultEntryPoints = ["https"]
+
+[entryPoints]
+  [entryPoints.prom]
+  address = "127.0.0.1:9101"
+  [entryPoints.http]
+  address = ":8080"
+    [entryPoints.http.redirect]
+      regex = "^http://(.*)"
+      replacement = "https://$1"
+      permanent = true
+  [entryPoints.https]
+  address = ":8443"
+    [entryPoints.https.tls]
+    minVersion = "VersionTLS12"
+    cipherSuites = [
+      "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384",
+      "TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305",
+      "TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256",
+      "TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256",
+      "TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256"
+    ]
+
+
+[acme]
+  email = "{{ traefik_acme_email }}"
+  entryPoint = "https"
+  storage = "{{ traefik_runtime_dir }}/acme.json"
+
+  {% if traefik_acme_use_staging is defined and traefik_acme_use_staging %}
+  caServer = "https://acme-staging-v02.api.letsencrypt.org/directory"
+  {% endif %}
+
+  [acme.httpChallenge]
+    entryPoint = "http"
+
+  {% for domain in traefik_acme_domains %}
+  [[acme.domains]]
+    main = "{{ domain }}"
+  {% endfor %}
+
+[traefikLog]
+  filePath = "/var/log/traefik/traefik.log"
+
+[accessLog]
+  filePath = "/var/log/traefik/access.log"
+  [accessLog.filters]
+    statusCodes = ["400-503"]
+
+[docker]
+endpoint = "unix:///var/run/docker.sock"
+watch = true

@@ -1,0 +1,19 @@
+---
+- name: Install vault
+  ansible.builtin.include_tasks: install-archive.yml
+  tags: [vault, vault-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: hardening.yml
+  when: vault_configure_server
+  tags: [vault, vault-configure, vault-hardening]
+
+- name: Configure vault
+  ansible.builtin.include_tasks: configure.yml
+  when: vault_configure_server
+  tags: [vault, vault-configure]
+
+- name: Init vault
+  ansible.builtin.include_tasks: init.yml
+  when: vault_configure_server
+  tags: [vault, vault-configure]

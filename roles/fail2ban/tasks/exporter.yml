@@ -1,0 +1,41 @@
+---
+- name: Checkout fail2ban-exporter
+  ansible.builtin.git:
+    repo: https://gitlab.com/soerenschneider/fail2ban-exporter
+    dest: "{{ fail2ban_exporter_path }}"
+    version: master
+  notify: Restart fail2ban-exporter
+  tags: [fail2ban, fail2ban-exporter]
+
+- name: Install requirements
+  ansible.builtin.package:
+    name: [python3-venv, python3-virtualenv, virtualenv]
+    install_recommends: false
+  when: ansible_os_family == "Debian"
+  tags: [fail2ban, fail2ban-exporter]
+
+- name: Build venv
+  ansible.builtin.pip:
+    requirements: "{{ fail2ban_exporter_path }}/requirements.txt"
+    virtualenv_ansible.builtin.command: /usr/bin/python3 -m venv
+    virtualenv: "{{ fail2ban_exporter_path }}/venv"
+    extra_args: --upgrade
+  notify: Restart fail2ban-exporter
+  tags: [fail2ban, fail2ban-exporter]
+
+- name: Create exporter config
+  ansible.builtin.template:
+    src: fail2ban-exporter.service.j2
+    dest: /etc/systemd/system/fail2ban-exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban-exporter
+  tags: [fail2ban, fail2ban-exporter]
+
+- name: Enable fail2ban-exporter
+  ansible.builtin.service:
+    name: fail2ban-exporter
+    state: started
+    enabled: true
+  tags: [fail2ban, fail2ban-exporter]

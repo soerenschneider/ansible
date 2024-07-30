@@ -1,0 +1,31 @@
+---
+acxi_jobs:
+  - name: acxi opus
+    source: "{{ media_dir }}/music"
+    target: "{{ media_dir }}/music-opus"
+    type: opus
+    quality: 128
+  - name: all
+    hour: "1"
+    minute: "0"
+    user: "{{ nas_media_user }}"
+
+acxi_jobs_hooks: [/usr/local/bin/sync-opus-collection]
+rclone_backup_hour: 3
+rclone_backup_minute: 0
+
+rclone_backup_definitions:
+  - name: scans-dropbox
+    user: "{{ nas_media_user }}"
+    src: "{{ disk.mountpoint }}/scans-crypt"
+    dst: dropbox:scans
+    excludes: gocryptfs.conf
+  - name: documents-dropbox
+    user: "{{ nas_media_user }}"
+    src: "{{ disk.mountpoint }}/documents-crypt"
+    dst: dropbox:documents
+    excludes: gocryptfs.conf
+  - name: all
+    hour: "{{ rclone_backup_hour }}"
+    minute: "{{ rclone_backup_minute }}"
+    user: "{{ nas_media_user }}"

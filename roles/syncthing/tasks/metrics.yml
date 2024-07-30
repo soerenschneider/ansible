@@ -1,0 +1,48 @@
+---
+- name: Add syncthing dirs metrics
+  ansible.builtin.copy:
+    src: syncthing_dirs_metrics.py
+    dest: /usr/local/bin/syncthing_dirs_metrics
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [syncthing, syncthing-metrics]
+
+- name: Add systemd service for syncthing dirs metrics
+  ansible.builtin.template:
+    src: syncthing-dirs-metrics@.service.j2
+    dest: /etc/systemd/system/syncthing-dirs-metrics@.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: _systemd_reload_daemon
+  tags: [syncthing, syncthing-metrics]
+
+- name: Add systemd timer for syncthing dirs metrics
+  ansible.builtin.template:
+    src: syncthing-dirs-metrics@.timer.j2
+    dest: /etc/systemd/system/syncthing-dirs-metrics@.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: _systemd_reload_daemon
+  tags: [syncthing, syncthing-metrics]
+
+- name: Add envs for configs
+  ansible.builtin.template:
+    src: syncthing-dirs-metrics.env.j2
+    dest: /etc/syncthing-dirs-metrics-{{ item.identifier }}.env
+    owner: root
+    group: root
+    mode: "0644"
+  with_items: "{{ syncthing_dirs_metrics_config }}"
+  tags: [syncthing, syncthing-metrics]
+
+- name: Enable syncthing dirs metrics timer
+  ansible.builtin.systemd:
+    name: syncthing-dirs-metrics@{{ item.identifier }}.timer
+    enabled: true
+    state: started
+    daemon-reload: true
+  with_items: "{{ syncthing_dirs_metrics_config }}"
+  tags: [syncthing, syncthing-metrics]

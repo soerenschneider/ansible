@@ -1,0 +1,13 @@
+---
+gobot_bme280_user: sensor
+gobot_bme280_group: sensor
+
+gobot_bme280_config_file: /etc/gobot-bme280.json
+
+gobot_bme280_config:
+  location: undefined
+  metrics_addr: :9091
+  gpio_pin: "7"
+  polling_interval_ms: 100
+  mqtt_host: tcp://host:1883
+  mqtt_topic: bla

@@ -1,0 +1,20 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: gpg.yml
+  tags: [gocryptfs, gocryptfs-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: deps.yml
+  tags: [gocryptfs, gocryptfs-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install.yml
+  tags: [gocryptfs, gocryptfs-install, deps]
+
+- name: Allow fuse mounts for others
+  ansible.builtin.lineinfile:
+    line: user_allow_other
+    regexp: ^user_allow_other
+    path: /etc/fuse.conf
+  when: gocryptfs_fuse_allow_other
+  tags: [gocryptfs, gocryptfs-install]

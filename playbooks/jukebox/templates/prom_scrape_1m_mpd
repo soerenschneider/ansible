@@ -1,0 +1,26 @@
+#!/bin/sh
+
+PROMETHEUS_TEXTFILE_DIR="/var/lib/node_exporter"
+METRIC_FILE="$PROMETHEUS_TEXTFILE_DIR/mpd.prom"
+
+STATS=$(mpc stats)
+
+ARTISTS_METRIC="mpd_artists_total"
+echo "# TYPE $ARTISTS_METRIC gauge" > $METRIC_FILE
+ARTISTS=$(echo "$STATS" | grep "Artists: " | sed 's/ //g' | cut -d":" -f2)
+echo "$ARTISTS_METRIC $ARTISTS" >> $METRIC_FILE
+
+ALBUMS_METRIC="mpd_albums_total"
+echo "# TYPE $ALBUMS_METRIC gauge" >> $METRIC_FILE
+ALBUMS=$(echo "$STATS" | grep "Albums: " | sed 's/ //g' | cut -d":" -f2)
+echo "$ALBUMS_METRIC $ALBUMS" >> $METRIC_FILE
+
+SONGS_METRIC="mpd_songs_total"
+echo "# TYPE $SONGS_METRIC gauge" >> $METRIC_FILE
+SONGS=$(echo "$STATS" | grep "Songs: " | sed 's/ //g' | cut -d":" -f2)
+echo "$SONGS_METRIC $SONGS" >> $METRIC_FILE
+
+IS_PLAYING_METRIC="mpd_is_playing_bool"
+echo "# TYPE $IS_PLAYING_METRIC gauge" >> $METRIC_FILE
+IS_PLAYING="$(mpc status | grep '\[playing\]' | wc -l)"
+echo "$IS_PLAYING_METRIC $IS_PLAYING" >> $METRIC_FILE

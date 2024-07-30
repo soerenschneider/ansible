@@ -1,0 +1,119 @@
+---
+- name: Torrent - transmission - install transmission
+  ansible.builtin.package:
+    name: [transmission-daemon, transmission-cli]
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - open udp port
+  ansible.posix.firewalld:
+    port: "{{ transmission_peer_port }}/udp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when: [transmission_open_peer_port, ansible_os_family == "RedHat"]
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - open tcp port
+  ansible.posix.firewalld:
+    port: "{{ transmission_peer_port }}/tcp"
+    permanent: true
+    state: enabled
+    immediate: true
+  when: [transmission_open_peer_port, ansible_os_family == "RedHat"]
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - set receive buffer
+  ansible.posix.sysctl:
+    name: net.core.rmem_max
+    value: "4194304"
+    state: present
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - set send buffer
+  ansible.posix.sysctl:
+    name: net.core.wmem_max
+    value: "1048576"
+    state: present
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - enable transmission daemon
+  ansible.builtin.systemd:
+    name: transmission-daemon
+    enabled: true
+  tags: [transmission, torrent]
+# transmission must not be running while doing config changes
+- name: Torrent - transmission - temporarily stop daemon
+  ansible.builtin.systemd:
+    name: transmission-daemon
+    state: stopped
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - create config folder
+  ansible.builtin.file:
+    path: "{{ transmission_base_dir }}/.config/transmission-daemon"
+    state: directory
+    owner: "{{ transmission_user }}"
+    group: "{{ transmission_download_dir_group }}"
+    mode: "0770"
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - create incomplete dir
+  ansible.builtin.file:
+    path: "{{ transmission_incomplete_dir }}"
+    state: directory
+    mode: "02775"
+    owner: "{{ transmission_user }}"
+    group: "{{ transmission_download_dir_group }}"
+  when: transmission_incomplete_dir_enabled
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - create downloads dir
+  ansible.builtin.file:
+    path: "{{ transmission_download_dir }}"
+    state: directory
+    mode: "02775"
+    owner: "{{ transmission_user }}"
+    group: "{{ transmission_download_dir_group }}"
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - stop transmission daemon if running
+  ansible.builtin.systemd:
+    name: transmission-daemon
+    state: stopped
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - build config
+  ansible.builtin.template:
+    src: settings.json.j2
+    dest: "{{ transmission_base_dir }}/.config/transmission-daemon/settings.json"
+    owner: "{{ transmission_user }}"
+    group: "{{ transmission_group }}"
+    mode: "0600"
+  register: transmission_config
+  tags: [transmission, torrent]
+
+- name: Add systemd override directory
+  ansible.builtin.file:
+    name: /etc/systemd/system/transmission-daemon.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [transmission, torrent]
+
+- name: Add systemd override config
+  ansible.builtin.template:
+    src: transmission-daemon.override.conf.j2
+    dest: /etc/systemd/system/transmission-daemon.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0640"
+  tags: [transmission, torrent]
+
+- name: Torrent - transmission - enable transmission service
+  ansible.builtin.systemd:
+    name: transmission-daemon
+    enabled: true
+    daemon-reload: true
+    state: started
+  tags: [transmission, torrent]

@@ -1,0 +1,21 @@
+[Unit]
+Description=Ansible Gitops runner
+After=network-online.target
+Wants=network-online.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/local/bin/aplos -config {{ aplos_config_file }}
+NoNewPrivileges=true
+PrivateTmp=yes
+User={{ aplos_user }}
+Group={{ aplos_group }}
+
+# restart forever
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

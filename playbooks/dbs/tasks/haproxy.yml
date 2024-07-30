@@ -1,0 +1,64 @@
+---
+- name: Including role
+  ansible.builtin.include_role:
+    name: haproxy
+  tags: always
+
+- name: Add configuration block
+  ansible.builtin.blockinfile:
+    path: /etc/haproxy/haproxy.cfg
+    block: |
+      listen stats
+          bind *:9000 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+                  # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          acl is_prom ssl_c_s_dn(cn) -m beg sauron
+          http-request use-service prometheus-exporter if is_prom
+
+          stats enable
+          stats hide-version
+          stats realm Haproxy\ Statistics
+          stats uri /stats if
+
+      frontend mysqld_exporter
+          bind *:9144 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+                  # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend mysqld_exporter
+
+      frontend node_exporter
+          bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+                  # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend node_exporter
+
+      backend mysqld_exporter
+        option httpchk
+        server node_exporter 127.0.0.1:9104 check inter 5m
+
+      backend node_exporter
+        option httpchk
+        server node_exporter 127.0.0.1:9100 check inter 5m
+
+      listen galera
+        bind *:3307
+        balance source
+        mode tcp
+        option tcpka
+        option tcplog
+
+        server mariadb-{{ location | default('0') }} localhost:3306 check
+        {% for node in groups['dbs'] -%}
+        {%- if node != inventory_hostname -%}
+        server mariadb-{{ hostvars[node].location }}-{{ loop.index }} {{ node }}:3306 check backup
+        {% endif -%}
+        {% endfor -%}
+
+  notify: Restart haproxy
+  tags: [haproxy]

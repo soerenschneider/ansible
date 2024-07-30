@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+LIVE_DIR=/etc/letsencrypt/live/
+HAPROXY_DIR=/etc/haproxy
+WHITELIST="{{ certbot_haproxy_whitelist_domain | default('') }}"
+RESTART="false"
+
+command -v haproxy || exit 0
+
+if [ ! -d ${LIVE_DIR} ]; then
+    echo "dir doesn't exist"
+    exit 1
+fi
+
+for dir in "${LIVE_DIR}"/*/; do
+    dir=${dir%*/}
+    host="$(basename ${dir})"
+
+    if [ -n "${WHITELIST}" ] && [ "${WHITELIST}" != "${host}" ]; then
+	    echo "${host} does not match ${WHITELIST}, continuing"
+	    continue
+    fi
+
+    cat "${dir}/fullchain.pem" "${dir}/privkey.pem" > "${HAPROXY_DIR}/${host}.pem"
+    RESTART="true"
+done
+
+if [[ "${RESTART}" = "true" ]]; then
+        echo "Restarting haproxy"
+        systemctl restart haproxy
+fi

@@ -1,0 +1,22 @@
+[Unit]
+Description=Run occult to unlock something - {{ occult_service_identifier }}
+After=network.target
+After=systemd-user-sessions.service
+After=network-online.target
+
+[Service]
+# resilience
+Restart=on-failure
+RestartSec=120
+StartLimitInterval=60
+StartLimitBurst=5
+
+User={{ occult_user }}
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/occult
+TimeoutSec=90
+Environment="OCCULT_CONFIG_FILE={{ occult_config_file }}"
+
+[Install]
+WantedBy=multi-user.target

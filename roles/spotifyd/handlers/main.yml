@@ -1,0 +1,5 @@
+---
+- name: Restart spotifyd
+  ansible.builtin.service:
+    name: spotifyd
+    state: restarted

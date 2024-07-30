@@ -1,0 +1,18 @@
+#!/bin/sh
+
+METRIC_PREFIX="metrics_emitter_gocryptfs_mount"
+
+echo "# HELP ${METRIC_PREFIX}_active_bool Shows whether a gocryptfs dir is mounted or not"
+echo "# TYPE ${METRIC_PREFIX}_active_bool gauge"
+
+for dir in {{ gocryptfs_mounts | map(attribute='path') | join(' ') }}; do
+	success=0
+	if mountpoint -q -- "${dir}"; then
+		success=1
+	fi
+	echo "${METRIC_PREFIX}_active_bool{dir=\"$dir\"} ${success}"
+done
+
+echo "# HELP ${METRIC_PREFIX}_heartbeat_seconds Shows whether a gocryptfs dir is mounted or not"
+echo "# TYPE ${METRIC_PREFIX}_heartbeat_seconds gauge"
+echo "${METRIC_PREFIX}_heartbeat_seconds $(date +%s)"

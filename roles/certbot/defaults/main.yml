@@ -1,0 +1,5 @@
+---
+# certbot_email: ""
+certbot_domains: []
+certbot_http_domains: []
+certbot_dns_domains: []

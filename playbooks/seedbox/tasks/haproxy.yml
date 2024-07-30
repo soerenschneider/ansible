@@ -1,0 +1,57 @@
+---
+- name: Including role
+  ansible.builtin.include_role:
+    name: haproxy
+  tags: always
+
+- name: Add configuration block
+  ansible.builtin.blockinfile:
+    path: /etc/haproxy/haproxy.cfg
+    block: |
+      listen stats
+          bind *:9000 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # deny request if not the correct domain name
+          http-request deny unless { hdr(host) {{ inventory_hostname }}:9000 }
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+          # make sure cn starts with 'sauron'
+          acl is_prom ssl_c_s_dn(cn) -m beg sauron
+          http-request use-service prometheus-exporter if is_prom
+
+          stats enable
+          stats hide-version
+          stats realm Haproxy\ Statistics
+          stats uri /stats if
+
+      frontend https_front_int
+          bind *:443 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
+          mode http
+          # deny request if not the correct domain name
+          http-request deny unless { hdr(host) {{ inventory_hostname }} }
+          # use transmission backend directly if ssl is verified
+          # use_backend transmission if !{ ssl_c_used 1 } || !{ ssl_c_verify 0 } || !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+
+          default_backend transmission
+
+      frontend node_exporter
+          bind *:9443 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # deny request if not the correct domain name
+          http-request deny unless { hdr(host) {{ inventory_hostname }}:9443 }
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          use_backend node_exporter
+
+      backend transmission
+          option forwardfor
+          http-request set-header X-Forwarded-Port %[dst_port]
+          http-request add-header X-Forwarded-Proto https if { ssl_fc }
+          server transmission 192.168.200.5:9091
+
+      backend node_exporter
+          option httpchk
+          server node_exporter 127.0.0.1:9100 check inter 5m
+  notify: Restart haproxy
+  tags: [haproxy]

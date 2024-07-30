@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=dufs fileserver
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ dufs_user }}
+Group={{ dufs_group | default('root') }}
+ExecStart=/usr/local/bin/dufs "{{ dufs_dir }}"
+
+PrivateTmp=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=full
+
+SyslogIdentifier=shutdown-listener
+
+# restart forever
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

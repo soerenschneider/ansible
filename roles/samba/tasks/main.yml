@@ -1,0 +1,12 @@
+---
+- name: Install
+  ansible.builtin.include_tasks: install.yml
+  tags: [samba, samba-install]
+
+- name: Users
+  ansible.builtin.include_tasks: users.yml
+  tags: [samba, samba-users, samba-configure]
+
+- name: Configure
+  ansible.builtin.include_tasks: configure.yml
+  tags: [samba, samba-configure]

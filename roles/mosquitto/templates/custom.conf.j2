@@ -1,0 +1,19 @@
+per_listener_settings true
+
+{% if mosquitto_plain_listener %}
+listener 1883 {% if mosquitto_plain_listener_expose == false %}localhost{% endif%} 
+max_connections {{ mosquitto_max_connections }}
+allow_anonymous {{ mosquitto_plain_allow_anonymous | default(false) | string | lower }}
+{% endif %}
+
+{% if mosquitto_tls_listener %}
+listener 8883
+tls_version tlsv1.3
+allow_anonymous {{ mosquitto_tls_allow_anonymous | default(false) | string | lower }}
+
+require_certificate {{ mosquitto_tls_require_cert | default(true) | string | lower }}
+use_identity_as_username {{ mosquitto_tls_identity_as_username | string | lower }}
+cafile {{ mosquitto_tls_ca_file }}
+certfile {{ mosquitto_tls_crt_file }} 
+keyfile {{ mosquitto_tls_key_file }}
+{% endif %}

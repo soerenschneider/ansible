@@ -1,0 +1,28 @@
+---
+- name: Add {{ node_exporter_group }} system group
+  ansible.builtin.group:
+    name: "{{ node_exporter_group }}"
+    system: true
+    state: present
+  tags: [monitoring, node_exporter, node_exporter-install]
+
+- name: Add the user {{ node_exporter_user }}
+  ansible.builtin.user:
+    name: "{{ node_exporter_user }}"
+    system: true
+    state: present
+    create_home: false
+    shell: /bin/false
+  tags: [monitoring, node_exporter, node_exporter-install]
+
+- name: Add users to the '{{ node_exporter_group }}' group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: ["{{ node_exporter_group }}"]
+    append: true
+  with_items: "{{ node_exporter_add_users }}"
+  tags: [monitoring, node_exporter, node_exporter-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  tags: [monitoring, node_exporter, node_exporter-install, deps]

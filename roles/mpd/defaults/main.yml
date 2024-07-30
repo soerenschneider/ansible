@@ -1,0 +1,17 @@
+---
+mpd_user: mpd
+mpd_bind_address: any
+mpd_music_path: ""
+mpd_output_device: hw:1,0
+mpd_output_device_dop: false
+mpd_buffer_size: 4096
+mpd_buffer_before_play: 25%
+
+mpd_input_cache_enabled: true
+mpd_input_cache_size: "512 MB"
+
+mpd_db:
+  type: simple
+  path: /var/lib/mpd/tag_cache
+
+mpd_passwords: []

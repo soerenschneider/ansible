@@ -1,0 +1,11 @@
+---
+- name: Reset MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Delete docker container
+      community.docker.docker_container:
+        name: "{{ item }}"
+        state: absent
+      with_items: [mysqld-exporter, "{{ mariadb_container_name }}"]

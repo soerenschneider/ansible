@@ -1,0 +1,32 @@
+---
+- name: "Install ethtool"
+  ansible.builtin.package:
+    name: "ethtool"
+  tags: [base, ethtool, wol, wake-on-lan]
+
+- name: "Create systemd service for Wake-on-LAN"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/wol.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Configure Wake On LAN
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/sbin/ethtool -s {{ baseline_wol_device }} wol g
+
+      [Install]
+      WantedBy=multi-user.target
+  register: _wol_service
+  tags: [base, ethtool, wol, wake-on-lan]
+
+- name: "Enable and start wol.service"
+  ansible.builtin.systemd:
+    name: "wol.service"
+    enabled: true
+    daemon_reload: "{% if _wol_service is changed %}true{% else %}false{% endif %}"
+    state: started
+  tags: [base, ethtool, wol, wake-on-lan]

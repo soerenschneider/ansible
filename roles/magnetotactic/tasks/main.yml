@@ -1,0 +1,19 @@
+---
+- name: Install python3
+  ansible.builtin.package:
+    name: [python3, python3-venv, python3-pip, make]
+  tags: [magnetotactic, magnetotactic-install]
+
+- name: Clone repository
+  ansible.builtin.git:
+    repo: https://gitlab.com/soerenschneider/magnetotactic.git
+    dest: "{{ magnetotactic_git_dir }}"
+    version: master
+  tags: [magnetotactic, magnetotactic-install]
+
+- name: Install magnetotactic
+  ansible.builtin.command: make install
+  args:
+    chdir: "{{ magnetotactic_git_dir }}"
+  changed_when: true
+  tags: [magnetotactic, magnetotactic-install]

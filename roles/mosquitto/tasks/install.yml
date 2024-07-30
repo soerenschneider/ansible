@@ -1,0 +1,5 @@
+---
+- name: Install mosquitto
+  ansible.builtin.package:
+    name: mosquitto
+  tags: [mosquitto, mosquitto-install]

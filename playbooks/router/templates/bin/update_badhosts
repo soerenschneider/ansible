@@ -1,0 +1,59 @@
+#!/bin/sh
+
+set -e
+
+# define vars
+TMP_DIR="/tmp/pfbadhosts"
+PF_BADHOSTS_FILE={{ pf_badhosts_file }}
+UNPRIV_USER={{ pf_tables_update_user }}
+PROMETHEUS_TEXTFILE_DIR="{{ prometheus_text_dir }}"
+METRIC_FILE="$PROMETHEUS_TEXTFILE_DIR/pf_bad_hosts.prom"
+
+# delete dir on error
+trap 'rm -r $TMP_DIR' ERR
+
+# start measuring the time
+START=$SECONDS
+
+mkdir $TMP_DIR
+cd $TMP_DIR 
+
+# Download popular IP blocklists and parse
+ftp https://www.binarydefense.com/banlist.txt
+ftp https://rules.emergingthreats.net/blockrules/compromised-ips.txt
+ftp https://rules.emergingthreats.net/fwrules/emerging-Block-IPs.txt
+ftp https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level3.netset
+ftp https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset
+ftp https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset
+perl -lne 'print if ! /^\s*(#.*)?$/' *.txt *.netset | sort -uV > pf_badhosts.txt
+
+# Block Shodan
+ftp https://isc.sans.edu/api/threatlist/shodan/shodan.txt 
+egrep -o '([[:digit:]]{1,3}\.){3}[[:digit:]]{1,3}' shodan.txt >> pf_badhosts.txt
+
+# Move banlist into /etc and reload the pf table
+doas cp $TMP_DIR/pf_badhosts.txt $PF_BADHOSTS_FILE
+doas pfctl -t pfbadhosts -T replace -f $PF_BADHOSTS_FILE
+
+# Clean up after ourselves
+rm -r $TMP_DIR
+
+# end
+END=$SECONDS
+DURATION=$((END - START))
+
+# update metrics
+ENTRIES_METRIC_NAME="pf_badhosts_entries_cnt"
+echo "# HELP $ENTRIES_METRIC_NAME the amount of entries in the pf blocklist" > $METRIC_FILE
+echo "# TYPE $ENTRIES_METRIC_NAME gauge" >> $METRIC_FILE
+echo "$ENTRIES_METRIC_NAME $(wc -l $PF_BADHOSTS_FILE | awk '{print $1}')" >> $METRIC_FILE
+
+UPDATE_METRIC_NAME="pf_badhosts_import_timestamp"
+echo "# HELP $UPDATE_METRIC_NAME the timestamp of the last import" >> $METRIC_FILE
+echo "# TYPE $UPDATE_METRIC_NAME gauge" >> $METRIC_FILE
+echo "$UPDATE_METRIC_NAME $(date +%s)" >> $METRIC_FILE
+
+DURATION_METRIC_NAME="pf_badhosts_import_duration_sec"
+echo "# HELP $DURATION_METRIC_NAME the duration of the last import" >> $METRIC_FILE
+echo "# TYPE $DURATION_METRIC_NAME gauge" >> $METRIC_FILE
+echo "$DURATION_METRIC_NAME $DURATION" >> $METRIC_FILE

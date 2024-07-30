@@ -1,0 +1,181 @@
+#!/bin/bash
+
+set -eu
+
+MOVIES_DIR="{{ media_dir }}/movies"
+SHOWS_DIR="{{ media_dir }}/shows"
+BOOKS_DIR="{{ media_dir }}/ebooks"
+MUSIC_FLAC_DIR="{{ media_dir }}/music"
+MUSIC_OPUS_DIR="{{ media_dir }}/music-opus"
+MUSIC_OGG_DIR="{{ media_dir }}/music-ogg"
+INCOMING_DIR="{{ media_dir }}/.incoming"
+
+PHOTOS_DIR="{{ disk.mountpoint }}/photos-crypt"
+GAMES_DIR="{{ disk.mountpoint }}/games-crypt"
+DOCUMENTS_DIR="{{ disk.mountpoint }}/documents-crypt"
+SCANS_DIR="{{ disk.mountpoint }}/scans-crypt"
+
+PROMETHEUS_TEXTDIR=${1:-/var/lib/node_exporter}
+
+function fetch_stats {
+    echo "# TYPE nas_files_count_total gauge"
+    echo "# TYPE nas_files_size_bytes gauge"
+
+    if [ -d ${DOCUMENTS_DIR} ]; then
+        DOCS_CNT=$(find ${DOCUMENTS_DIR} -type f ! -iname "gocryptfs.*" | wc -l)
+        if [ ! -z "${DOCS_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"documents\"} ${DOCS_CNT}"
+        fi
+
+        DOCS_SIZE=$(du -bs ${DOCUMENTS_DIR} | awk '{print $1}')
+        if [ ! -z "${DOCS_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"documents\"} ${DOCS_SIZE}"
+        fi
+    fi
+    if [ -d ${SCANS_DIR} ]; then
+        SCANS_CNT=$(find ${SCANS_DIR} -type f ! -iname "gocryptfs.*" | wc -l)
+        if [ ! -z "${DOCS_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"scans\"} ${SCANS_CNT}"
+        fi
+
+        SCANS_SIZE=$(du -bs ${SCANS_DIR} | awk '{print $1}')
+        if [ ! -z "${SCANS_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"scans\"} ${SCANS_SIZE}"
+        fi
+    fi
+    if [ -d ${GAMES_DIR} ]; then
+        GAMES_CNT=$(find ${GAMES_DIR} -type f ! -iname "gocryptfs.*" | wc -l)
+        if [ ! -z "${GAMES_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"games\"} ${GAMES_CNT}"
+        fi
+
+        GAMES_SIZE=$(du -bs ${GAMES_DIR} | awk '{print $1}')
+        if [ ! -z "${GAMES_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"games\"} ${GAMES_SIZE}"
+        fi
+    fi
+    
+    if [ -d ${PHOTOS_DIR} ]; then
+        PHOTOS_CNT=$(find ${PHOTOS_DIR} -type f ! -iname "gocryptfs.*" | wc -l)
+        if [ ! -z "${PHOTOS_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"photos\"} ${PHOTOS_CNT}"
+        fi
+
+        PHOTOS_SIZE=$(du -bs ${PHOTOS_DIR} | awk '{print $1}')
+        if [ ! -z "${PHOTOS_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"photos\"} ${PHOTOS_SIZE}"
+        fi
+    fi
+    if [ -d ${MOVIES_DIR} ]; then
+        MOVIES_CNT=$(find ${MOVIES_DIR} -type f ! -iname "*.srt" | wc -l)
+        if [ ! -z "${MOVIES_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"movies\"} ${MOVIES_CNT}"
+        fi
+
+        MOVIES_SIZE=$(du -bs ${MOVIES_DIR} | awk '{print $1}')
+        if [ ! -z "${MOVIES_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"movies\"} ${MOVIES_SIZE}"
+        fi
+    fi
+    
+    if [ -d ${SHOWS_DIR} ]; then
+        SHOWS_EPISODES_CNT=$(find ${SHOWS_DIR} -type f ! -iname "*.srt" | wc -l)
+        if [ ! -z "${SHOWS_EPISODES_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"shows\",type=\"episodes\"} ${SHOWS_EPISODES_CNT}"
+        fi
+
+        SHOWS_CNT=$(find ${SHOWS_DIR} -maxdepth 1 -mindepth 1 -type d | wc -l)
+        if [ ! -z "${SHOWS_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"shows\",type=\"shows\"} ${SHOWS_CNT}"
+        fi
+
+        SHOWS_SIZE=$(du -bs ${SHOWS_DIR} | awk '{print $1}')
+        if [ ! -z "${SHOWS_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"shows\"} ${SHOWS_SIZE}"
+        fi
+    fi
+
+    if [ -d ${BOOKS_DIR} ]; then
+        BOOKS_CNT=$(find ${BOOKS_DIR} -type f | wc -l)
+        if [ ! -z "${BOOKS_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"books\"} ${BOOKS_CNT}"
+        fi 
+
+        BOOKS_SIZE=$(du -bs ${BOOKS_DIR} | awk '{print $1}')
+        if [ ! -z "${BOOKS_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"books\"} ${BOOKS_SIZE}"
+        fi
+    fi
+    
+    if [ -d ${INCOMING_DIR} ]; then
+        INCOMING_CNT=$(find ${INCOMING_DIR} -type f | wc -l)
+        if [ ! -z "${INCOMING_CNT}" ]; then
+            echo "nas_files_count_total{kind=\"incoming\"} ${INCOMING_CNT}"
+        fi 
+
+        INCOMING_SIZE=$(du -bs ${INCOMING_DIR} | awk '{print $1}')
+        if [ ! -z "${INCOMING_SIZE}" ]; then
+            echo "nas_files_size_bytes{kind=\"incoming\"} ${INCOMING_SIZE}"
+        fi
+    fi
+
+    if [ -d ${MUSIC_FLAC_DIR} ]; then
+    	SONGS_CNT=$(find ${MUSIC_FLAC_DIR} -type f -iname "*.flac" | wc -l)
+        if [ ! -z ${SONGS_CNT} ]; then
+    	    echo "nas_files_count_total{kind=\"music\",type=\"songs\",codec=\"flac\"} ${SONGS_CNT}"
+        fi
+
+        ALBUMS_CNT=$(find ${MUSIC_FLAC_DIR} -maxdepth 2 -mindepth 2 -type d | wc -l)
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_count_total{kind=\"music\",type=\"albums\",codec=\"flac\"} ${ALBUMS_CNT}"
+        fi
+
+        MUSIC_SIZE=$(du -bs ${MUSIC_FLAC_DIR} | awk '{print $1}')
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_size_bytes{kind=\"music\",codec=\"flac\"} ${MUSIC_SIZE}"
+        fi
+    fi
+    
+    if [ -d ${MUSIC_OPUS_DIR} ]; then
+    	SONGS_CNT=$(find ${MUSIC_OPUS_DIR} -type f -iname "*.opus" | wc -l)
+        if [ ! -z ${SONGS_CNT} ]; then
+    	    echo "nas_files_count_total{kind=\"music\",type=\"songs\",codec=\"opus\"} ${SONGS_CNT}"
+        fi
+
+        ALBUMS_CNT=$(find ${MUSIC_OPUS_DIR} -maxdepth 2 -mindepth 2 -type d | wc -l)
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_count_total{kind=\"music\",type=\"albums\",codec=\"opus\"} ${ALBUMS_CNT}"
+        fi
+
+        MUSIC_SIZE=$(du -bs ${MUSIC_OPUS_DIR} | awk '{print $1}')
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_size_bytes{kind=\"music\",codec=\"opus\"} ${MUSIC_SIZE}"
+        fi
+    fi
+    
+    if [ -d ${MUSIC_OGG_DIR} ]; then
+    	SONGS_CNT=$(find ${MUSIC_OGG_DIR} -type f -iname "*.ogg" | wc -l)
+        if [ ! -z ${SONGS_CNT} ]; then
+    	    echo "nas_files_count_total{kind=\"music\",type=\"songs\",codec=\"ogg\"} ${SONGS_CNT}"
+        fi
+
+        ALBUMS_CNT=$(find ${MUSIC_OGG_DIR} -maxdepth 2 -mindepth 2 -type d | wc -l)
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_count_total{kind=\"music\",type=\"albums\",codec=\"ogg\"} ${ALBUMS_CNT}"
+        fi
+
+        MUSIC_SIZE=$(du -bs ${MUSIC_OGG_DIR} | awk '{print $1}')
+        if [ ! -z ${ALBUMS_CNT} ]; then
+            echo "nas_files_size_bytes{kind=\"music\",codec=\"ogg\"} ${MUSIC_SIZE}"
+        fi
+    fi
+
+	echo "nas_files_heartbeat_timestamp_seconds $(date +%s)"
+}
+
+MEDIASTATS_FILE=""
+if [ -d "${PROMETHEUS_TEXTDIR}" ]; then
+    MEDIASTATS_FILE="${PROMETHEUS_TEXTDIR}/nas_files.prom"
+fi
+
+fetch_stats | sponge "${MEDIASTATS_FILE}"

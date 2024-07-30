@@ -1,0 +1,80 @@
+server:
+{% for network in networks[location].devices %}
+{% if network.dns is defined and network.dns %}
+    interface: {{ network.address | ipaddr('address') }}
+{% endif %}
+{% endfor %}
+    interface: 127.0.0.1
+    interface: ::1
+
+    access-control: 0.0.0.0/0 refuse
+    access-control: ::0/0 refuse
+    access-control: 127.0.0.1 allow
+    access-control: ::1 allow
+{% for network in networks[location].devices %}
+{% if network.dns is defined and network.dns %}
+    access-control: {{ network.address | ipaddr(0) }} allow
+{% endif %}
+{% endfor %}
+{% for source in unbound_additional_allowed_sources %}
+    access-control: {{ source }} allow
+{% endfor %}
+
+    hide-identity: yes
+    hide-version: yes
+    qname-minimisation: yes
+    rrset-roundrobin: {% if unbound_enable_roundrobin | default(False) %}yes{% else %}no{% endif %}
+
+    # performance
+    outgoing-range: 4096
+    num-queries-per-thread: 2048
+    so-reuseport: yes
+    num-threads: 2
+    rrset-cache-size: 100m
+    msg-cache-size: 50m
+    msg-cache-slabs: 1
+    rrset-cache-slabs: 1
+    infra-cache-slabs: 1
+    key-cache-slabs: 1
+
+{% if ansible_os_family | lower != 'redhat' %}
+    auto-trust-anchor-file: "{{ unbound_root_key_file }}"
+{% endif %}
+    val-log-level: 2
+    aggressive-nsec: yes
+
+{% for network_domain in network_domains %}
+    local-zone: "{{ location }}.{{ network_domain }}." transparent
+    domain-insecure: {{ network_domain }}
+{% endfor %}
+
+{% for wildcard_domain in unbound_wildcard_domains %}
+    local-zone: "{{ wildcard_domain.domain }}" redirect
+    local-data: "{{ wildcard_domain.domain }} 3600 IN A {{ wildcard_domain.record_a }}"
+{% endfor %}
+
+include: {{ unbound_config_dir }}/{% if ansible_os_family | lower == 'debian' %}unbound.{% endif %}conf.d/*.db
+
+# forward requests
+{% if unbound_nameservers is defined and unbound_nameservers | length > 0 %}
+forward-zone:
+    name: "."
+    {% for nameserver in unbound_nameservers %}
+    forward-addr: {{ nameserver }}
+    {% endfor %}
+{% endif %}
+
+{% if ansible_system == 'OpenBSD' %}
+remote-control:
+    control-enable: yes
+    control-use-cert: no
+    control-interface: /var/run/unbound.sock
+remote-control:
+    control-enable: yes
+    control-interface: 127.0.0.1
+    control-port: 8953
+    server-key-file: "/etc/unbound/unbound_server.key"
+    server-cert-file: "/etc/unbound/unbound_server.pem"
+    control-key-file: "/etc/unbound/unbound_control.key"
+    control-cert-file: "/etc/unbound/unbound_control.pem"
+{% endif %}

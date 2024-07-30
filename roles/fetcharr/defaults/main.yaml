@@ -1,0 +1,21 @@
+---
+# renovate: datasource=github-releases depName=soerenschneider/fetcharr
+fetcharr_version: v1.1.0
+fetcharr_config_file: /etc/fetcharr.yaml
+fetcharr_user: fetcharr
+fetcharr_wanted_services: []
+fetcharr_required_services: []
+
+fetcharr_conf:
+  syncer_impl: rsync
+
+  rsync:
+    host: remote.tld
+    remote_dir: /srv/incoming/
+    local_dir: /media/
+    bwlimit: 12m
+
+  events_impl: [webhook]
+  webhook_server:
+    address: :9999
+    path: /webhook

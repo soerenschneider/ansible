@@ -1,0 +1,13 @@
+[Unit]
+  Description=cifs mount fileserver {{ item }}
+  Requires=network-online.target
+  After=network-online.service
+
+[Mount]
+  What=//localhost/{{ item }}
+  Where=/media/fileserver/{{ item }}
+  Options=ro,cache=loose,actimeo=3600,nofail,credentials=/root/.smb-fileserver-credentials
+  Type=cifs
+
+[Install]
+  WantedBy=multi-user.target

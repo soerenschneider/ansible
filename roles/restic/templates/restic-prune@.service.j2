@@ -1,0 +1,7 @@
+[Unit]
+Description=Restic backup service (data pruning)
+
+[Service]
+Type=oneshot
+ExecStart=python3 /opt/scripts/restic/restic_prune.py -i %I
+EnvironmentFile=/etc/restic-%i.conf

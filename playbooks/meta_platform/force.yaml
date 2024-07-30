@@ -1,0 +1,11 @@
+---
+- name: Rotate approle secret_ids
+  hosts: all,!k8s
+  strategy: free
+  become: true
+  tasks:
+    - name: Rotate secret
+      ansible.builtin.include_tasks: tasks/run.yml
+      with_items: "{{ vault_approles }}"
+      when: [vault_approles is defined and vault_approles | length > 0, "lookup('env', 'VAULT_TOKEN') | length > 0"]
+      tags: [vault-approle, vault-approle-install]

@@ -1,0 +1,50 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ device_stalker_group }}"
+    system: true
+  tags: [device-stalker, device-stalker-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ device_stalker_user }}"
+    shell: "/bin/false"
+    system: true
+    groups: "{{ device_stalker_group }}"
+  tags: [device-stalker, device-stalker-install]
+
+- name: "Include tasks"
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: "device-stalker"
+    github_repo: "soerenschneider/device-stalker"
+    service_name: "device-stalker"
+    version_wanted: "{{ device_stalker_version }}"
+  when: false
+  tags: [device-stalker, device-stalker-install, deps]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ device_stalker_config | to_nice_yaml }}"
+    dest: "{{ device_stalker_config_file }}"
+    owner: "{{ device_stalker_user }}"
+    group: "{{ device_stalker_group }}"
+    mode: "0400"
+  notify: restart device-stalker
+  tags: [device-stalker, device-stalker-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: "device-stalker.service.j2"
+    dest: "/etc/systemd/system/device-stalker.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: restart device-stalker
+  tags: [device-stalker, device-stalker-configure]
+
+- name: Enable/disable device-stalker
+  ansible.builtin.service:
+    name: "{{ device_stalker_service_name }}"
+    enabled: true
+  tags: [device-stalker, device-stalker-configure]

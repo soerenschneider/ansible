@@ -1,0 +1,22 @@
+---
+- name: Setup k0s
+  hosts: k0s
+  become: true
+  strategy: free
+  gather_facts: true
+  vars:
+    node_exporter_web_listen_address: 0.0.0.0:9100
+  tasks:
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/limits.yaml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      when: false and 'master' in inventory_hostname
+      tags: always

@@ -1,0 +1,27 @@
+[Unit]
+Description=conditional-reboot
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/local/bin/conditional-reboot 
+Type=idle
+User={{ conditional_reboot_user }}
+
+Restart=always
+RestartSec=60s
+
+{% if conditional_reboot_allow_ping %}
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+{% endif %}
+
+LimitNOFILE=4096
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadOnlyPaths={{ conditional_reboot_config_file }}
+ReadWritePaths={{ conditional_reboot_journal_file }}{% if conditional_reboot_metrics_dir is defined %} {{ conditional_reboot_metrics_dir }}{% endif %}
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,73 @@
+---
+- name: Including role
+  ansible.builtin.include_role:
+    name: haproxy
+  tags: always
+
+- name: Enable haproxy
+  ansible.builtin.systemd:
+    name: haproxy
+    enabled: true
+
+- name: Allow haproxy to bind to any port
+  ansible.posix.seboolean:
+    name: haproxy_connect_any
+    state: true
+    persistent: true
+  tags: haproxy
+
+- name: Add configuration block
+  ansible.builtin.blockinfile:
+    path: /etc/haproxy/haproxy.cfg
+    block: |
+       frontend samba
+         bind {{ haproxy_listen_addr }}:445
+         mode tcp
+         option tcplog
+         default_backend smb
+
+       frontend mpd
+         bind {{ haproxy_listen_addr }}:6600
+         mode tcp
+         option tcplog
+         default_backend mpd
+
+       backend smb
+         mode tcp
+         timeout check 5000
+         timeout server 30000
+         timeout connect 5000
+         server smb-{{ location }} nas.{{ location }}.{{ primary_domain }}:445 check
+         # backup servers
+         {% if location == 'dd' -%}
+         server smb-pt nas.pt.{{ primary_domain }}:445 check backup weight 200
+         server smb-ez nas.ez.{{ primary_domain }}:445 check backup weight 1
+         {% elif location == 'ez' -%}
+         server smb-pt nas.pt.{{ primary_domain }}:445 check backup weight 200
+         server smb-dd nas.dd.{{ primary_domain }}:445 check backup weight 1
+         {% elif location == 'pt' -%}
+         server smb-dd nas.dd.{{ primary_domain }}:445 check backup weight 20
+         server smb-ez nas.ez.{{ primary_domain }}:445 check backup weight 10
+         {% endif -%}
+
+
+       # highly available mpd library
+       backend mpd
+         mode tcp
+         timeout check 5000
+         timeout server 30000
+         timeout connect 5000
+         server mpd-{{ location }} nas.{{ location }}.{{ primary_domain }}:6600 check
+         # backup servers
+         {% if location == 'dd' -%}
+         server mpd-pt nas.pt.{{ primary_domain }}:6600 check backup weight 200
+         server mpd-ez nas.ez.{{ primary_domain }}:6600 check backup weight 1
+         {% elif location == 'ez' -%}
+         server mpd-pt nas.pt.{{ primary_domain }}:6600 check backup weight 200
+         server mpd-dd nas.dd.{{ primary_domain }}:6600 check backup weight 1
+         {% elif location == 'pt' -%}
+         server mpd-dd nas.dd.{{ primary_domain }}:6600 check backup weight 20
+         server mpd-ez nas.ez.{{ primary_domain }}:6600 check backup weight 10
+         {% endif -%}
+  notify: Restart haproxy
+  tags: haproxy

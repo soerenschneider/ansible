@@ -1,0 +1,30 @@
+---
+- name: Install Minio cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Create minio user
+      ansible.builtin.user:
+        name: "{{ minio_user }}"
+        system: true
+      tags: [minio, docker]
+
+    - name: Create minio base dir
+      ansible.builtin.file:
+        path: /var/lib/minio
+        state: directory
+        owner: "{{ minio_user }}"
+        group: "{{ minio_user }}"
+        mode: "0700"
+      tags: [minio, docker]
+
+    - name: Create minio dirs
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ minio_user }}"
+        group: "{{ minio_user }}"
+        mode: "0700"
+      with_items: ["{{ minio_certs_dir }}", "{{ minio_certs_dir }}/CAs", "{{ minio_storage_dir }}"]
+      tags: [minio, docker]

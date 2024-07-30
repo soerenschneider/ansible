@@ -1,0 +1,49 @@
+---
+- name: Setup vault cluster
+  hosts: vault
+  become: true
+  tasks:
+    - name: Including role
+      ansible.builtin.debug:
+        msg: "User is: {{ ansible_user }}"
+    - name: Including role
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Add credentials
+      tags: [acme, cert]
+      block:
+        - name: Create aws dir
+          ansible.builtin.file:
+            path: /root/.aws
+            state: directory
+            owner: root
+            group: root
+            mode: "0700"
+
+        - name: Write AWS config
+          ansible.builtin.template:
+            src: templates/aws.config.j2
+            dest: /root/.aws/config
+            owner: root
+            group: root
+            mode: "0600"
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: certbot
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/certificate.yml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: vault
+      tags: always

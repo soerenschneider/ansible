@@ -1,0 +1,119 @@
+---
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/gocryptfs
+  register: gocryptfs_binary
+  tags: [gocryptfs, gocryptfs-install, deps]
+
+- name: Run block
+  when: gocryptfs_binary.stat.exists
+  tags: [gocryptfs, gocryptfs-install, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell: set -o pipefail && /usr/local/bin/gocryptfs -version | awk '{print $2}'
+      register: gocryptfs_installed_version
+      changed_when: false
+
+    - name: Print debug information
+      ansible.builtin.set_fact:
+        gocryptfs_installed_version: "{{ gocryptfs_installed_version.stdout }}"
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ gocryptfs_installed_version }}"
+
+- name: Run block
+  when: gocryptfs_version is not defined or gocryptfs_version | length == 0
+  tags: [gocryptfs, gocryptfs-install, deps]
+  block:
+    - name: Fetch latest release information from github
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/rfjakob/gocryptfs/releases/latest
+        return_content: true
+      register: github_release
+      retries: 3
+      delay: 5
+      until: github_release is not failed
+
+    - name: Set gocryptfs release
+      ansible.builtin.set_fact:
+        gocryptfs_version: "{{ github_release.json.tag_name }}"
+
+- name: Set OS for generating download link
+  ansible.builtin.set_fact:
+    go_os: "{{ ansible_system | lower }}"
+    go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' }}"
+  tags: [gocryptfs, gocryptfs-install, deps]
+
+- name: Run block
+  when: not gocryptfs_binary.stat.exists or gocryptfs_version != gocryptfs_installed_version
+  tags: [gocryptfs, gocryptfs-install, deps]
+  block:
+    - name: Create download directory
+      become: false
+      ansible.builtin.file:
+        path: /tmp/gocryptfs
+        state: directory
+        mode: "0700"
+
+    - name: Set archive name
+      ansible.builtin.set_fact:
+        gocryptfs_archive: gocryptfs_{{ gocryptfs_version }}_linux-static_amd64.tar.gz
+
+    - name: Set download url
+      ansible.builtin.set_fact:
+        gocryptfs_url: https://github.com/rfjakob/gocryptfs/releases/download/{{ gocryptfs_version }}/{{ gocryptfs_archive }}
+
+    - name: Download gocryptfs archive
+      become: false
+      # checkov:skip=CKV2_ANSIBLE_2:false positive
+      ansible.builtin.get_url:
+        url: "{{ gocryptfs_url }}"
+        dest: /tmp/gocryptfs/{{ gocryptfs_archive }}
+        mode: "0640"
+      register: download_gocryptfs
+      until: download_gocryptfs is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Download gocryptfs checksum
+      # checkov:skip=CKV2_ANSIBLE_2:false positive
+      become: false
+      ansible.builtin.get_url:
+        url: "{{ gocryptfs_url }}.asc"
+        dest: /tmp/gocryptfs/{{ gocryptfs_archive }}.asc
+        mode: "0640"
+      register: download_gocryptfs_checksum
+      until: download_gocryptfs_checksum is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Verify archive
+      become: false
+      ansible.builtin.command: gpg2 --verify /tmp/gocryptfs/{{ gocryptfs_archive }}.asc
+      changed_when: false
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: /tmp/gocryptfs/{{ gocryptfs_archive }}
+        dest: /tmp/gocryptfs/
+        creates: /tmp/gocryptfs/gocryptfs
+        remote_src: true
+      check_mode: false
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: /tmp/gocryptfs/gocryptfs
+        dest: /usr/local/bin/gocryptfs
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+      with_items: [gocryptfs]
+
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: [/tmp/gocryptfs]

@@ -1,0 +1,10 @@
+---
+device_stalker_user: device-stalker
+device_stalker_group: device-stalker
+device_stalker_service_name: device-stalker
+
+device_stalker_config_file: /etc/device-stalker.yaml
+device_stalker_config: {}
+
+# renovate: datasource=github-releases depName=soerenschneider/device-stalker
+device_stalker_version: "v1.0.0"

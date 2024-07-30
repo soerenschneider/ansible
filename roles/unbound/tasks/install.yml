@@ -1,0 +1,84 @@
+---
+- name: Install unbound
+  when: ansible_system == "Linux"
+  tags: [unbound, unbound-install]
+  block:
+    - name: Install packages
+      ansible.builtin.package:
+        name: unbound
+
+    - name: Install packages
+      ansible.builtin.package:
+        name: unbound-anchor
+      when: ansible_os_family | lower == "debian"
+
+    - name: Create systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/unbound.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create override for unbound service
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+                    # restart forever
+          StartLimitIntervalSec=0
+
+          [Service]
+                    # restart forever
+          Restart=always
+          RestartSec={{ unbound_restart_delay_s }}
+        dest: /etc/systemd/system/unbound.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable unbound
+      ansible.builtin.systemd:
+        name: unbound
+        enabled: true
+
+- name: Enable unbound
+  ansible.builtin.service:
+    name: unbound
+    enabled: true
+  when: ansible_system == "OpenBSD"
+  tags: [unbound, unbound-install]
+
+- name: Check if unbound has received root key
+  ansible.builtin.stat:
+    path: "{{ unbound_root_key_file }}"
+  register: unbound_root_key
+  tags: [unbound, unbound-install]
+
+- name: Receive unbound root key
+  ansible.builtin.command: unbound-anchor -a '{{ unbound_root_key_file }}'
+  when: not unbound_root_key.stat.exists
+  register: unbound_anchor
+  failed_when: unbound_anchor.rc not in [0, 1]
+  changed_when: true
+  tags: [unbound, unbound-install]
+
+- name: Create unbound database
+  ansible.builtin.template:
+    src: bla.db.j2
+    dest: "{{ unbound_config_conf_d_dir }}/local.db"
+    owner: root
+    group: "{{ unbound_config_group }}"
+    mode: "0644"
+  notify: Restart unbound
+  tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
+
+- name: Create unbound config
+  ansible.builtin.template:
+    src: unbound.conf.j2
+    dest: "{{ unbound_config_file }}"
+    owner: root
+    group: "{{ unbound_config_group }}"
+    mode: "0660"
+    validate: unbound-checkconf %s
+  notify: Restart unbound
+  tags: [unbound, unbound-configure, unbound-config, dns-config, dns]

@@ -1,0 +1,40 @@
+---
+transmission_bot_telegram_token: ""
+transmission_bot_master_users: {}
+transmission_bot_user: transmissionbot
+transmission_bot_group: "{{ transmission_bot_user }}"
+
+transmission_open_peer_port: true
+transmission_user: "{% if ansible_os_family == 'Debian' %}debian-{% endif %}transmission"
+transmission_group: "{{ transmission_user }}"
+
+transmission_blocklist_url: https://files.it-kraut.net/transmission-blocklist/blocklist.gz
+# transmission_base_dir: "/var/lib/transmission"
+transmission_base_dir: /var/lib/transmission{% if ansible_os_family == 'Debian' %}-daemon{% endif %}
+transmission_download_dir: "{{ transmission_base_dir }}/complete"
+transmission_download_dir_group: "{{ transmission_group }}"
+transmission_incomplete_dir: "{{ transmission_base_dir }}/incomplete"
+transmission_incomplete_dir_enabled: true
+transmission_peer_port: 51413
+transmission_rpc_bind_address: 127.0.0.1
+transmission_rpc_enabled: true
+transmission_rpc_host_whitelist: localhost{% if transmission_fqdn is defined %},{{ transmission_fqdn }}{% endif %}
+transmission_rpc_host_whitelist_enabled: true
+transmission_rpc_username: ""
+# checkov:skip=CKV_SECRET_6:false positive
+transmission_rpc_password: pleasesetapassword
+transmission_rpc_port: 9091
+transmission_rpc_whitelist: 127.0.0.1
+transmission_rpc_whitelist_enabled: true
+transmission_ratio_limit: 0
+transmission_ratio_limit_enabled: true
+transmission_speed_limit_down: 100
+transmission_speed_limit_down_enabled: false
+transmission_speed_limit_up: 0
+transmission_speed_limit_up_enabled: true
+transmission_umask: 2
+
+transmission_script_torrent_added_enabled: false
+transmission_script_torrent_added_path: ""
+transmission_script_torrent_done_enabled: false
+transmission_script_torrent_done_path: ""

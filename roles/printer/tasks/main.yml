@@ -1,0 +1,22 @@
+---
+- name: Install packages
+  ansible.builtin.dnf:
+    name: [cups, foomatic-filters, foomatic-db-ppds]
+
+- name: Copy printers.conf
+  ansible.builtin.copy:
+    src: files/printers.conf
+    dest: /etc/cups/printers.conf
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [printer, cups]
+
+- name: Copy printers
+  ansible.builtin.copy:
+    src: files/hl2030.ppd
+    dest: /etc/cups/ppd/
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [printer, cups]

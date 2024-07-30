@@ -1,0 +1,50 @@
+ui = {% if vault_ui is defined and vault_ui %}true{% else %}false{% endif %}
+
+listener "tcp" {
+  address       = "{{ vault_listen_address | default('0.0.0.0:8200') }}"
+  cluster_addr  = "{{ vault_cluster_listen_address | default('0.0.0.0:8201') }}"
+  proxy_protocol_behavior = "allow_authorized"
+{% if vault_authorized_addrs | default([]) | length > 0 %}
+  proxy_protocol_authorized_addrs = "{% for i in vault_authorized_addrs %}{{ i }}{% if not loop.last %}, {% endif %}{% endfor %}"
+{% endif %}
+
+{% if vault_tls_crt | length > 0 and vault_tls_key | length > 0%}
+  tls_cert_file = "{{ vault_tls_crt }}"
+  tls_key_file  = "{{ vault_tls_key }}"
+  tls_min_version = "{{ vault_tls.min_version | default('tls13') }}"
+{% elif vault_allow_insecure %}
+  tls_disable = 1
+{% endif %}
+
+}
+
+{%- if groups[vault_ansible_group_name] | length > 1 -%}
+  cluster_addr = "{{ vault_cluster_listen_address | default('https://' + inventory_hostname + ':8201') }}"
+  api_addr     = "{{ vault_api_listen_address     | default('https://' + inventory_hostname + ':8200') }}"
+{% endif %}
+
+{% if groups[vault_ansible_group_name] | length > 1 %}
+
+cluster_name = "{{ vault_cluster_name }}"
+
+storage "raft" {
+  path    = "{{ vault_storage_dir }}"
+  node_id = "{{ inventory_hostname | replace(".", "_") }}"
+{% for host in groups[vault_ansible_group_name] %}
+{% if host != inventory_hostname %}
+  retry_join {
+    leader_api_addr = "https://{{ host }}:8200"
+  }
+{% endif %}
+{% endfor %}
+}
+{% else %}
+storage "file" {
+  path = "{{ vault_storage_dir }}"
+}
+{% endif %}
+
+telemetry {
+  prometheus_retention_time = "24h"
+  disable_hostname = true
+}

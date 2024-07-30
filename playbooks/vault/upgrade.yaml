@@ -1,0 +1,29 @@
+---
+- name: Safely upgrade a Vault cluster
+  hosts: vault
+  become: true
+  serial: 1
+  tasks:
+    - name: Run block
+      ansible.builtin.include_role:
+        name: vault
+      tags: always
+
+    - name: Run block
+      tags: [always, health]
+      block:
+        - name: Perform Health Check
+          # checkov:skip=CKV_ANSIBLE_1:ignore local cert
+          ansible.builtin.uri:
+            url: https://localhost:8200/v1/sys/health
+            validate_certs: false
+          register: health_result
+          until: health_result.status in [200, 429]
+          failed_when: false
+          retries: 90
+          delay: 2
+
+        - name: Fail if node unhealthy
+          ansible.builtin.fail:
+            msg: Node doesn't get healthy, halting upgrade
+          when: health_result.status not in [200, 429]

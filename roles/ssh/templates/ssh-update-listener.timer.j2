@@ -1,0 +1,10 @@
+[Unit]
+Description=Timer to update SSH Listener based on Wireguard availability
+
+[Timer]
+OnCalendar={{ ssh_update_listener_on_calendar | default('*:0/15') }}
+Persistent=true
+Unit=ssh-update-listener.service
+
+[Install]
+WantedBy=timers.target

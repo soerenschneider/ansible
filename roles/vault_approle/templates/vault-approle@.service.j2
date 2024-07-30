@@ -1,0 +1,23 @@
+[Unit]
+Description=Rotate a AppRole secret_id
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vault-approle-cli --config /etc/vault-approle/%I.json rotate-secret-id
+
+# Security
+##########
+NoNewPrivileges=true
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=yes
+RestrictRealtime=yes
+
+# Paths
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectProc=yes

@@ -1,0 +1,59 @@
+---
+- name: Upsert MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ minio_user }}"
+      tags: always
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _minio_user_string: "{{ getent_passwd['minio'][1] }}"
+      tags: always
+
+    - name: Create minio docker network
+      community.docker.docker_network:
+        name: minio-cluster
+      tags: [docker, minio]
+
+    - name: Pull minio
+      community.docker.docker_image:
+        name: "{{ minio_image }}"
+        source: pull
+      tags: [docker, minio]
+
+    - name: Get infos about existing container
+      community.docker.docker_container_info:
+        name: "{{ minio_container_name | default('minio') }}"
+      register: _container_result
+      tags: [docker, minio]
+
+    - name: Run block
+      when: _container_result.exists
+      tags: [docker, minio]
+      block:
+        - name: Stop replicas
+          community.docker.docker_container:
+            name: "{{ minio_container_name | default('minio') }}"
+            state: absent
+
+    - name: Run minio
+      community.docker.docker_network:
+        name: "{{ minio_container_name | default('minio') }}"
+        image: "{{ minio_image }}"
+        restart_policy: always
+        env:
+          MINIO_ROOT_USER: "{{ minio_root_user }}"
+          MINIO_ROOT_PASSWORD: "{{ minio_root_password }}"
+        command: [server, --console-address, ":9001", --certs-dir, /certs, /storage]
+        user: "{{ _minio_user_string }}"
+        networks:
+          - name: minio-cluster
+        ports: [0.0.0.0:8080:9000, 127.0.0.1:9001:9001]
+        volumes: ["{{ minio_certs_dir }}:/certs", "{{ minio_storage_dir }}:/storage"]
+      tags: [docker, minio]

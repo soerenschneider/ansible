@@ -1,0 +1,40 @@
+---
+- name: Add minio group
+  ansible.builtin.group:
+    name: "{{ minio_group }}"
+  tags: [minio, minio-install]
+
+- name: Add minio user
+  ansible.builtin.user:
+    name: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    shell: /usr/sbin/nologin
+  tags: [minio, minio-install]
+
+- name: Add minio certs dir
+  ansible.builtin.file:
+    path: /home/{{ minio_user }}/.minio/certs
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0750"
+  tags: [minio, minio-install]
+
+- name: Add base dir
+  ansible.builtin.file:
+    path: "{{ minio_base_dir }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0700"
+  tags: [minio, minio-install]
+
+- name: Add volume dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ minio_user }}"
+    group: "{{ minio_group }}"
+    mode: "0700"
+  with_items: "{{ minio_volumes }}"
+  tags: [minio, minio-install]

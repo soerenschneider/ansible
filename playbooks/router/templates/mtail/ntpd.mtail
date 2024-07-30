@@ -1,0 +1,72 @@
+# Copyright 2008 Google Inc. All Rights Reserved.
+# This file is available under the Apache license.
+
+# Syslog decorator
+def syslog {
+  /^(?P<date>(?P<legacy_date>\w+\s+\d+\s+\d+:\d+:\d+)|(?P<rfc3339_date>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d+[+-]\d{2}:\d{2}))/ +
+  /\s+(?:\w+@)?(?P<hostname>[\w\.-]+)\s+(?P<application>[\w\.-]+)(?:\[(?P<pid>\d+)\])?:\s+(?P<message>.*)/ {
+    len($legacy_date) > 0 {
+      strptime($2, "Jan _2 15:04:05")
+    }
+    len($rfc3339_date) > 0 {
+      strptime($rfc3339_date, "2006-01-02T03:04:05-0700")
+    }
+    next
+  }
+}
+
+@syslog {
+  counter mtail_ntpd_int_syscalls
+
+  /select\(.*\) error: Interrupted system call/ {
+    mtail_ntpd_int_syscalls++
+  }
+
+  counter mtail_ntpd_recvbuf_overflows
+  gauge mtail_ntpd_last_recvbuf
+  /too many recvbufs allocated \((\d+)\)/ {
+    mtail_ntpd_recvbuf_overflows++
+    mtail_ntpd_last_recvbuf = $1
+  }
+
+  counter mtail_ntpd_exits
+  /ntpd exiting on signal 15/ {
+    mtail_ntpd_exits++
+  }
+
+  counter mtail_ntpd_starts
+  /x?ntpd .* \w+\s+\w+\s+\d+\s+\d+:\d+:\d+\s+\w+\s+\d+\s+\(\d\)/ {
+    mtail_ntpd_starts++
+  }
+
+  gauge mtail_ntpd_sync_status
+  /kernel time sync (status (change)?|enabled|disabled) (?P<status>\d+)/ {
+    mtail_ntpd_sync_status = $status
+  }
+
+# PLL status change.
+#
+# Described here: http://obswww.unige.ch/~bartho/xntp_faq/faq3Care.htm#araee
+  counter mtail_ntpd_pll_changes
+  gauge mtail_ntpd_pll_status
+  /kernel pll status change (?P<status>\d+)/ {
+    mtail_ntpd_pll_changes++
+    mtail_ntpd_pll_status = $status
+  }
+
+  counter mtail_ntpd_peer_syncs
+  /synchronized to (\d+\.\d+\.\d+\.\d+|LOCAL\(\d\)), stratum(=| )(\d+)/ {
+    mtail_ntpd_peer_syncs++
+  }
+
+  counter mtail_ntpd_driftfile_errors
+  /can't open .*drift.*: No such file or directory/ {
+    mtail_ntpd_driftfile_errors++
+  }
+
+  counter mtail_ntpd_sync_lost_total
+  /synchronisation lost/ {
+    mtail_ntpd_sync_lost_total++
+  }
+
+} # end syslog

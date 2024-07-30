@@ -1,0 +1,235 @@
+#!/bin/bash
+
+IDENTIFIER="${1}"
+RCLONE_SRC="${2}"
+RCLONE_DEST="${3}"
+EXCLUDES="${4}"
+PROMETHEUS_TEXTDIR="${5:-{{ node_exporter_textfile_dir }}}"
+
+METRIC_PREFIX="rclone_backup"
+BASE_DIR="/tmp"
+LOCKFILE="${BASE_DIR}/rclone.lock"
+LOGFILE="${BASE_DIR}/rclone_${IDENTIFIER}.log"
+LAST_SUCCESSFUL_DATE_FILE="${BASE_DIR}/rclone_${IDENTIFIER}_date"
+
+BWLIMIT_UPLOAD="{{ rclone_bwlimit_upload | default(0) }}"
+BWLIMIT_DOWNLOAD="{{ rclone_bwlimit_download | default(0) }}"
+
+DIRECTION=""
+FILENAME=""
+LAST_SUCCESSFUL_DATE=""
+
+detect_direction() {
+    egrep '^[[:alnum:]]+:' <<< ${RCLONE_SRC} > /dev/null
+    if [ $? -eq 0 ]; then
+        DIRECTION="pull"
+    fi
+
+    if [ -z ${DIRECTION} ]; then
+        egrep '^[[:alnum:]]+:' <<< ${RCLONE_DEST} > /dev/null
+        if [ $? -eq 0 ]; then
+            DIRECTION="push"
+        fi
+    fi
+
+    if [ -z ${DIRECTION} ]; then
+        DIRECTION="unknown"
+    fi
+}
+
+build_excludes() {
+    if [ -z "${EXCLUDES}" ]; then
+        exclude_opts=()
+        return
+    fi
+
+    for exclude in ${EXCLUDES//,/ }; do
+        exclude_opts+=( --exclude="$exclude" )
+    done
+}
+
+print_metrics() {
+    echo "# HELP ${METRIC_PREFIX}_timestamp_seconds The timestamp of the last invokation"
+    echo "# TYPE ${METRIC_PREFIX}_timestamp_seconds gauge"
+    echo "${METRIC_PREFIX}_timestamp_seconds{identifier=\"${IDENTIFIER}\",direction=\"${DIRECTION}\",outcome=\"$1\"} $(date +%s)"
+    RUNTIME=$(expr $(date +%s) - ${START_DATE})
+    
+    ###############################################################################################################################
+
+    echo "# HELP ${METRIC_PREFIX}_runtime_seconds The total runtime of the script"
+    echo "# TYPE ${METRIC_PREFIX}_runtime_seconds gauge"
+    echo "${METRIC_PREFIX}_runtime_seconds{identifier=\"${IDENTIFIER}\",direction=\"${DIRECTION}\"} ${RUNTIME}"
+    
+    ###############################################################################################################################
+
+    FILES_CNT="$(grep "^Transferred:" ${LOGFILE} | tail -n1 | cut -d '/' -f1 | awk '{print $2}' | tr -cd '[:digit:]')"
+    if [ -z "${FILES_CNT}" ]; then
+        FILES_CNT=0
+    fi
+    echo "# HELP ${METRIC_PREFIX}_files_count_total Total amount of files to be copied"
+    echo "# TYPE ${METRIC_PREFIX}_files_count_total gauge"
+    echo "${METRIC_PREFIX}_files_count_total{identifier=\"${IDENTIFIER}\",direction=\"${DIRECTION}\"} ${FILES_CNT}"
+
+    ###############################################################################################################################
+
+    TRANSFERRED_FILES="$(grep "^Transferred:" ${LOGFILE} | tail -n1 | cut -d '/' -f2 | awk '{print $1}' | tr -cd '[:digit:]')"
+    if [ -z "${TRANSFERRED_FILES}" ]; then
+        TRANSFERRED_FILES=0
+    fi
+
+    echo "# HELP ${METRIC_PREFIX}_files_transferred_total Total amount of copied files"
+    echo "# TYPE ${METRIC_PREFIX}_files_transferred_total gauge"
+    echo "${METRIC_PREFIX}_files_transferred_total{identifier=\"${IDENTIFIER}\",direction=\"${DIRECTION}\"} ${TRANSFERRED_FILES}"
+    
+    ###############################################################################################################################
+
+    TRANSFERRED_SIZE=$(grep "^Transferred:" ${LOGFILE} | tail -n2 | head -n1 | cut -d"/" -f1 | awk '{print $2}')
+    TRANSFERRED_UNIT=$(echo "${TRANSFERRED_SIZE}" | awk '{print substr($0,length($0),1)}')
+    TRANSFERRED_SIZE=$(echo "${TRANSFERRED_SIZE}" | sed 's/[a-zA-Z]//g')
+    if [ "${TRANSFERRED_UNIT}" = "b" ]; then
+        TRANSFERRED_BYTES="${TRANSFERRED_SIZE}"
+    elif [ "${TRANSFERRED_UNIT}" = "k" ]; then
+        TRANSFERRED_BYTES=$(awk "BEGIN {printf \"%.2f\",${TRANSFERRED_SIZE}*1024}")
+    elif [ "${TRANSFERRED_UNIT}" = "M" ]; then
+        TRANSFERRED_BYTES=$(awk "BEGIN {printf \"%.2f\",${TRANSFERRED_SIZE}*1024*1024}")
+    elif [ "${TRANSFERRED_UNIT}" = "G" ]; then
+        TRANSFERRED_BYTES=$(awk "BEGIN {printf \"%.2f\",${TRANSFERRED_SIZE}*1024*1024*1024}")
+    elif [ "${TRANSFERRED_UNIT}" = "T" ]; then
+        TRANSFERRED_BYTES=$(awk "BEGIN {printf \"%.2f\",${TRANSFERRED_SIZE}*1024*1024*1024*1024}")
+    elif [ "${TRANSFERRED_UNIT}" = "P" ]; then
+        TRANSFERRED_BYTES=$(awk "BEGIN {printf \"%.2f\",${TRANSFERRED_SIZE}*1024*1024*1024*1024*1024}")
+    fi
+
+    if [ -z "${TRANSFERRED_BYTES}" ]; then
+        TRANSFERRED_BYTES=0
+    fi
+    echo "# HELP ${METRIC_PREFIX}_transferred_bytes Bytes transferred during backup"
+    echo "# TYPE ${METRIC_PREFIX}_transferred_bytes gauge"
+    echo "${METRIC_PREFIX}_transferred_bytes{identifier=\"${IDENTIFIER}\",direction=\"${DIRECTION}\"} ${TRANSFERRED_BYTES}"
+
+    ###############################################################################################################################
+
+    if [ ${1} = "success" ] || [ ${1} = "no-work" ]; then
+        exit 0
+    fi
+    exit 1
+}
+
+get_bwlimit() {
+    if [ ${DIRECTION} = "pull" ]; then
+        echo "${BWLIMIT_DOWNLOAD}"
+    elif [ ${DIRECTION} = "push" ]; then
+        echo "${BWLIMIT_UPLOAD}"
+    else
+        echo "0"
+    fi
+}
+
+check_files() {
+    log "Trying to determine last successful date"
+    if [ -f ${LAST_SUCCESSFUL_DATE_FILE} ]; then
+        LAST_SUCCESSFUL_DATE=$(cat ${LAST_SUCCESSFUL_DATE_FILE})
+        DIFF_MINUTES=$(((START_DATE - LAST_SUCCESSFUL_DATE) / 60 + 1))
+        log "Last successful start time is ${DIFF_MINUTES}m ago ($(date -d @${LAST_SUCCESSFUL_DATE}))..."
+    else
+        log "No previous successful start time found"
+    fi
+}
+
+copy_files() {
+    if [ -d ${RCLONE_SRC} ] || [ -d ${RCLONE_DEST} ]; then
+        if [ -d ${RCLONE_SRC} ] && [ -z "$(find ${RCLONE_SRC} -mindepth 1)" ]; then
+            echo "Empty source dir specified" > ${LOGFILE}
+            print_metrics "failed"
+            exit 1
+        fi
+
+        FILES_AVAILABLE=1
+        # a negative value is used to prevent the 'find' check
+        if [ ${DIRECTION} = "push" ] && [ ! -z ${DIFF_MINUTES} ]; then
+            FILES_AVAILABLE=$(find ${RCLONE_SRC} -type f -mmin -"${DIFF_MINUTES}" | wc -l)
+            log "Found ${FILES_AVAILABLE} modified files since the last successful run"
+        fi
+
+        if [ ${FILES_AVAILABLE} -eq 0 ]; then
+            log "Nothing to do"
+            date +%s > "${LAST_SUCCESSFUL_DATE_FILE}"
+            print_metrics "no-work"
+        else
+            log "Starting file copy process..."
+            log "Exceuting: rclone copy -v --exclude gocryptfs.conf ${exclude_opts[@]} --bwlimit=${BWLIMIT} ${RCLONE_SRC} ${RCLONE_DEST}"
+            RCLONE_START_TIME="$(date +%s)"
+            BWLIMIT=$(get_bwlimit)
+            rclone copy -v --exclude gocryptfs.conf "${exclude_opts[@]}" --bwlimit="${BWLIMIT}" "${RCLONE_SRC}" "${RCLONE_DEST}" 2>> ${LOGFILE}
+
+            if [ $? -eq 0 ]; then
+                if [ ${DIRECTION} = "push" ]; then
+                    echo "${RCLONE_START_TIME}" > ${LAST_SUCCESSFUL_DATE_FILE}
+                fi
+                print_metrics "success"
+                return
+            else
+                print_metrics "failed"
+                return
+            fi
+        fi
+    fi
+
+    # default case
+    print_metrics "failed"
+}
+
+prepare_logfile() {
+    if [ ! -e ${LOGFILE} ]; then
+        set -e
+        touch ${LOGFILE}
+        set +e
+    fi
+    cat /dev/null > ${LOGFILE}
+    log "Hi, this is rclone-copy wrapper"
+    chmod 600 ${LOGFILE}
+}
+
+die() {
+    echo "$(date "+%Y/%m/%d %H:%M:%S") ${1}"
+    exit 1
+}
+
+log() {
+    echo "$(date "+%Y/%m/%d %H:%M:%S") ${1}" >> ${LOGFILE}
+}
+
+verify() {
+    if [ -z "${IDENTIFIER}" ]; then
+        echo "You must submit an identifier"
+        exit 1
+    fi
+
+    if [ -z "${RCLONE_SRC}" ]; then
+        echo "You must submit a src"
+        exit 1
+    fi
+
+    if [ -z "${RCLONE_DEST}" ]; then
+        echo "You must submit a destination"
+        exit 1
+    fi
+
+    if [ -d "${PROMETHEUS_TEXTDIR}" ]; then
+        FILENAME="${PROMETHEUS_TEXTDIR}/rclone_copy_${IDENTIFIER}.prom"
+    fi
+}
+
+(
+    verify
+    # try to wait for 8h (28800s) for lock
+    flock -x -w 28800 200 || die "Could not gain lock on ${LOCKFILE}"
+    START_DATE="$(date +%s)"
+    prepare_logfile
+    detect_direction
+
+    check_files
+    build_excludes
+    OUTPUT="$(copy_files)" 
+    echo "${OUTPUT}" | sponge ${FILENAME}
+) 200>${LOCKFILE}

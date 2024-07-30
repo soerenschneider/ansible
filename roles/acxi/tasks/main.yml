@@ -1,0 +1,8 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install.yml
+  tags: [acxi, acxi-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: jobs.yml
+  tags: [acxi, acxi-jobs]

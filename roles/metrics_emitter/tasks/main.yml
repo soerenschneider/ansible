@@ -1,0 +1,63 @@
+---
+- name: Create metrics-emitter binaries directory
+  ansible.builtin.file:
+    path: "{{ metrics_emitter_bins }}"
+    state: directory
+    owner: root
+    group: "{% if ansible_system == 'OpenBSD' %}wheel{% else %}root{% endif %}"
+    mode: "0755"
+  tags: [metrics, metrics-emitter]
+
+- name: Copy basic emitters
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ metrics_emitter_bins }}"
+    owner: root
+    group: "{% if ansible_system == 'OpenBSD' %}wheel{% else %}root{% endif %}"
+    mode: "0555"
+  with_fileglob: [templates/emitters/*]
+  tags: [metrics, metrics-emitter]
+
+- name: Create metrics-emitter binary
+  ansible.builtin.template:
+    src: metrics-emitter.j2
+    dest: /usr/local/bin/metrics-emitter
+    owner: root
+    group: "{% if ansible_system == 'OpenBSD' %}wheel{% else %}root{% endif %}"
+    mode: "0755"
+  tags: [metrics, metrics-emitter]
+
+- name: Create systemd service for metrics-emitter
+  ansible.builtin.template:
+    src: metricsemitter.bsd.j2
+    dest: /etc/rc.d/metricsemitter
+    owner: root
+    group: wheel
+    mode: "0755"
+  when: ansible_system == 'OpenBSD'
+  tags: [metrics, metrics-emitter]
+
+- name: Enable and (re)start metrics-emitter
+  ansible.builtin.service:
+    name: metricsemitter
+    enabled: true
+  when: ansible_system == 'OpenBSD'
+  tags: [metrics, metrics-emitter]
+
+- name: Create systemd service for metrics-emitter
+  ansible.builtin.template:
+    src: metrics-emitter.service.j2
+    dest: /etc/systemd/system/metrics-emitter.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_system == 'Linux'
+  tags: [metrics, metrics-emitter]
+
+- name: Enable and (re)start metrics-emitter
+  ansible.builtin.systemd:
+    state: restarted
+    name: metrics-emitter
+    enabled: true
+  when: ansible_system == 'Linux'
+  tags: [metrics, metrics-emitter]

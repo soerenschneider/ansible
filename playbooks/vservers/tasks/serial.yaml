@@ -1,0 +1,10 @@
+---
+- name: Update GRUB configuration
+  ansible.builtin.lineinfile:
+    path: /etc/default/grub
+    regexp: ^GRUB_CMDLINE_LINUX=
+    line: GRUB_CMDLINE_LINUX="console=tty0 console=ttyS0,115200"
+    backup: true
+  register: _grub_line_result
+  notify: Regenerate GRUB configuration
+  tags: [serial]

@@ -1,0 +1,10 @@
+---
+- name: Add emitters
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ metrics_emitter_bins }}/{{ item }}"
+    owner: root
+    group: root
+    mode: "0755"
+  with_items: [emitter-gocryptfs.sh, emitter-offline-backup.sh]
+  tags: [metrics]

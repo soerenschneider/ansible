@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=shutdown-listener
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ directory_exporter_user }}
+Group={{ directory_exporter_group | default('root') }}
+ExecStart=/usr/local/bin/directory-exporter -config "{{ directory_exporter_config_file }}"
+
+PrivateTmp=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=full
+
+SyslogIdentifier=shutdown-listener
+
+# restart forever
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

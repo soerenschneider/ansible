@@ -1,0 +1,6 @@
+[Resolve]
+DNS=
+DNS=127.0.0.1
+FallbackDNS={% for dns in unbound_nameservers | default([]) %}{{ dns }} {% endfor %} 
+Domains=~.
+

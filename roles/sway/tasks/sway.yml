@@ -1,0 +1,42 @@
+---
+- name: Install sway dependencies
+  ansible.builtin.dnf:
+    name: [json-c-devel, pcre-devel, pango-devel, cairo-devel, gdk-pixbuf2-devel]
+  tags: [sway]
+
+- name: Checkout sway
+  become: false
+  ansible.builtin.git:
+    repo: https://github.com/swaywm/sway.git
+    dest: "{{ sway_sw_dir }}/sway"
+    version: "{{ sway_version }}"
+  register: git_clone
+  tags: [sway]
+
+- name: Meson build
+  environment:
+    PKG_CONFIG_PATH: /usr/local/lib64/pkgconfig
+  ansible.builtin.command: meson build
+  become: false
+  changed_when: true
+  args:
+    chdir: "{{ sway_sw_dir }}/sway"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway]
+
+- name: Ninja build
+  ansible.builtin.command: ninja -C build
+  changed_when: true
+  become: false
+  args:
+    chdir: "{{ sway_sw_dir }}/sway"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway]
+
+- name: Ninja install
+  ansible.builtin.command: ninja -C build install
+  changed_when: true
+  args:
+    chdir: "{{ sway_sw_dir }}/sway"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway]

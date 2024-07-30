@@ -1,0 +1,45 @@
+#!/bin/sh
+
+ARCHIVE=/tmp/cfg-archive-$(hostname).tar.gz.enc
+
+check_permissions() {
+    if [ $(id -u) -ne 0 ]; then
+        echo "This script must be run as root"
+        exit 1
+    fi
+}
+
+cleanup() {
+    set +e
+    umount /cfg
+}
+
+create_backup() {
+    mount -r /cfg
+    tar -czpf - /cfg | openssl enc -salt -pbkdf2 -iter 10000 -aes256 -e -out "${ARCHIVE}"
+}
+
+import_backup() {
+    if [ ! -f "${ARCHIVE}" ]; then
+        echo "File ${ARCHIVE} does not exist, stopping"
+        exit 1
+    fi
+    mount /cfg
+    openssl enc -salt -pbkdf2 -iter 10000 -aes256 -d -in "${ARCHIVE}" | tar pzxf -
+}
+
+check_permissions
+if [ $# -lt 1 ]; then
+    echo "Expected sub-command 'export' or 'import' and an optional filename"
+    exit 1
+fi
+if [ $# -eq 2 ]; then
+    ARCHIVE="$2"
+fi
+trap cleanup ERR EXIT
+
+if [ "$1" = "export" ]; then
+    create_backup
+elif [ "$1" = "import" ]; then
+    import_backup
+fi

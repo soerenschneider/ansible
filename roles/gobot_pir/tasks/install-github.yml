@@ -1,0 +1,140 @@
+---
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/{{ binary_name }}
+  register: local_binary
+  tags: [gobot-pir, gobot-pir-install, gobot, deps]
+
+- name: Check installed version
+  when: local_binary.stat.exists
+  tags: [gobot-pir, gobot-pir-install, gobot, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'
+      register: installed_version
+      changed_when: false
+
+    - name: Register local version
+      ansible.builtin.set_fact:
+        installed_version: "{{ installed_version.stdout }}"
+      changed_when: false
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ installed_version }}"
+      changed_when: false
+
+- name: Fetch latest release information from github
+  when: desired_version is not defined or not desired_version
+  tags: [gobot-pir, gobot-pir-install, gobot, deps]
+  block:
+    - name: Print debug information
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/{{ github_repo }}/releases/latest
+        return_content: true
+      register: github_release
+      retries: 3
+      delay: 5
+      until: github_release is not failed
+
+    - name: Set github release
+      ansible.builtin.set_fact:
+        desired_version: "{{ github_release.json.tag_name }}"
+      changed_when: false
+
+    - name: Print latest GitHub version
+      ansible.builtin.debug:
+        msg: "Latest GitHub version: {{ desired_version }}"
+      changed_when: false
+
+- name: Run block
+  when: not local_binary.stat.exists or desired_version != installed_version
+  tags: [gobot-pir, gobot-pir-install, gobot, deps]
+  block:
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        go_os: "{{ ansible_system | lower }}"
+        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+      changed_when: false
+
+    - name: Set filenames
+      ansible.builtin.set_fact:
+        checksum_signature_file: /tmp/{{ binary_name }}-checksums.sha256.sig
+        checksum_file: /tmp/{{ binary_name }}-checksums.sha256
+        full_filename: "{{ binary_name }}-{{ go_os }}-{{ go_arch }}"
+      changed_when: false
+
+    - name: Get checksum for archive
+      ansible.builtin.set_fact:
+        release_checksum: "{{ item.split(' ')[0] }}"
+      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+
+    - name: Download binary
+      become: false
+      ansible.builtin.get_url:
+        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
+        dest: /tmp/{{ full_filename }}
+        checksum: sha256:{{ release_checksum }}
+        mode: "0640"
+      register: download_archive
+      until: download_archive is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Download release checksum
+      become: false
+      ansible.builtin.get_url:
+        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256
+        dest: "{{ checksum_file }}"
+        mode: "0640"
+      register: download_signature
+      until: download_signature is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Download release checksum signature
+      become: false
+      ansible.builtin.get_url:
+        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256.sig
+        dest: "{{ checksum_signature_file }}"
+        mode: "0640"
+      register: download_signature
+      until: download_signature is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Verify signature
+      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ checksum_file }}
+      changed_when: false
+
+    - name: Stop service
+      ansible.builtin.service:
+        name: "{{ service_name }}"
+        state: stopped
+      failed_when: false
+      register: stopped_service
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: /tmp/{{ full_filename }}
+        dest: /usr/local/bin/{{ item }}
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+      with_items: ["{{ binary_name }}"]
+
+  always:
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: ["{{ checksum_signature_file }}", "{{ checksum_file }}", "/tmp/{{ full_filename }}"]
+      failed_when: false
+
+    - name: Restart service
+      ansible.builtin.service:
+        name: "{{ service_name }}"
+        state: restarted
+      when: stopped_service is defined and stopped_service is changed

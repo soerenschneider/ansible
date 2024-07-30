@@ -1,0 +1,9 @@
+---
+- name: Create configuration file
+  ansible.builtin.template:
+    src: conf.yml.j2
+    dest: /etc/default/lootorganizer.yml
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [lootorganizer, lootorganizer-configure]

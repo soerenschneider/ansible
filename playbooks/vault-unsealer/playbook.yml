@@ -1,0 +1,19 @@
+---
+- name: Install vault-unsealer
+  hosts: vault-unsealer
+  become: true
+  tasks:
+    - name: Including role
+      ansible.builtin.include_role:
+        name: vault_unsealer
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: conditional_reboot
+      tags: always

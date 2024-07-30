@@ -1,0 +1,17 @@
+---
+- name: Disable onboard sound
+  ansible.builtin.lineinfile:
+    path: /boot/config.txt
+    regexp: ^dtparam=audio=on
+    line: "#dtparam=audio=on"
+  when: hifiberry_driver is defined and hifiberry_driver | length > 0
+  tags: [hifiberry, dac]
+
+- name: Enable hifiberry driver
+  ansible.builtin.lineinfile:
+    path: /boot/config.txt
+    insertafter: EOF
+    line: dtoverlay=hifiberry-{{ hifiberry_driver }}
+  when: hifiberry_driver is defined and hifiberry_driver | length > 0
+  notify: Reboot load hifiberry driver
+  tags: [hifiberry, dac]

@@ -1,0 +1,75 @@
+---
+- name: Set sudoers securepath
+  ansible.builtin.lineinfile:
+    path: /etc/sudoers
+    regex: ^Defaults\s+secure_path\s*=
+    line: Defaults    secure_path = /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin
+    state: present
+    validate: visudo -cf %s
+  when: ansible_os_family | lower == "redhat"
+  tags: [base, sudo]
+
+- name: Set PATH for cron
+  ansible.builtin.cron:
+    name: PATH
+    env: true
+    job: /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin
+  when: ansible_os_family | lower == "redhat"
+  tags: [base, sudo]
+
+- name: Run block
+  when: [ansible_system != "OpenBSD", not inventory_hostname | ipaddr('bool')]
+  tags: [base, hostname]
+  block:
+    - name: Set full hostname
+      ansible.builtin.hostname:
+        name: "{{ inventory_hostname }}"
+      failed_when: false
+
+    - name: Add hostname to /etc/hosts
+      ansible.builtin.template:
+        src: hosts.j2
+        dest: /etc/hosts
+        owner: root
+        group: root
+        mode: "0644"
+
+- name: Run block
+  when: ansible_os_family == "Debian"
+  tags: [base, hostname]
+  block:
+    - name: Make sure 'dbus' is installed and started
+      ansible.builtin.package:
+        name: dbus
+    - name: Make sure 'dbus' is started
+      ansible.builtin.systemd:
+        name: dbus
+        state: started
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ timezone | default('UTC') }}"
+  tags: [base, timezone]
+
+- name: Run block
+  when: ansible_os_family | lower == "redhat"
+  tags: [base, base-ntp]
+  block:
+    - name: Install chronyd
+      ansible.builtin.dnf:
+        name: chrony
+
+    - name: Enable chronyd
+      ansible.builtin.systemd:
+        name: chronyd
+        enabled: true
+        state: started
+
+- name: Add bashrc
+  ansible.builtin.template:
+    src: bashrc.j2
+    dest: "{{ item }}"
+    mode: "0640"
+  with_items: [/root/.bashrc, "{{ ansible_env.HOME }}/.bashrc"]
+  when: ansible_system == "Linux"
+  tags: [base]

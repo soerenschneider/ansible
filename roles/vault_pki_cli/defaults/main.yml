@@ -1,0 +1,16 @@
+---
+# renovate: datasource=github-releases depName=soerenschneider/vault-pki-cli
+vault_pki_cli_version: v1.14.0
+
+vault_pki_cli_issue_timer_delay: 6h
+vault_pki_cli_issue_timer_calendar: "*-*-* 04/6:00:00"
+
+vault_pki_cli_acme_timer_delay: 5m
+vault_pki_cli_acme_timer_calendar: "*-*-* 04/6:00:00"
+
+vault_pki_cli_crl_enabled: true
+vault_pki_cli_crl_timer_delay: 1h
+vault_pki_cli_crl_timer_calendar: 00/02:00
+
+vault_pki_cli_group: vault_pki
+vault_pki_cli_create_group: true

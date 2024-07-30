@@ -1,0 +1,47 @@
+---
+- name: Add aplos group
+  ansible.builtin.group:
+    name: "{{ aplos_group }}"
+  tags: [aplos, aplos-install]
+
+- name: Add aplos user
+  ansible.builtin.user:
+    name: "{{ aplos_user }}"
+    group: "{{ aplos_group }}"
+  tags: [aplos, aplos-install]
+
+- name: Add aplos dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ aplos_user }}"
+    group: "{{ aplos_group }}"
+    mode: "0700"
+  with_items: ["{{ aplos_data_dir }}", "{{ aplos_data_dir }}/repos"]
+  tags: [aplos, aplos-install]
+
+- name: Add aplos config
+  ansible.builtin.copy:
+    content: "{{ aplos_config | to_nice_json }}"
+    dest: "{{ aplos_config_file }}"
+    owner: "{{ aplos_user }}"
+    group: "{{ aplos_group }}"
+    mode: "0600"
+  tags: [aplos, aplos-install]
+
+- name: Add aplos systemd file
+  ansible.builtin.template:
+    src: aplos.service.j2
+    dest: /etc/systemd/system/aplos.service
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [aplos, aplos-install]
+
+- name: Enable/disable aplos
+  ansible.builtin.systemd:
+    name: aplos
+    enabled: "{% if aplos_disabled | default(False) %}false{% else %}true{% endif %}"
+    state: "{% if aplos_disabled | default(False) %}stopped{% else %}restarted{% endif %}"
+    daemon_reload: true
+  tags: [aplos, aplos-install]

@@ -1,0 +1,72 @@
+---
+- name: Add user for updating adblocker
+  ansible.builtin.user:
+    name: "{{ unbound_adblocker_update_user }}"
+    shell: /sbin/nologin
+    home: /nonexistent
+    create_home: false
+    append: true
+  tags: [unbound, adblocker]
+
+- name: Make sure adblocker db exists
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ unbound_adblocker_adblocker_file }}"
+    force: false
+    owner: "{{ unbound_adblocker_update_user }}"
+    group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}root{% endif %}"
+    mode: "0660"
+  tags: [unbound, adblocker]
+
+- name: Copy unbound_update_adblocker_db script
+  ansible.builtin.template:
+    src: unbound_update_adblocker_db.j2
+    dest: "{% if ansible_system == 'OpenBSD' %}/etc/scripts{% else %}/usr/local/bin{% endif %}/unbound_update_adblocker_db"
+    owner: root
+    group: "{% if ansible_system == 'OpenBSD' %}wheel{% else %}root{% endif %}"
+    mode: "0755"
+  tags: [unbound, adblocker]
+
+- name: Check whether adblocker file is already populated
+  ansible.builtin.stat:
+    path: "{{ unbound_adblocker_adblocker_file }}"
+  register: _adblocker_file
+  tags: [unbound, adblocker]
+
+- name: Add weekly cron job to update adblocker db (Linux)
+  ansible.builtin.cron:
+    name: update adblocker db
+    special_time: weekly
+    user: root
+    job: bash /usr/local/bin/unbound_update_adblocker_db
+    state: absent
+  when: unbound_adblocker_update_cron_run_weekly
+  tags: [unbound, adblocker]
+
+- name: Copy units to update adblockers
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  with_items: [unbound-update-adblocker-db.service, unbound-update-adblocker-db.timer]
+  register: _adblocker_systemd_units
+  tags: [unbound, adblocker]
+  when: ansible_system == "Linux"
+
+- name: Enable timer
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: unbound-update-adblocker-db.timer
+    state: restarted
+    enabled: true
+  tags: [unbound, adblocker]
+
+- name: Initialize adblocker db (Linux)
+  ansible.builtin.command: bash /usr/local/bin/unbound_update_adblocker_db
+  ignore_errors: true
+  register: ignore_errors_register
+  when: _adblocker_file.stat.size < 1
+  changed_when: true
+  tags: [unbound, adblocker]

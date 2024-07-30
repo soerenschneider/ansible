@@ -1,0 +1,44 @@
+---
+- name: Create rclone_copy wrapper
+  ansible.builtin.template:
+    src: templates/rclone_copy.j2
+    dest: /usr/local/bin/rclone_copy
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [rclone, rclone-backups]
+
+- name: Create rclone_copy_all wrapper
+  ansible.builtin.template:
+    src: templates/rclone_copy_all.j2
+    dest: /usr/local/bin/rclone_copy_all
+    owner: root
+    group: root
+    mode: "0755"
+  tags:
+    - rclone
+    - rclone-backups
+# special name all
+- name: Schedule all backups
+  ansible.builtin.cron:
+    name: rclone-all
+    hour: "{{ item.hour }}"
+    minute: "{{ item.minute }}"
+    weekday: "{{ item.weekday | default('*') }}"
+    user: "{{ item.user }}"
+    job: /usr/local/bin/rclone_copy_all
+  with_items: "{{ rclone_backup_definitions | default([]) }}"
+  when: item.name == "all"
+  tags: [rclone, rclone-backups]
+
+- name: Schedule individual backups
+  ansible.builtin.cron:
+    name: rclone-{{ item.name }}
+    hour: "{{ item.hour }}"
+    minute: "{{ item.minute }}"
+    weekday: '{{ item.weekday | default("*") }}'
+    user: "{{ item.user }}"
+    job: /usr/local/bin/rclone_copy {{ item.name }} {{ item.src }} {{ item.dst }}
+  with_items: "{{ rclone_backup_definitions | default([]) }}"
+  when: [item.name != "all", item.hour is defined, item.minute is defined]
+  tags: [rclone, rclone-backups]

@@ -1,0 +1,11 @@
+[Unit]
+Description=Prune data from the restic repository
+
+[Timer]
+Unit=restic-prune@%i.service
+OnCalendar=Sun *-*-* 12:00:00
+RandomizedDelaySec=7200
+Persistent=true
+
+[Install]
+WantedBy=timers.target

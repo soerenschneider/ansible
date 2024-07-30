@@ -1,0 +1,9 @@
+[Unit]
+Description=Update unbound adblocker database
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/unbound_update_adblocker_db
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,50 @@
+---
+- name: Install dependencies (Debian)
+  ansible.builtin.apt:
+    install_recommends: false
+    name: [vorbis-tools, opus-tools, flac, libparallel-forkmanager-perl]
+  when: ansible_os_family == "Debian"
+  tags: [acxi]
+
+- name: Install dependencies (RedHat)
+  ansible.builtin.dnf:
+    name: [vorbis-tools, flac, perl-Parallel-ForkManager]
+  when: ansible_os_family == "RedHat"
+  tags: [acxi]
+
+- name: Download archive
+  ansible.builtin.git:
+    repo: https://github.com/smxi/acxi.git
+    dest: /opt/acxi
+    version: "{{ acxi_version }}"
+  tags: [acxi, deps]
+
+- name: Link binary
+  ansible.builtin.file:
+    src: /opt/acxi/acxi
+    dest: /usr/local/bin/acxi
+    owner: root
+    group: root
+    state: link
+  tags: [acxi]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    manpage_dest: /usr/local/share/man/man1/acxi.1
+  when: ansible_os_family == "RedHat"
+  tags: [acxi, deps]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    manpage_dest: /usr/local/share/man/acxi.1
+  when: ansible_os_family == "Debian"
+  tags: [acxi, deps]
+
+- name: Link man-page
+  ansible.builtin.file:
+    src: /opt/acxi/acxi.1
+    dest: "{{ manpage_dest }}"
+    owner: root
+    group: root
+    state: link
+  tags: [acxi, deps]

@@ -1,0 +1,48 @@
+---
+- name: Set facts
+  ansible.builtin.set_fact:
+    firewall_rules: "{{ [{'from': ['any'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"
+  tags: [firewall, always]
+
+- name: Collect TCP rules
+  ansible.builtin.set_fact:
+    fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+  loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'tcp') | list }}"
+  tags: [firewall, always]
+
+- name: Collect UDP rules
+  ansible.builtin.set_fact:
+    fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+  loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'udp') | list }}"
+  tags: [firewall, always]
+
+- name: Reset firewall
+  community.general.ufw:
+    state: reset
+  tags: [firewall, always]
+
+- name: Allow TCP rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    src: "{{ item.1 }}"
+    proto: tcp
+  loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
+  tags: [firewall, always]
+
+- name: Allow UDP rules
+  community.general.ufw:
+    rule: allow
+    port: "{{ item.0 }}"
+    src: "{{ item.1 }}"
+    proto: udp
+  loop: "{{ fw_udp_rules | default([]) | flatten(levels=1) }}"
+  tags: [firewall, always]
+
+- name: Set default ingress policy to reject
+  community.general.ufw:
+    state: enabled
+    default: reject
+    direction: incoming
+    logging: low
+  tags: [firewall, always]

@@ -1,0 +1,13 @@
+---
+- name: Run mysqld exporter
+  community.docker.docker_container:
+    name: mysqld-exporter
+    image: "{{ mysqld_exporter_image }}"
+    user: "{{ _mariadb_user_string }}"
+    restart_policy: always
+    networks:
+      - name: mariadb-cluster
+    env:
+      DATA_SOURCE_NAME: exporter:{{ mysqld_exporter_password }}@({{ mariadb_container_name }}:3306)/?tls=skip-verify
+    ports: [0.0.0.0:9104:9104]
+  tags: [mariadb, exporter, mysql]

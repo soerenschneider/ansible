@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+
+set -eu
+
+# define vars
+URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+
+TMP_FILE="/tmp/adblocker.db"
+ADSERVERS_FILE={{ unbound_adblocker_adblocker_file }}
+UNPRIV_USER={{ unbound_adblocker_update_user }}
+PROMETHEUS_TEXTFILE_DIR="{{ prometheus_text_dir }}"
+METRIC_FILE="$PROMETHEUS_TEXTFILE_DIR/unbound_adblocker.prom"
+SUCCESS=0
+
+# script start
+with_backoff() {
+  local max_attempts=${ATTEMPTS-10}
+  local timeout=${TIMEOUT-1}
+  local attempt=0
+  local exitCode=0
+
+  while [[ $attempt < $max_attempts ]]
+  do
+    "$@"
+    exitCode=$?
+
+    if [[ $exitCode == 0 ]]
+    then
+      break
+    fi
+
+    echo "Failure! Retrying in $timeout.." 1>&2
+    sleep $timeout
+    attempt=$(( attempt + 1 ))
+    timeout=$(( timeout * 2 ))
+  done
+
+  if [[ $exitCode != 0 ]]
+  then
+    echo "Giving up eventually! ($@)" 1>&2
+  fi
+
+  return $exitCode
+}
+
+fetch_list() {
+    set +e
+    # run the update command as unprivileged user
+    if [ "${OS}" = "OpenBSD" ];  then
+        with_backoff doas -u {{ unbound_adblocker_update_user }} /usr/local/bin/curl -sS -L --compressed "${URL}" | awk 'BEGIN { OFS = "" } NF == 2 && $1 == "0.0.0.0" { print "local-zone: \"", $2, "\" redirect"; print "local-data: \"", $2, " A 0.0.0.0\"" }' > $TMP_FILE
+    else
+        with_backoff sudo -u {{ unbound_adblocker_update_user }} curl -sS -L --compressed "${URL}" | awk 'BEGIN { OFS = "" } NF == 2 && $1 == "0.0.0.0" { print "local-zone: \"", $2, "\" redirect"; print "local-data: \"", $2, " A 0.0.0.0\"" }' > $TMP_FILE
+    fi
+    set -e
+}
+
+apply_changes() {
+    # restart the unbound server to make changes effective, but only if files differ
+    CHECKSUM_NEW="$(checksum ${TMP_FILE})"
+    if [[ "${CHECKSUM_NEW}" != "${CHECKSUM_OLD}" ]] && [[ -s ${TMP_FILE} ]]; then
+        if [ -f "${ADSERVERS_FILE}" ]; then
+            mv "${ADSERVERS_FILE}" "${ADSERVERS_FILE}.bak"
+        fi
+        mv "${TMP_FILE}" "${ADSERVERS_FILE}"
+        chmod 640 "${ADSERVERS_FILE}"
+
+        # set file permissions and SELinux context (if applicable)
+        if [ "${OS}" = "OpenBSD" ];  then
+            chown root:_unbound "${ADSERVERS_FILE}"
+        else
+            chown root:root "${ADSERVERS_FILE}"
+            set +e
+            if command -v restorecon >/dev/null 2>&1; then
+              restorecon "${ADSERVERS_FILE}"
+            fi
+            set -e
+        fi
+
+        # check config and restart service on success, rewind on failure
+        if unbound-checkconf; then
+            if [ "${OS}" = "OpenBSD" ];  then
+                unbound-control reload
+                SUCCESS=1
+            else
+                systemctl restart unbound
+                SUCCESS=1
+            fi
+            # delete temporary backup file after confirming that everything works
+            if [ -f "${ADSERVERS_FILE}.bak" ]; then
+                rm "${ADSERVERS_FILE}.bak"
+            fi
+        else
+            # undo change, continue using the old adblockers file
+            mv -v "${ADSERVERS_FILE}.bak" "${ADSERVERS_FILE}"
+        fi
+    else
+        SUCCESS=1
+    fi
+}
+
+print_metrics() {
+    # update metrics
+    local SUCCESS_METRIC_NAME="unbound_adblocker_import_success_bool"
+    echo "# HELP $SUCCESS_METRIC_NAME bool that indicates success of the import"
+    echo "# TYPE $SUCCESS_METRIC_NAME gauge"
+    echo "$SUCCESS_METRIC_NAME ${SUCCESS}"
+
+    local UPDATE_METRIC_NAME="unbound_adblocker_import_timestamp"
+    echo "# HELP $UPDATE_METRIC_NAME the timestamp of the last import"
+    echo "# TYPE $UPDATE_METRIC_NAME gauge"
+    echo "$UPDATE_METRIC_NAME $(date +%s)"
+
+    local ENTRIES_CNT_METRIC_NAME="unbound_adblocker_entries_total"
+    echo "# HELP $ENTRIES_CNT_METRIC_NAME the number of entries the adblocker list has"
+    echo "# TYPE $ENTRIES_CNT_METRIC_NAME gauge"
+    echo "$ENTRIES_CNT_METRIC_NAME $(grep 'local-zone:' $ADSERVERS_FILE | wc -l)"
+
+    local END=$SECONDS
+    local DURATION=$((END - START))
+    local DURATION_METRIC_NAME="unbound_adblocker_import_duration_sec"
+    echo "# HELP $DURATION_METRIC_NAME the duration of the last import"
+    echo "# TYPE $DURATION_METRIC_NAME gauge"
+    echo "$DURATION_METRIC_NAME $DURATION"
+}
+
+checksum() {
+    if [ "${OS}" = "OpenBSD" ];  then
+        sha256 "${1}" | awk '{print $1}'
+    else
+        sha256sum "${1}" | awk '{print $1}'
+    fi
+}
+
+main() {
+    if [ $(id -u) -ne 0 ]; then
+        echo "This script must be run as root"
+        exit 1
+    fi
+    
+    START=$SECONDS
+    OS="$(uname)"
+
+    if [ -f "${ADSERVERS_FILE}" ]; then
+        CHECKSUM_OLD=$(checksum ${ADSERVERS_FILE})
+    else
+        CHECKSUM_OLD=""
+    fi
+
+    fetch_list
+    apply_changes
+
+    if [ -d ${PROMETHEUS_TEXTFILE_DIR} ]; then
+        print_metrics > ${METRIC_FILE}.tmp
+        mv ${METRIC_FILE}.tmp ${METRIC_FILE}
+    fi
+}
+
+main

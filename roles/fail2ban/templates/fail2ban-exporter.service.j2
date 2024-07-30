@@ -1,0 +1,14 @@
+[Unit]
+Description=fail2ban prometheus exporter
+Wants=fail2ban.target
+StartLimitIntervalSec=3600
+StartLimitBurst=720
+
+[Service]
+User=root
+ExecStart={{ fail2ban_exporter_path }}/fail2ban-exporter
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Spindown hard drives
+After=suspend.target
+
+[Service]
+Type=oneshot
+ExecStart=/sbin/hdparm -S{{ hdparm_spindown }} {{ hdparm_disk }}
+
+[Install]
+WantedBy=suspend.target basic.target

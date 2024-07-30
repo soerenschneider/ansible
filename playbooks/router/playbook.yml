@@ -1,0 +1,59 @@
+---
+- name: Setup routers
+  hosts: routers
+  become: true
+  handlers:
+    - name: Import handlers
+      ansible.builtin.import_tasks: handlers/main.yml
+  vars:
+    nftables_variables_file: /etc/nftables/nftables-variables.nft
+
+  tasks:
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/network.yaml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: unbound
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: device_stalker
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/haproxy.yaml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/firewall.yaml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/sysctl.yaml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/dhcpd.yml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_tasks: tasks/ntpd.yml
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
+        name: dyndns
+      tags: always

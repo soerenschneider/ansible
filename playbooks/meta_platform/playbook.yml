@@ -1,0 +1,24 @@
+---
+- name: Re-issue vault certificates
+  # FIX: if we roll out node_exporter through this playbook we overwrie all the whitelist settings as they're all defined in the playbook vars
+  hosts: all,!k8s
+  strategy: free
+  become: true
+  vars:
+    acmevault_client_config: "{{ acmevault_default_client_config }}"
+    node_exporter_systemd_whitelist: (acmevault-.*|apparmor|cron|hass|ssh|unattended-upgrades)\.service
+  tasks:
+    - name: Run command
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Re-issue x509 certificates
+      ansible.builtin.command: find /etc/vault-pki-cli -type f -exec vault-pki-cli issue --config {} \;
+      changed_when: true
+      tags: never
+
+    - name: Re-issue ssh certificates
+      ansible.builtin.command: ssh-key-signer sign-host-key
+      changed_when: true
+      tags: never

@@ -1,0 +1,6 @@
+---
+inventory_hostname: soeren-nb.ha.soeren.cloud
+location: ha
+use_wireguard: true
+wireguard_wg_net_name: mesh
+wg_enable_default: false

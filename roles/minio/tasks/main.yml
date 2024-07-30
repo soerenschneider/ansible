@@ -1,0 +1,17 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install.yml
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: minio
+    github_repo: minio/minio
+    service_name: minio
+    version_wanted: "{{ minio_version }}"
+  tags: always
+
+- name: Including tasks
+  ansible.builtin.include_tasks: configure.yaml
+  tags: always

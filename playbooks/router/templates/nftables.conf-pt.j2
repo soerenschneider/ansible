@@ -1,0 +1,120 @@
+#!/usr/sbin/nft -f
+
+flush ruleset
+
+include "{{ nftables_variables_file }}"
+
+define WG_CLIENTS = { 192.168.72.0/21, $LOCAL_KODI }
+define NET_LOCAL = 192.168.72.0/21
+
+table ip global {
+    chain inbound_world {
+        # accepting ping (icmp-echo-request) for diagnostic purposes.
+        # However, it also lets probes discover this host is alive.
+        # This sample accepts them within a certain rate limit:
+        #
+        # icmp type echo-request limit rate 5/second accept
+
+        # allow wireguard
+        udp dport $WIREGUARD_PORT accept
+
+        # allow SSH connections from some well-known internet host
+        ip saddr $WORLD_SSH_SOURCES tcp dport ssh accept
+    }
+
+    chain inbound_private {
+        # accepting ping (icmp-echo-request) for diagnostic purposes.
+        icmp type echo-request limit rate 5/second accept
+
+        # allow DHCP, DNS and SSH from the private network
+        ip saddr $NET_PRIVATE ip protocol . th dport vmap {
+            udp . 53 : accept,
+            tcp . 53 : accept,
+            udp . 67 : accept,
+            udp . 123 : accept
+        }
+
+        ip saddr $LOCAL_PROMETHEUS_SERVER tcp dport { 9100, 9192 } accept
+        ip saddr { 192.168.72.0/24, 192.168.74.0/24 } tcp dport { 445, 6600 } accept
+        ip saddr $NET_PRIVATE tcp dport ssh accept
+    }
+
+    chain inbound_wg {
+        # accepting ping (icmp-echo-request) for diagnostic purposes.
+        icmp type echo-request limit rate 5/second accept
+
+        # allow DHCP, DNS and SSH from the private network
+        ip protocol . th dport vmap {
+            tcp . 22 : accept,
+            udp . 53 : accept,
+            tcp . 53 : accept,
+            udp . 67 : accept,
+            udp . 123 : accept
+        }
+    }
+
+    chain inbound {
+        type filter hook input priority 0; policy drop;
+
+        # Allow traffic from established and related packets, drop invalid
+        ct state vmap { established : accept, related : accept, invalid : drop }
+
+        # allow loopback traffic, anything else jump to chain for further evaluation
+        iifname vmap {
+            lo : accept,
+            $DEV_WORLD : jump inbound_world,
+            $WG_IF : jump inbound_wg,
+            $DEV_PRIVATE : jump inbound_private,
+            "vlan72": jump inbound_private,
+            "vlan73": jump inbound_private,
+            "vlan74": jump inbound_private,
+            "vlan75": jump inbound_private,
+            "vlan76": jump inbound_private
+        }
+
+        # the rest is dropped by the above policy
+    }
+
+    chain forward {
+        type filter hook forward priority 0; policy drop;
+
+        # Allow traffic from established and related packets, drop invalid
+        ct state vmap { established : accept, related : accept, invalid : drop }
+
+        iifname "vlan72" accept
+        iifname "vlan73" oifname { "vlan73", "vlan74", "vlan75", "wg0" } ip daddr {192.168.74.0/24, 192.168.75.0/24, 192.168.65.0/24, 192.168.2.0/24 } accept
+        # todo local_mqtt
+        iifname "vlan74" ip saddr { $LOCAL_SMB_CLIENT } oifname { "vlan73", "wg0" } ip daddr { $LOCAL_FILESERVER, $GLOBAL_FILESERVER } tcp dport { 443, 445, 139} accept
+        iifname "vlan75" oifname { "vlan73", "vlan74" } accept
+
+        # steam streaming
+        iifname "vlan74" ip saddr { 192.168.74.10 }     oifname { "vlan72" } ip daddr { 192.168.72.3 } udp dport 27031-27036 accept
+        iifname "vlan74" ip saddr { 192.168.74.10 }     oifname { "vlan72" } ip daddr { 192.168.72.3 } tcp dport 27036-27037 accept
+
+        # connections from the internal net to the internet or to other
+        # internal nets are allowed
+        # route
+        iifname { "vlan72", "vlan73", "vlan74", "vlan75", "vlan76" } ip daddr != 192.168.0.0/16 accept
+        ip saddr $WG_CLIENTS iifname { "vlan73", "vlan75" } accept
+        # allow servers
+        ip saddr { 192.168.2.0/24, 192.168.65.0/24, 192.168.200.1/32, 192.168.200.100 } iifname $WG_IF oifname "vlan73" accept
+        # allow routers for HA nas
+        ip saddr { 192.168.200.2, 192.168.200.3 } iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport { 445, 6600 } accept
+
+        ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport 9999 accept
+        ip saddr 192.168.200.0/24 iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_VAULT_SERVER      tcp dport 443  accept
+        ip saddr 192.168.200.1    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_PROMETHEUS_SERVER tcp dport 443  accept
+        ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport 9999 accept
+        ip saddr $GLOBAL_DEVICE_SOEREN_WORK iifname $WG_IF ip daddr $LOCAL_K8S_MASTER               tcp dport 6443 accept
+        ip saddr $WG_NET iifname $WG_IF accept
+        #iifname wg0 ip daddr 192.168.2.0/24 accept
+
+        # the rest is dropped by the above policy
+    }
+
+    chain postrouting {
+        type nat hook postrouting priority 100; policy accept;
+        # masquerade private IP addresses
+        ip saddr $NET_LOCAL oifname $DEV_WORLD masquerade
+    }
+}

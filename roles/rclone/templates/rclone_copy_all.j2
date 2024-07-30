@@ -1,0 +1,9 @@
+#!/bin/sh
+
+set +e
+
+{% for item in rclone_backup_definitions %}
+{% if item.name != "all" %}
+/usr/local/bin/rclone_copy {{ item.name }} {{ item.src }} {{ item.dst }}{% if item.excludes is defined %} {{ item.excludes }}{% endif %} 
+{% endif %}
+{% endfor %}

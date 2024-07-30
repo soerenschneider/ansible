@@ -1,0 +1,14 @@
+---
+- name: Install samba (CentOS)
+  ansible.builtin.dnf:
+    name: [samba]
+  when: ansible_os_family == 'RedHat'
+  notify: Restart samba
+  tags: [samba, samba-install]
+
+- name: Install samba (Debian)
+  ansible.builtin.apt:
+    name: [samba]
+  when: ansible_os_family == 'Debian'
+  notify: Restart samba
+  tags: [samba, samba-install]

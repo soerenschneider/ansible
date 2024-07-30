@@ -1,0 +1,16 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install.yml
+  tags: [rclone, rclone-configure]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags: [rclone, rclone-configure]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: exporter.yml
+  tags: [rclone, rclone-exporter]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: backups.yml
+  tags: [rclone, rclone-backups]

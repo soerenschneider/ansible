@@ -1,0 +1,13 @@
+---
+profile: production
+exclude_paths:
+  - .github
+  - scripts
+  - .checkov.yaml
+  - .pre-commit-config.yaml
+  - .yamllint.yaml
+  - trivy.yaml
+  - requirements.yml
+skip_list:
+  - name[template]
+  - yaml[line-length]

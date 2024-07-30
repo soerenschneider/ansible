@@ -1,0 +1,5 @@
+---
+- name: Restart gobot-lux
+  ansible.builtin.service:
+    name: gobot-lux
+    state: restarted

@@ -1,0 +1,11 @@
+---
+- name: Rollout wireguard configuration
+  hosts: wireguard_mesh
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Including role
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always

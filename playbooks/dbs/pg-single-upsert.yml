@@ -1,0 +1,58 @@
+---
+- name: Upsert Postgres db
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ postgres_user }}"
+      tags: always
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _postgres_user_string: "{{ getent_passwd['postgres'][1] }}"
+        # _postgres_user_string: "{{ getent_passwd['postgres'][1] }}:{{ getent_passwd['postgres'][2] }}"
+      tags: always
+
+    - name: Create postgres docker network
+      community.docker.docker_network:
+        name: postgres-cluster
+      tags: [docker, postgres]
+
+    - name: Get infos about existing container
+      community.docker.docker_container_info:
+        name: "{{ postgres_container_name }}"
+      register: _container_result
+      tags: [docker, postgres]
+
+    - name: Stop postgres
+      community.docker.docker_container:
+        name: "{{ postgres_container_name }}"
+        state: stopped
+      when: _container_result.exists
+      tags: [docker, postgres]
+
+    - name: Run master
+      community.docker.docker_container:
+        name: "{{ postgres_container_name }}"
+        image: postgres:14.5-bullseye
+        restart_policy: always
+        recreate: true
+        user: "{{ _postgres_user_string }}"
+        command: [-c ssl=on, -c ssl_cert_file=/tls.crt, -c ssl_key_file=/tls.key]
+        networks:
+          - name: postgres-cluster
+        ports: [0.0.0.0:5432:5432]
+        env:
+          POSTGRES_PASSWORD: "{{ postgres_root_password }}"
+          POSTGRES_ENABLE_TLS: "yes"
+          POSTGRES_TLS_CERT_FILE: /tls.crt
+          POSTGRES_TLS_KEY_FILE: /tls.key
+          #          POSTGRESQL_TLS_CA_FILE: /ca.crt
+          TZ: UTC
+        volumes: [/etc/postgres/ca.crt:/ca.crt:ro, /etc/postgres/tls.key:/tls.key:ro, /etc/postgres/tls.crt:/tls.crt:ro, /etc/postgres/storage:/var/lib/postgresql/data, /etc/passwd:/etc/passwd:ro]
+      when: inventory_hostname == postgres_cluster_master
+      tags: [docker, postgres]

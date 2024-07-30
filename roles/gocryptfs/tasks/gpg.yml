@@ -1,0 +1,25 @@
+---
+- name: Make sure GPG key is imported
+  become: false
+  tags: [gocryptfs]
+  block:
+    - name: Check if key is already in keyring
+      ansible.builtin.command: gpg2 --list-keys FFF3E01444FED7C316A3545A895F5BC123A02740
+      changed_when: false
+  rescue:
+    - name: Copy GPG pub key
+      become: false
+      ansible.builtin.copy:
+        src: gocryptfs-signing-key.pub
+        dest: /tmp/gocryptfs-signing-key.pub
+        mode: "0644"
+
+    - name: Import GPG public key
+      become: false
+      ansible.builtin.command: gpg2 --import /tmp/gocryptfs-signing-key.pub
+      changed_when: true
+
+    - name: Clean up key
+      ansible.builtin.file:
+        state: absent
+        path: /tmp/gocryptfs-signing-key.pub

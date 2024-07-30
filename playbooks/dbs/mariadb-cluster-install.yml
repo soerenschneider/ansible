@@ -1,0 +1,223 @@
+---
+- name: Install MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Create mariadb user
+      ansible.builtin.user:
+        name: "{{ mariadb_user }}"
+        system: true
+      tags: [mariadb, exporter, mysql, db]
+
+    - name: Create mariadb dir
+      ansible.builtin.file:
+        path: "{{ mariadb_base_dir }}"
+        state: directory
+        owner: "{{ mariadb_user }}"
+        group: root
+        mode: "0700"
+        recurse: true
+      tags: [mariadb, mysql, db]
+
+    - name: Create mariadb storage dir
+      ansible.builtin.file:
+        path: "{{ mariadb_storage_dir }}"
+        state: directory
+        owner: "{{ mariadb_user }}"
+        group: root
+        mode: "0700"
+      tags: [mariadb, mysql, db]
+
+    - name: Create mariadb certs dir
+      ansible.builtin.file:
+        path: "{{ mariadb_certs_dir }}"
+        state: directory
+        owner: "{{ mariadb_user }}"
+        group: root
+        mode: "0700"
+      tags: [mariadb, mysql, db]
+
+    - name: Create mariadb dir storage
+      ansible.builtin.template:
+        src: templates/01-exporter.sql.j2
+        dest: "{{ mariadb_base_dir }}/01-exporter.sql"
+        owner: "{{ mariadb_user }}"
+        group: "{{ mariadb_user }}"
+        mode: "0700"
+      tags: [mariadb, mysql, db]
+
+    - name: Copy letsencrypt sst.cnf
+      ansible.builtin.copy:
+        content: |
+          [sst]
+          encrypt=4
+          tkey=/certs/wsrep.key
+          tcert=/certs/wsrep.crt
+          tca=/certs/wsrep-ca.crt
+        dest: "{{ mariadb_base_dir }}/sst.cnf"
+        owner: root
+        group: root
+        mode: "0444"
+      tags: [mariadb, mysql, db]
+
+    - name: Copy soeren pki ca
+      ansible.builtin.copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          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
+          plaUXnCo4Q==
+          -----END CERTIFICATE-----
+          -----BEGIN CERTIFICATE-----
+          MIIF1TCCA72gAwIBAgIUPmywCIVMRsWase49HzsCEIbN+kswDQYJKoZIhvcNAQEL
+          BQAwKDENMAsGA1UEChMEc29yZzEXMBUGA1UEAxMOc3JuLmltIHJvb3QgY2EwHhcN
+          MjMxMjEwMTUzOTU3WhcNMjYxMjA5MTU0MDE5WjAoMQ0wCwYDVQQKEwRzb3JnMRcw
+          FQYDVQQDEw5zcm4uaW0gcm9vdCBjYTCCAiIwDQYJKoZIhvcNAQEBBQADggIPADCC
+          AgoCggIBANcEbwKuPBVKL7xw17S0mWpPOe+iGZGDpz9WeigghxL3/8F4dq2Q+Qpa
+          vtdK/BoTtZPLqGnL6VNkCI+hqH9OYVR3RIYjQNLj/dajiCrcharXTfAUiBVMPfTA
+          so9UsZsrg3ssuMIasoIVRaU25HMbQA6eTA4MdJ+RQzIPDx1ZNuohDLQL5J3o+oDX
+          uzwEV/NU5nAUkOlWLj13+cCtRYDfaRad+LzEiOLVRzRUWNtoGQ6dZT7HoznezN1D
+          P6lAsR57VqDqUEGgwZkmps4GRr4tQHKgyrnTbhbN6SkMo4FfWF/t1yYCVINFZme0
+          9xKuRJzkCjMmZArKsNtTk4TmYEey2xb9Ii3cRz5uodRxdQfIxncv67b4eKgysiYV
+          0fVZ9N+MaSSyx9LT9qbA38Lx+jM5gvnP+qGbH/Wbf1LWRKgdRqPwwNZ+ep0eTRwR
+          /PhynI26qdykvSXM6a15ecF5zhpwfBEnbe318/Mx6khq2z9C0gonmVLBMIq9Xt8f
+          BUUQ+28q81dMpDgmwLgOJ2n+/gqGLDzbyqm3QyJdjO8rMW0id4sYsWsL9bmRgBSJ
+          O5UliP3XG4Bj0HW76MAeexIlwEjZfY5vZZ/MRlPt8hrAf8rudBKejysrawoj96kS
+          03HLKMimWu4Subajey0STUEOyIFvBGWbBWzG6zLA2Z31ZEApaCwXAgMBAAGjgfYw
+          gfMwDgYDVR0PAQH/BAQDAgEGMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFM/r
+          VRBlTHcRu/l9G8CWoXS/vStdMB8GA1UdIwQYMBaAFM/rVRBlTHcRu/l9G8CWoXS/
+          vStdMEwGCCsGAQUFBwEBBEAwPjA8BggrBgEFBQcwAoYwaHR0cHM6Ly92YXVsdC5o
+          YS5zb2VyZW4uY2xvdWQvdjEvcGtpX3Jvb3Rfc3JuL2NhMEIGA1UdHwQ7MDkwN6A1
+          oDOGMWh0dHBzOi8vdmF1bHQuaGEuc29lcmVuLmNsb3VkL3YxL3BraV9yb290X3Ny
+          bi9jcmwwDQYJKoZIhvcNAQELBQADggIBAIO44MZdkYp7zd1iRJ/paHnxdk2WZTrK
+          IctigOCzyEE6C9vvmY07VD2z9V7OzpWzvjYM4pe9CH9KqQuGHMpbK+VhDFckOKWG
+          iHE8y6U9i2gZ662TsyNbSOGpFxM/4R3z1Ss2A6Hv+gt+sUKA4iLLBBaKY0HiO4eL
+          jxcyYP/TNXBtTAolUrTIFfIDhnqJg4P3ymXlgJoAXN/00q47rSV8S7jEXHIGQvXr
+          liAsaXM20rWNJnUprCqr3000dJAmJKLoeqObmBsebeo82UNam2BNGFMCmxCC3pch
+          n0GAHX2yG+aqLOb8ZPCfEWqxFpy895C3H2qDx/Cpe5xRQzrxstuWhxWaSaGt0ppv
+          TC8oEkanv6VuygYoU+9r32NFPzq+oBBzDw27e9rpO683d4NJ0p+RZ/u5z2UpxWeo
+          CgSKFFrbgDTDtu7Uzopa3EKRMR1MDch02P4jqUnHtYfnUfMKCtwe4sYLiYY0EdVx
+          mxIzijk+qgjiJAK9kE5697sfq23jJjDKoFiTVkN9j2L7bZd6Mmbo3HA8+bDotHnG
+          4zbS0VKM6ttBQE9wzKERlRRyLrzhzT85n6Nz1d8kePlkfbi3sNnjsz4MWp1A0FIG
+          kDYRT4O1I8WagNbY84mZlngCWnDdOm8vaYNmUhtBshS1CZaUAXrt0figsoxMijXB
+          OgPYYsxXD/Y+
+          -----END CERTIFICATE-----
+        dest: "{{ mariadb_certs_dir }}/wsrep-ca.crt"
+        owner: root
+        group: root
+        mode: "0444"
+      tags: [mariadb, mysql, db]
+
+    - name: Copy letsencrypt ca
+      ansible.builtin.copy:
+        content: |
+          -----BEGIN CERTIFICATE-----
+          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
+          nLRbwHOoq7hHwg==
+          -----END CERTIFICATE-----
+        dest: "{{ mariadb_certs_dir }}/ca.crt"
+        owner: root
+        group: root
+        mode: "0444"
+      tags: [mariadb, mysql, db]
+
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ mariadb_user }}"
+      tags: [mariadb, mysql, exporter, db]
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _mariadb_user_string: "{{ getent_passwd[mariadb_user][1] }}"
+        # _mariadb_user_string: "{{ getent_passwd[mariadb_pass][1] }}:{{ getent_passwd[mariadb_user][2] }}"
+      tags: [mariadb, exporter, mysql, db]
+
+    - name: Create mariadb docker network
+      community.docker.docker_network:
+        name: mariadb-cluster
+      tags: [docker, mariadb, mysql]
+
+    - name: Get infos about existing container
+      community.docker.docker_container_info:
+        name: "{{ mariadb_container_name }}"
+      register: _container_result
+      tags: [docker, mariadb, mysql]
+
+    - name: Including tasks
+      tags: [mariadb, mysql]
+      when: not _container_result.exists
+
+      block:
+        - name: Init cluster, run master
+          ansible.builtin.include_tasks: tasks/mariadb_run_master.yaml
+          when: inventory_hostname == mariadb_cluster_master
+
+        - name: Run slaves, connect to cluster
+          ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+          when: inventory_hostname != mariadb_cluster_master
+
+        - name: Run initial master as slave
+          ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+          when: inventory_hostname == mariadb_cluster_master
+    - name: Run exporter
+      ansible.builtin.include_tasks: tasks/mariadb_run_exporter.yaml
+      tags: [mariadb, exporter, mysql]

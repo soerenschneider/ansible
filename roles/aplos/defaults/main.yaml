@@ -1,0 +1,7 @@
+---
+aplos_group: aplos
+aplos_user: aplos
+aplos_data_dir: /srv/aplos
+
+aplos_config: ""
+aplos_disabled: false

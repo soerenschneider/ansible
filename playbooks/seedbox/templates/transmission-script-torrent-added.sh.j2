@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# https://github.com/soerenschneider/hermes
+HOST="{{ transmission_webhook_added_url }}"
+
+curl --connect-timeout 5 \
+     --max-time 10 \
+     --retry 5 \
+     --retry-delay 5 \
+     --retry-max-time 40 \
+     -X POST -d '{"service_id":"telegram","subject":"Transmission","message":"Added '"${TR_TORRENT_NAME}"'"}' \
+     "${HOST}/notify"

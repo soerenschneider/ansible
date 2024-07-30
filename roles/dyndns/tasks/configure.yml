@@ -1,0 +1,101 @@
+---
+- name: Add interface config to client config
+  ansible.builtin.set_fact:
+    dyndns_client_config: "{{ dyndns_client_config | combine({'interface': dyndns_client_interface}) }}"
+  when: [dyndns_client_config is defined, dyndns_client_interface | default("") | length > 0]
+  notify: Restart dyndns-client
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Create client config file
+  ansible.builtin.copy:
+    content: "{{ dyndns_client_config | ansible.builtin.to_nice_yaml(indent=2,width=800) }}"
+    dest: "{{ dyndns_client_config_file }}"
+    owner: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
+    mode: "0600"
+  when: dyndns_client_config is defined
+  notify: Restart dyndns-client
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Create server config file
+  ansible.builtin.copy:
+    content: "{{ dyndns_server_config | ansible.builtin.to_nice_yaml(indent=2,width=800) }}"
+    dest: "{{ dyndns_server_config_file }}"
+    owner: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
+    mode: "0600"
+  when: dyndns_server_config is defined
+  notify: Restart dyndns-server
+  tags: [dyndns, dyndns-server, dyndns-configure, dyndns-server-configure]
+
+- name: Assemble keypair
+  ansible.builtin.set_fact:
+    _dyndns_client_keypair: {'public_key': "{{ dyndns_client_pub_key }}", 'private_key': "{{ dyndns_client_private_key }}"}
+  when: [dyndns_client_pub_key is defined, dyndns_client_private_key is defined]
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Fail if pubkey not found
+  ansible.builtin.fail:
+    msg: Pubkey {{ dyndns_client_pub_key }} is not defined for host {{ dyndns_client_config_host }}
+  when: [dyndns_pub_keys is defined, dyndns_client_pub_key is defined, dyndns_client_private_key is defined, 'dyndns_client_pub_key not in dyndns_pub_keys[dyndns_client_config_host]']
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Write keypair file
+  ansible.builtin.copy:
+    content: "{{ _dyndns_client_keypair | to_nice_json }}"
+    dest: /etc/dyndns/keypair.json
+    owner: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
+    mode: "0600"
+  when: _dyndns_client_keypair is defined
+  notify: Restart dyndns-client
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Create environment files
+  ansible.builtin.copy:
+    content: ""
+    force: false
+    dest: "/etc/dyndns/environment-{{ item }}"
+    owner: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
+    mode: "0600"
+  with_items:
+    - server
+    - client
+  tags: [dyndns, dyndns-install]
+
+- name: Add client systemd unit
+  ansible.builtin.template:
+    src: dyndns-client.service.j2
+    dest: /etc/systemd/system/dyndns-client.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_system == "Linux"
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Enable client systemd unit
+  ansible.builtin.systemd:
+    name: dyndns-client
+    enabled: "{% if dyndns_client_config is defined %}true{% else %}false{% endif %}"
+    daemon_reload: true
+  when: ansible_system == "Linux"
+  tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
+
+- name: Add server systemd unit
+  ansible.builtin.template:
+    src: dyndns-server.service.j2
+    dest: /etc/systemd/system/dyndns-server.service
+    owner: root
+    group: root
+    mode: "0644"
+  when: ansible_system == "Linux"
+  tags: [dyndns, dyndns-server, dyndns-configure, dyndns-server-configure]
+
+- name: Enable server systemd unit
+  ansible.builtin.systemd:
+    name: dyndns-server
+    enabled: "{% if dyndns_server_config is defined %}true{% else %}false{% endif %}"
+    daemon_reload: true
+  when: ansible_system == "Linux"
+  tags: [dyndns, dyndns-server, dyndns-configure, dyndns-server-configure]

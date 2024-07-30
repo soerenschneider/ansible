@@ -1,0 +1,15 @@
+---
+- name: Wait for node to be ready
+  ansible.builtin.command: >
+    docker exec {{ mariadb_container_name }} mysql -B -s -u{{ mariadb_root_user | default('root') }} -p{{ mariadb_root_password }} --execute="SHOW STATUS LIKE 'wsrep_local_state_comment';"
+  register: _result
+  until: result.rc == 0
+  retries: 20
+  changed_when: false
+  delay: 3
+  tags: [docker, mariadb, mysql]
+
+- name: Debug
+  ansible.builtin.debug:
+    var: _result.stdout
+  tags: [docker, mariadb, mysql]

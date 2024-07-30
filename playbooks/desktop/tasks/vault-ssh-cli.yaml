@@ -1,0 +1,10 @@
+---
+- name: Add vault-ssh-cli config
+  become: false
+  ansible.builtin.copy:
+    content: "{{ vault_ssh_cli_config_desktop }}"
+    dest: ~/.vault-ssh-cli.yaml
+    owner: "{{ default_user }}"
+    group: "{{ default_user }}"
+    mode: "0600"
+  tags: [vault-ssh-cli-configure, vault-ssh-cli]

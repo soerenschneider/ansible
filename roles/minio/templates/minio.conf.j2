@@ -1,0 +1,12 @@
+MINIO_VOLUMES="{{ minio_volumes }}"
+MINIO_OPTS="--address {{ minio_address }} --console-address {{ minio_console_address }} --certs-dir=/home/{{ minio_user }}/.minio/certs"
+
+MINIO_SERVER_URL=https://{{ minio_server_url | default(inventory_hostname) }}
+MINIO_BROWSER_REDIRECT_URL=https://{{ minio_browser_redirect_url | default(inventory_hostname) }}/minio-ui/
+
+{% if minio_root_user | default('') | length > 0 %}
+MINIO_ROOT_USER={{ minio_root_user }}
+{% endif %}
+{%- if minio_root_password | default('') | length > 0 %}
+MINIO_ROOT_PASSWORD={{ minio_root_password }}
+{% endif %}

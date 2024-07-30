@@ -1,0 +1,97 @@
+---
+- name: "{{ item.config.role_name }} - Create config"
+  ansible.builtin.copy:
+    content: "{{ item.config | to_nice_json }}"
+    dest: /etc/vault-approle/{{ item.name }}.json
+    owner: "{{ item.config.secret_id_file_user }}"
+    group: "{{ item.config.secret_id_file_group }}"
+    mode: "0600"
+
+- name: "{{ item.config.role_name }} - Create base directory if file does not exist"
+  ansible.builtin.stat:
+    path: "{{ item.config.secret_id_file | dirname }}"
+  register: file_stat
+  changed_when: false
+
+- name: "{{ item.config.role_name }} - Create base directory"
+  ansible.builtin.file:
+    path: "{{ item.config.secret_id_file | dirname }}"
+    state: directory
+    owner: "{{ item.config.secret_id_file_user }}"
+    group: "{{ item.config.secret_id_file_group }}"
+    mode: "0750"
+  when: not file_stat.stat.exists
+
+- name: "{{ item.config.role_name }} - Create secret_id file"
+  ansible.builtin.copy:
+    dest: "{{ item.config.secret_id_file }}"
+    content: ""
+    force: false
+    owner: "{{ item.config.secret_id_file_user }}"
+    group: "{{ item.config.secret_id_file_group }}"
+    mode: "0600"
+
+- name: "{{ item.config.role_name }} - Check if secret_id file exists"
+  ansible.builtin.stat:
+    path: "{{ item.config.secret_id_file }}"
+  register: _secret_id_file
+
+- name: "{{ item.config.role_name }} - Try login with existing credentials for"
+  ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output login }} --secret-id-file={{ item.config.secret_id_file }}
+  when: _secret_id_file.stat.exists and _secret_id_file.stat.size > 0
+  register: _login
+  changed_when: false
+  failed_when: false
+
+- name: "{{ item.config.role_name }} - Create new wrapped secret_id"
+  ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output  add-secret-id }} --metadata host={{ inventory_hostname }} --role-name={{ item.config.role_name }} --wrap-ttl=900
+  register: _vault_output
+  when: _login.skipped is defined or _login.rc != 0
+  become: false
+  changed_when: true
+  delegate_to: localhost
+
+- name: "{{ item.config.role_name }} - Store wrapped secret_id"
+  ansible.builtin.set_fact:
+    vault_wrapped_token: "{{ (_vault_output.stdout | from_json).vault_response.token }}"
+  when: _login.skipped is defined or _login.rc != 0
+  become: false
+  delegate_to: localhost
+
+- name: Run block
+  when: _login.skipped is defined or _login.rc != 0
+
+  block:
+    - name: "{{ item.config.role_name }} - Unwrap token"
+      ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output unwrap-secret-id }}
+      changed_when: false
+      environment:
+        VAULT_TOKEN: "{{ vault_wrapped_token }}"
+
+    - name: "{{ item.config.role_name }} - Rotate secret_id"
+      ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output rotate-secret-id }} --role-name={{ item.config.role_name }} --secret-id-file={{ item.config.secret_id_file }}
+      changed_when: true
+      register: _rotate
+
+    - name: "{{ item.config.role_name }} - Output"
+      ansible.builtin.debug:
+        msg: "{{ _rotate.stdout }}"
+- name: "{{ item.config.role_name }} - Enable systemd service"
+  ansible.builtin.systemd:
+    name: vault-approle@{{ item.name }}.service
+    enabled: true
+
+- name: "{{ item.config.role_name }} - Enable systemd timer"
+  ansible.builtin.systemd:
+    name: vault-approle@{{ item.name }}.timer
+    enabled: true
+
+- name: "{{ item.config.role_name }} - Start systemd service"
+  ansible.builtin.systemd:
+    name: vault-approle@{{ item.name }}.service
+    state: started
+
+- name: "{{ item.config.role_name }} - Enable systemd timer"
+  ansible.builtin.systemd:
+    name: vault-approle@{{ item.name }}.timer
+    state: started

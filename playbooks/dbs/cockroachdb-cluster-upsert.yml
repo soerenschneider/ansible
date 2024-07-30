@@ -1,0 +1,44 @@
+---
+- name: Upsert cockroachdb cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ cockroachdb_user }}"
+      tags: always
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        # _cockroachdb_user_string: "{{ getent_passwd['cockroachdb'][1] }}:{{ getent_passwd['cockroachdb'][2] }}"
+        _cockroachdb_user_string: "{{ getent_passwd['cockroachdb'][1] }}"
+      tags: always
+
+    - name: Create cockroachdb docker network
+      community.docker.docker_network:
+        name: cockroachdb-cluster
+      tags: [docker, cockroachdb]
+
+    - name: Run cockroachdb
+      community.docker.docker_container:
+        name: "{{ cockroachdb_container_name }}"
+        image: cockroachdb/cockroach:{{ cockroachdb_version }}
+        # user: "{{ _cockroachdb_user_string }}"
+        restart_policy: always
+        recreate: true
+        ansible.builtin.command: [start, --certs-dir=/certs, "--cert-principal-map=soeren-nb.ha.soeren.cloud:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}", --cluster-name=kakerlake, '--locality=zone={{ location }}', --listen-addr=0.0.0.0:26257, '--advertise-addr={{ inventory_hostname }}:26257', '--advertise-sql-addr={{ inventory_hostname }}:26258', --sql-addr=0.0.0.0:26258, --http-addr=0.0.0.0:8080, "--join={% for node in groups['dbs'] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}"]
+        ports: [0.0.0.0:8080:8080, 0.0.0.0:26257:26257, 0.0.0.0:26258:26258]
+        env:
+          TZ: UTC
+        volumes: [/etc/cockroachdb/certs:/certs:ro, /etc/cockroachdb/storage:/cockroach/cockroach-data/]
+      tags: [docker, cockroachdb]
+
+    - name: Init cluster
+      community.docker.docker_container_exec:
+        container: cockroachdb
+        ansible.builtin.command: cockroach init --certs-dir /certs/ --cert-principal-map={% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %} --host {{ inventory_hostname }}
+      # ansible.builtin.command: cockroach init --insecure --cluster-name=kakerlake
+      when: false and inventory_hostname == groups["dbs"][0]

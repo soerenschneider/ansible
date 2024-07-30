@@ -1,0 +1,4 @@
+---
+syncthing_dirs_metrics_configs: {}
+syncthing_local_nets: []
+syncthing_traffic_class: 1

@@ -1,0 +1,27 @@
+[Unit]
+Description="dyndns-server"
+Documentation=https://www.github.com/soerenschneider/dyndns
+Requires=network-online.target
+After=network-online.target
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+User={{ dyndns_user }}
+Group={{ dyndns_group }}
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+SecureBits=keep-caps
+NoNewPrivileges=yes
+EnvironmentFile=/etc/dyndns/environment-server
+ExecStart=/usr/local/bin/dyndns-server -config={{ dyndns_server_config_file }}
+ExecReload=/bin/kill --signal HUP $MAINPID
+KillMode=process
+KillSignal=SIGINT
+
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

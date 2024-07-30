@@ -1,0 +1,16 @@
+[Unit]
+Description=Reresolve DNS of all WireGuard endpoints
+Wants=network-online.target
+After=network-online.target
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+# restart forever
+Restart=always
+RestartSec=30
+Type=simple
+ExecStart=/usr/local/bin/tunnelguard wg0
+
+[Install]
+WantedBy=multi-user.target

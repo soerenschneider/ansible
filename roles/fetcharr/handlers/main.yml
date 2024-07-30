@@ -1,0 +1,5 @@
+---
+- name: Restart fetcharr
+  ansible.builtin.systemd:
+    name: fetcharr
+    state: restarted

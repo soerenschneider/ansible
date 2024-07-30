@@ -1,0 +1,24 @@
+[Unit]
+Description=fetcharr
+# restart forever
+StartLimitIntervalSec=0
+{% if fetcharr_required_services | default([]) | length > 0 %}
+Requires={{ fetcharr_required_services | join(' ') }}
+{% endif %}
+{% if fetcharr_wanted_services | default([]) | length > 0 %}
+Wants={{ fetcharr_wanted_services | join(' ') }}
+{% endif %}
+
+[Service]
+ExecStart=/usr/local/bin/fetcharr 
+Type=idle
+User={{ fetcharr_user }}
+
+Restart=always
+RestartSec=600s
+
+LimitNOFILE=4096
+ProtectHome=read-only
+
+[Install]
+WantedBy=multi-user.target

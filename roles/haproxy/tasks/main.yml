@@ -1,0 +1,55 @@
+---
+- name: Install haproxy
+  ansible.builtin.package:
+    name: haproxy
+  tags: [haproxy, haproxy-install]
+- name: Create systemd override directory
+  ansible.builtin.file:
+    path: "{{ _haproxy_override_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [haproxy, haproxy-configure]
+
+- name: Create override for service
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+      # restart forever
+      StartLimitIntervalSec=0
+
+      [Service]
+      # restart forever
+      Restart=always
+      RestartSec={{ haproxy_systemd_restart_s }}
+    dest: "{{ _haproxy_override_directory }}/override.conf"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: [Reload systemd, Restart haproxy]
+  tags: [haproxy, haproxy-configure]
+
+- name: Add file for allowed user CNs
+  ansible.builtin.template:
+    src: allowed_cns.txt.j2
+    dest: "{{ haproxy_allowed_users_cns_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    cns: "{{ haproxy_allowed_user_cns | default([]) }}"
+  notify: Restart haproxy
+  tags: haproxy
+
+- name: Add file for allowed scraping CNs
+  ansible.builtin.template:
+    src: allowed_cns.txt.j2
+    dest: "{{ haproxy_allowed_scrapers_cns_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart haproxy
+  vars:
+    cns: "{{ haproxy_allowed_scraper_cns | default([]) }}"
+  tags: haproxy

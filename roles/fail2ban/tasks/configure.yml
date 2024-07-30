@@ -1,0 +1,41 @@
+---
+- name: Detect local files
+  ansible.builtin.stat:
+    path: "{{ item.logpath }}"
+  register: logpaths
+  with_items: "{{ fail2ban_services }}"
+  tags: [fail2ban, fail2ban-configure]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    existing_logpaths: "{{ existing_logpaths | default([]) + [item.item.name] }}"
+  with_items: "{{ logpaths.results }}"
+  when: item.stat.exists
+  tags: [fail2ban, fail2ban-configure]
+
+- name: Copy jail.local configuration
+  ansible.builtin.template:
+    src: templates/jail.local.j2
+    dest: "{{ fail2ban_config_dir }}/jail.local"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fail2ban
+  tags: [fail2ban, fail2ban-configure]
+
+- name: Install filters
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ fail2ban_config_dir }}/filter.d/"
+    owner: root
+    group: root
+    mode: "0644"
+  with_fileglob: templates/filters/*.conf
+  notify: Restart fail2ban
+  tags: [fail2ban, fail2ban-configure]
+
+- name: Enable fail2ban
+  ansible.builtin.systemd:
+    name: fail2ban
+    enabled: true
+  tags: [fail2ban, fail2ban-configure]

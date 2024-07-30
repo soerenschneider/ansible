@@ -1,0 +1,51 @@
+---
+- name: Check if we are on an internal system
+  ansible.builtin.set_fact:
+    is_internal_system: true
+  when: item.domain in ansible_host
+  with_items: "{{ internal_domains }}"
+  tags: [base, authorized_keys, ssh]
+
+- name: Build list of internal networks
+  ansible.builtin.set_fact:
+    soft_keys_options: from="{{ ssh_authorized_keys_soft_opts_from | join(',') }}"
+  when: ["ssh_authorized_keys_soft_opts_from | default([]) | length > 0", is_internal_system is defined, is_internal_system is true]
+  tags: [base, authorized_keys, ssh]
+
+- name: Collect regular keys
+  ansible.builtin.set_fact:
+    soft_keys: "{{ authorized_keys_soft | map(attribute='pub') | join('\n') }}"
+  tags: [base, authorized_keys, ssh]
+
+- name: Add current user '{{ ansible_user }}' to authorized_keys_users
+  ansible.builtin.set_fact:
+    authorized_keys_users: "{{ authorized_keys_users | default([]) + [ansible_user] | unique }}"
+  tags: [base, authorized_keys, ssh]
+
+- name: Add hardware keys exclusively without any restrictions
+  ansible.posix.authorized_key:
+    key: "{{ authorized_keys_hw }}"
+    exclusive: true
+    key_options: ""
+    user: "{{ item }}"
+  with_items: "{{ authorized_keys_users }}"
+  tags: [base, authorized_keys, ssh]
+
+- name: Add confined soft keys
+  ansible.posix.authorized_key:
+    key: "{{ soft_keys }}"
+    exclusive: false
+    key_options: "{{ soft_keys_options | default('') }}"
+    user: "{{ item }}"
+  with_items: "{{ authorized_keys_users }}"
+  tags: [base, authorized_keys, ssh]
+
+- name: Add custom ssh keys
+  ansible.posix.authorized_key:
+    key: "{{ item.pub }}"
+    exclusive: false
+    key_options: "{{ item.options | default(omit) }}"
+    user: "{{ item.user }}"
+  when: item.pub is defined and item.user is defined
+  with_items: "{{ additional_authorized_keys }}"
+  tags: [base, authorized_keys, ssh]

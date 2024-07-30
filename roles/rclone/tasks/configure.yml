@@ -1,0 +1,21 @@
+---
+- name: Create rclone config directory
+  become: false
+  ansible.builtin.file:
+    path: ~/.config/rclone
+    state: directory
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0700"
+  tags: [rclone, rclone-configure]
+
+- name: Create rclone config
+  become: false
+  ansible.builtin.copy:
+    content: "{{ rclone_config }}"
+    dest: ~/.config/rclone/rclone.conf
+    owner: "{{ ansible_user }}"
+    group: "{{ ansible_user }}"
+    mode: "0600"
+  when: rclone_config is defined
+  tags: [rclone, rclone-configure]

@@ -1,0 +1,114 @@
+---
+- name: Run block
+  when: [ansible_system == "Linux"]
+  tags: [wireguard, vpn]
+  block:
+    - name: Install wireguard
+      ansible.builtin.package:
+        name: wireguard
+      when: ansible_os_family | lower == "debian"
+
+    - name: Install wireguard
+      ansible.builtin.package:
+        name: wireguard-tools
+
+    - name: Add wg timer template
+      ansible.builtin.template:
+        src: wg@.timer.j2
+        dest: /etc/systemd/system/wg@.timer
+        owner: root
+        group: root
+        mode: "0640"
+      register: _wg_timer
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
+      when: _wg_timer is changed  # noqa: no-handler
+
+- name: Run block
+  when: [ansible_system == "OpenBSD", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
+  tags: [wireguard, vpn]
+  block:
+    - name: Write wg config
+      ansible.builtin.template:
+        src: wg-{{ ansible_system | lower }}.j2
+        dest: /etc/hostname.{{ item.device }}
+        owner: root
+        group: wheel
+        mode: "0640"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+      register: _wg_config_changed
+    - name: Run command
+      ansible.builtin.command: sh /etc/netstart
+      changed_when: false
+      when: [_wg_config_changed is defined, _wg_config_changed is changed]
+
+- name: Run block
+  when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
+  tags: [wireguard, vpn]
+  block:
+    - name: Add wireguard device
+      ansible.builtin.template:
+        src: wg-{{ ansible_system | lower }}.j2
+        dest: /etc/wireguard/{{ item.device }}.conf
+        owner: root
+        group: root
+        mode: "0640"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+
+    - name: Add systemd override directory
+      ansible.builtin.file:
+        name: /etc/systemd/system/wg-quick@{{ item.device }}.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+
+    - name: Add systemd override config
+      ansible.builtin.template:
+        src: wg-quick.override.conf.j2
+        dest: /etc/systemd/system/wg-quick@{{ item.device }}.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0640"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+
+    - name: Start and enable wireguard tunnel
+      ansible.builtin.systemd:
+        name: wg-quick@{{ item.device }}
+        state: "{% if wg_enable_default | default(True) %}restarted{% else %}stopped{% endif %}"
+        daemon_reload: true
+        enabled: "{% if wg_enable_default | default(True) %}true{% else %}false{% endif %}"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+
+- name: Run block
+  when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
+  tags: [tunnelguard, wireguard, vpn]
+  block:
+    - name: Add tunnelguard script
+      ansible.builtin.template:
+        src: tunnelguard.j2
+        dest: /usr/local/bin/tunnelguard
+        owner: root
+        group: root
+        mode: "0755"
+      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+      register: _tunnelguard_service_script
+
+    - name: Add tunnelguard service
+      ansible.builtin.template:
+        src: tunnelguard.service.j2
+        dest: /etc/systemd/system/tunnelguard.service
+        owner: root
+        group: root
+        mode: "0644"
+      register: _tunnelguard_service_systemd
+
+    - name: Start and enable tunnelguard
+      ansible.builtin.systemd:
+        name: tunnelguard
+        enabled: true
+        daemon_reload: "{% if _tunnelguard_service_systemd is changed %}true{% else %}false{% endif %}"
+        state: "{% if _tunnelguard_service_script is changed %}restarted{% else %}started{% endif %}"

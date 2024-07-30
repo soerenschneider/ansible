@@ -1,0 +1,27 @@
+[Unit]
+Description=metrics-emitter
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/local/bin/metrics-emitter {% if node_exporter_textfile_dir is defined %}{{ node_exporter_textfile_dir }}{% endif %} 
+PrivateTmp=true
+ProtectHome=true
+NoNewPrivileges=true
+#ReadWritePaths=
+#ReadWriteDirectories=
+#ProtectSystem=strict
+#ProtectControlGroups=true
+#ProtectKernelModules=true
+#ProtectKernelTunables=true
+ProtectSystem=full
+
+SyslogIdentifier=metrics-emitter
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

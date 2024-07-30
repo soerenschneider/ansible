@@ -1,0 +1,73 @@
+---
+- name: Run master with startdb sql
+  community.docker.docker_container:
+    name: "{{ mariadb_container_name }}"
+    image: "{{ mariadb_image }}"
+    restart_policy: always
+    user: "{{ _mariadb_user_string }}"
+    networks:
+      - name: mariadb-cluster
+    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+    env:
+      MARIADB_GALERA_CLUSTER_BOOTSTRAP: "yes"
+      MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_galera_backup_user }}"
+      MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_galera_backup_pw }}"
+      MARIADB_GALERA_CLUSTER_NAME: "{{ mariadb_galera_cluster_name }}"
+      MARIADB_REPLICATION_USER: "{{ mariadb_replication_user }}"
+      MARIADB_REPLICATION_PASSWORD: "{{ mariadb_replication_pass }}"
+      MARIADB_ENABLE_TLS: "yes"
+      MARIADB_TLS_CERT_FILE: /certs/tls.crt
+      MARIADB_TLS_KEY_FILE: /certs/tls.key
+      MARIADB_TLS_CA_FILE: /certs/ca.crt
+      MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_520_ci
+      MARIADB_EXTRA_FLAGS: --require_secure_transport=1 --wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/node-ca.crt;socket.ssl_cert=/certs/node.crt;socket.ssl_key=/certs/node.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568; --wsrep_node_incoming_address={{ inventory_hostname }} }} --wsrep_node_address={{ inventory_hostname }}
+      TZ: UTC
+    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/sst.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf, /etc/mariadb/01-exporter.sql:/docker-entrypoint-startdb.d/01-exporter.sql:ro]
+  tags: [docker, mariadb, mysql]
+
+- name: Wait for 30s
+  ansible.builtin.pause:
+    seconds: 30
+  tags: [docker, mariadb, mysql]
+
+- name: Run master
+  community.docker.docker_container:
+    name: "{{ mariadb_container_name }}"
+    image: "{{ mariadb_image }}"
+    restart_policy: always
+    recreate: true
+    user: "{{ _mariadb_user_string }}"
+    networks:
+      - name: mariadb-cluster
+    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+    env:
+      MARIADB_GALERA_CLUSTER_BOOTSTRAP: "yes"
+      MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_galera_backup_user }}"
+      MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_galera_backup_pw }}"
+      MARIADB_GALERA_CLUSTER_NAME: "{{ mariadb_galera_cluster_name }}"
+      MARIADB_ENABLE_TLS: "yes"
+      MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
+      MARIADB_TLS_CERT_FILE: /certs/tls.crt
+      MARIADB_TLS_KEY_FILE: /certs/tls.key
+      MARIADB_TLS_CA_FILE: /certs/ca.crt
+      MARIADB_EXTRA_FLAGS: --require_secure_transport=1 --wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/node-ca.crt;socket.ssl_cert=/certs/node.crt;socket.ssl_key=/certs/node.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568; --wsrep_node_incoming_address={{ inventory_hostname }} }} --wsrep_node_address={{ inventory_hostname }}
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_520_ci
+      MARIADB_REPLICATION_USER: "{{ mariadb_replication_user }}"
+      MARIADB_REPLICATION_PASSWORD: "{{ mariadb_replication_pass }}"
+      TZ: UTC
+    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/sst.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
+  tags: [docker, mariadb, mysql]
+
+- name: Wait for master to be ready
+  ansible.builtin.command: >
+    docker exec {{ mariadb_container_name }} mysqladmin ping -u{{ mariadb_root_user | default('root') }} -p{{ mariadb_root_password }}
+  register: _result
+  until: result.rc == 0
+  retries: 100
+  delay: 5
+  no_log: true
+  changed_when: false
+  tags: [docker, mariadb, mysql]

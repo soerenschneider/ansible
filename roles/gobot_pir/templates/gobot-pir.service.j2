@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+[Unit]
+Description=gobot-pir
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ gobot_pir_user }}
+Group={{ gobot_pir_group | default(gobot_pir_user) }}
+ExecStart=/usr/local/bin/gobot-pir -config "{{ gobot_pir_config_file }}"
+
+#PrivateTmp=true
+#ProtectHome=true
+#NoNewPrivileges=true
+#ProtectSystem=strict
+#ProtectControlGroups=true
+#ProtectKernelModules=true
+#ProtectKernelTunables=true
+#ProtectSystem=full
+
+SyslogIdentifier=gobot-pir
+
+# restart forerver
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

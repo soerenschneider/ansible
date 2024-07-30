@@ -1,0 +1,23 @@
+---
+mosquitto_max_connections: 768
+
+mosquitto_plain_listener: true
+mosquitto_plain_listener_expose: false
+mosquitto_plain_allow_anonymous: false
+
+mosquitto_tls_listener: false
+# mosquitto_tls_domain: ""
+mosquitto_tls_whitelist_domain: ""
+mosquitto_tls_require_cert: true
+mosquitto_tls_identity_as_username: true
+mosquitto_tls_ca_file: /etc/pki_soerenschneider_ca.crt
+mosquitto_tls_crt_file: /etc/mosquitto/{{ mosquitto_tls_domain | default(inventory_hostname) }}.crt.pem
+mosquitto_tls_key_file: /etc/mosquitto/{{ mosquitto_tls_domain | default(inventory_hostname) }}.key.pem
+mosquitto_tls_allow_anonymous: false
+
+mosquitto_password_file: /etc/mosquitto/pwfile
+
+mosquitto_exporter_install: true
+mosquitto_exporter_user: mosquitto_exporter
+
+mosquitto_install_certbot_hooks: false

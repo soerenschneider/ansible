@@ -1,0 +1,34 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: gobot-bme280
+    github_repo: soerenschneider/gobot-bme280
+    service_name: gobot-bme280
+  tags: [gobot, gobot-bme280, gobot-bme280-install, deps]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ gobot_bme280_config | to_nice_json }}"
+    dest: "{{ gobot_bme280_config_file }}"
+    owner: "{{ gobot_bme280_user }}"
+    group: "{{ gobot_bme280_group }}"
+    mode: "0644"
+  notify: Restart gobot-bme280
+  tags: [gobot, gobot-bme280, gobot-bme280-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: gobot-bme280.service.j2
+    dest: /etc/systemd/system/gobot-bme280.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart gobot-bme280
+  tags: [gobot, gobot-bme280, gobot-bme280-configure]
+
+- name: Enable/disable gobot-bme280
+  ansible.builtin.service:
+    name: gobot-bme280
+    enabled: true
+  tags: [gobot, gobot-bme280, gobot-bme280-configure]

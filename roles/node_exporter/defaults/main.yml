@@ -1,0 +1,28 @@
+---
+node_exporter_textfile_dir: /var/lib/node_exporter
+node_exporter_textfile_is_ramdisk: true
+node_exporter_web_listen_address: 127.0.0.1:9100
+node_exporter_user: node_exporter
+node_exporter_group: "{{ node_exporter_user }}"
+# add users to the node_exporter group
+node_exporter_add_users: []
+# renovate: datasource=github-releases depName=prometheus/node_exporter
+node_exporter_version: v1.8.1
+
+node_exporter_traefik:
+  disable_auth: false
+  enable: false
+  domain: ""
+
+node_exporter_systemd_whitelist: (crond|sshd)\.service
+node_exporter_ramdisk_size_mb: 1
+
+node_exporter_enabled_collectors:
+  - systemd
+  - textfile:
+      directory: "{{ node_exporter_textfile_dir }}"
+  - filesystem:
+      ignored-mount-points: ^/(sys|proc|dev|var/lib/docker|var/lib/k0s/kubelet|run/docker)($|/)
+      ignored-fs-types: ^(sys|proc|overlay|ns|auto)fs$
+
+node_exporter_disabled_collectors: [infiniband, nfs, nfsd, mdadm, zfs]

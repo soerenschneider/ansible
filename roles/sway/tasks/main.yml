@@ -1,0 +1,46 @@
+---
+- name: Install utilities
+  ansible.builtin.dnf:
+    name: [xorg-x11-server-Xwayland, light, rofi, dunst, pulseaudio-utils]
+  tags: [sway]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: wlroots.yml
+  tags: [sway, wlroots]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: swaybg.yml
+  tags: [sway, swaybg]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: swaylock.yml
+  tags: [sway, swaylock]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: swayidle.yml
+  tags: [sway, swayidle]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: sway.yml
+  tags: [sway]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: mako.yml
+  tags: [sway, mako]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: redshift.yml
+  when: sway_install_redshift
+  tags: [sway, redshift]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: bumblebee_status.yml
+  tags: [sway, bumblebee_status]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: grim.yml
+  tags: [sway, grim]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: slurp.yml
+  tags: [sway, slurp]

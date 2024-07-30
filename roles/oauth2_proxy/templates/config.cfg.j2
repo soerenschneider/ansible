@@ -1,0 +1,3 @@
+{% for item in oauth2_proxy_config.content | dict2items %}
+{{ item.key }} = {{ item.value | to_json }}
+{% endfor %}

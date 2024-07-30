@@ -1,0 +1,20 @@
+---
+- name: Install 'dnf-automatic'
+  ansible.builtin.package:
+    name: dnf-automatic
+  tags: [automatic-sysupdates]
+
+- name: Automatically apply dnf updates
+  ansible.builtin.lineinfile:
+    dest: /etc/dnf/automatic.conf
+    regexp: ^apply_updates =
+    line: apply_updates = yes
+    state: present
+  tags: [automatic-sysupdates]
+
+- name: Enable and (re)start dnf-automatic-install
+  ansible.builtin.systemd:
+    state: started
+    name: dnf-automatic.timer
+    enabled: true
+  tags: [automatic-sysupdates]

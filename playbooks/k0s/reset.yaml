@@ -1,0 +1,19 @@
+---
+- name: Destroy k0s
+  hosts: k8s
+  become: true
+  strategy: free
+  gather_facts: true
+  tasks:
+    - name: Reboot
+      ansible.builtin.reboot: {}
+
+    - name: Remove stuff
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_items: [/etc/k0s, /var/lib/k0s, /var/lib/kubelet, /etc/systemd/system/k0scontroller.service]
+
+    - name: Clean rest
+      ansible.builtin.command: sudo find / -iname "*k0s*" -exec rm -rf {} \;
+      changed_when: true

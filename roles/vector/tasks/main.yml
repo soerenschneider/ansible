@@ -1,0 +1,40 @@
+---
+- name: Create group for vector
+  ansible.builtin.group:
+    name: "{{ vector_group }}"
+    system: true
+    state: present
+  tags: [vector, vector-install, deps]
+
+- name: Create user for vector
+  ansible.builtin.user:
+    name: "{{ vector_user }}"
+    system: true
+    shell: /sbin/nologin
+    group: "{{ vector_group }}"
+    groups: [adm]
+    append: true
+    createhome: false
+  tags: [vector, vector-install]
+
+- name: Create dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ vector_user }}"
+    group: "{{ vector_group }}"
+    mode: "0700"
+  with_items: [/etc/vector, /var/lib/vector]
+  tags: [vector, vector-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: vector
+    github_repo: vectordotdev/vector
+    service_name: vector
+  tags: [vector, vector-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags: [vector, vector-install, deps]

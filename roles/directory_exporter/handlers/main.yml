@@ -1,0 +1,5 @@
+---
+- name: Restart directory-exporter
+  ansible.builtin.service:
+    name: "{{ directory_exporter_service_name }}"
+    state: restarted

@@ -1,0 +1,7 @@
+[Unit]
+Description=Prune docker
+After=docker.target
+
+[Service]
+Type=oneshot
+ExecStart=docker system prune -af --filter "label!=prune=keep"

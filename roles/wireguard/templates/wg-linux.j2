@@ -1,0 +1,37 @@
+[Interface]
+Address    = {{ item.address }}
+ListenPort = {{ item.port | default(51820) }}
+PrivateKey = {{ wg_private_keys[wireguard_wg_net_name][inventory_hostname] }}
+{% if item.dns is defined %}
+DNS        = {{ item.dns |join(', ') }}
+{% endif %}
+{% if item.mtu is defined %}
+MTU        = {{ item.mtu }}
+{% endif %}
+
+{% if item.postup is defined %}
+PostUp   = {{ item.postup }}
+{% endif %}
+{% if item.postdown is defined %}
+PostDown = {{ item.postdown }}
+{% endif %}
+
+{% for peer in item.peers %}
+{% set ordered_peers = [inventory_hostname, peer.host] | sort %}
+{% set psk_key = "%s_%s" | format(ordered_peers[0], ordered_peers[1]) %}
+[Peer] 
+# {{ peer.host }}
+PublicKey           = {{ wg_pub_keys[wireguard_wg_net_name][peer.host] }}
+AllowedIPs          = {% for ip in peer.allowed_ips %}{{ ip }}{{ ", " if not loop.last else "" }}{% endfor %}
+
+{% if psk_key is in wg_psks[wireguard_wg_net_name] %}
+PresharedKey        = {{ wg_psks[wireguard_wg_net_name][psk_key] }}
+{% endif %}
+{% if peer.endpoint is defined %}
+Endpoint            = {{ peer.endpoint }}:{{ peer.port | default(51820) }}
+{% endif %}
+{% if peer.keepalive is defined %}
+PersistentKeepalive = {{ peer.keepalive }}
+{% endif %}
+
+{% endfor %}

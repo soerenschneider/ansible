@@ -1,0 +1,13 @@
+---
+baseline_mount_set_noatime: true
+baseline_install_packages: true
+baseline_packages: [acl, ca-certificates, git, gnupg2, kitty-terminfo, moreutils, rsync, tar, tmux, unzip, vim, zsh]
+
+baseline_systemd_journal_storage: "auto"
+baseline_systemd_journal_system_max_use: "512M"
+baseline_systemd_journal_system_max_file_size: "32M"
+baseline_systemd_journal_runtime_max_use: "32M"
+baseline_systemd_journal_runtime_max_file_size: "4M"
+
+baseline_wol_enable: false
+baseline_wol_device: "{{ ansible_default_ipv4.interface }}"

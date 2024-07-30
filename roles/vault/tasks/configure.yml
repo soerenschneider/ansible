@@ -1,0 +1,138 @@
+---
+- name: Set vault address
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: VAULT_ADDR={{ vault_addr }}
+  tags: [vault, vault-configure]
+
+- name: Add group vault
+  ansible.builtin.user:
+    name: "{{ vault_group }}"
+    system: true
+  tags: [vault, vault-configure]
+
+- name: Add user vault
+  ansible.builtin.user:
+    name: "{{ vault_user }}"
+    system: true
+    shell: /bin/false
+    group: vault
+    groups: "{{ vault_user_additional_groups | default([]) }}"
+  tags: [vault, vault-configure]
+
+- name: Create vault audit log file
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ vault_audit_log }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0600"
+    force: false
+  tags: [vault, vault-configure]
+
+- name: Delete vault dir
+  ansible.builtin.file:
+    state: absent
+    path: "{{ vault_dir }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0700"
+  when: [vault_wipe_everything is defined, vault_wipe_everything]
+  tags: [vault, vault-configure]
+
+- name: Create vault dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ vault_dir }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0700"
+  tags: [vault, vault-configure]
+
+- name: Set permissions for TLS keypair
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0600"
+  with_items: ["{{ vault_tls.cert_file }}", "{{ vault_tls.key_file }}"]
+  when: [vault_tls_key.stat is defined, vault_tls_cert.stat is defined]
+  ignore_errors: true
+  register: ignore_errors_register
+  tags: [vault, vault-configure]
+
+- name: Create config
+  ansible.builtin.template:
+    src: vault-config.hcl.j2
+    dest: "{{ vault_dir }}/vault.hcl"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0640"
+  notify: Restart vault
+  tags: [vault, vault-configure]
+
+- name: Create vault storage dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ vault_storage_dir }}"
+    owner: "{{ vault_user }}"
+    group: "{{ vault_group }}"
+    mode: "0700"
+  tags: [vault, vault-configure]
+
+- name: Check vault storage dir content
+  ansible.builtin.find:
+    paths: "{{ vault_storage_dir }}"
+    recurse: true
+  register: vault_storage_files
+  notify: Restart vault
+  changed_when: vault_storage_files.matched == 0
+  tags: [vault, vault-configure]
+
+- name: Add logrotate config for vault
+  ansible.builtin.template:
+    src: vault_logrotate.j2
+    dest: /etc/logrotate.d/vault_logrotate
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [vault, vault-configure]
+
+- name: Create systemd config
+  ansible.builtin.template:
+    src: vault.service.j2
+    dest: /etc/systemd/system/vault.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart vault
+  tags: [vault, vault-configure]
+
+- name: Enable vault service
+  ansible.builtin.systemd:
+    name: vault.service
+    enabled: true
+  tags: [vault, vault-configure]
+
+- name: Run block
+  when: vault_audit_log | default("") | length > 0
+  tags: [vault, vault-configure]
+  block:
+    - name: Create systemd unit for vault audit file
+      ansible.builtin.template:
+        src: vault-audit-file.service.j2
+        dest: /etc/systemd/system/vault-audit-file.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable and start vault audit file service
+      ansible.builtin.systemd:
+        name: vault-audit-file.service
+        state: started
+        daemon_reload: true
+        enabled: true
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+  tags: [vault, vault-configure]

@@ -1,0 +1,20 @@
+#!/bin/sh
+
+PROMETHEUS_TEXTFILE_DIR="{{ prometheus_text_dir }}"
+METRIC_FILE="${PROMETHEUS_TEXTFILE_DIR}/syspatch_updates.prom"
+
+function print_metrics {
+    UPDATES_METRIC="sysupdates_available_updates_total"
+    echo "# TYPE $UPDATES_METRIC gauge"
+    echo "$UPDATES_METRIC ${AVAILABLE_UPDATES}"
+
+    LAST_CHECK="sysupdates_last_check_timestamp"
+    echo "# TYPE $LAST_CHECK gauge"
+    echo "$LAST_CHECK $(date +%s)"
+}
+
+AVAILABLE_UPDATES=$(syspatch -c | wc -l | sed 's/ //g')
+if [ -z $AVAILABLE_UPDATES ]; then
+    AVAILABLE_UPDATES="0"
+fi
+print_metrics | /usr/local/bin/sponge $METRIC_FILE

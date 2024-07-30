@@ -1,0 +1,11 @@
+[Unit]
+Description=Trigger updating unbound's adblocker database
+After=network-online.target
+
+[Timer]
+Unit=unbound-update-adblocker-db
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

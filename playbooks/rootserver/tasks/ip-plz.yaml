@@ -1,0 +1,11 @@
+---
+- name: Copy certbot hook for ip-plz
+  ansible.builtin.template:
+    src: certbot-hook-ip-plz.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
+    owner: root
+    group: root
+    mode: "0755"
+  register: _ip_plz_hook
+  notify: Run ip-plz renewal hook
+  tags: [ip-plz, certbot]

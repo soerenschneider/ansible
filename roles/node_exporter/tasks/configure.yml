@@ -1,0 +1,55 @@
+---
+- name: Create ramdisk textfile directory
+  ansible.builtin.file:
+    path: "{{ node_exporter_textfile_dir }}"
+    state: directory
+    owner: "{{ node_exporter_user }}"
+    group: "{{ node_exporter_group }}"
+    mode: "0770"
+  tags: [monitoring, node_exporter, node_exporter-configure]
+
+- name: Create tmpfs mountpoint for textfile dir and mount it (OpenBSD)
+  ansible.posix.mount:
+    path: "{{ node_exporter_textfile_dir }}"
+    src: mfs
+    fstype: mfs
+    opts: -s={{ node_exporter_ramdisk_size_mb }}m,-u={{ node_exporter_user }},-g={{ node_exporter_group }}
+    state: mounted
+  when: [node_exporter_textfile_is_ramdisk | bool, ansible_system == "OpenBSD"]
+  tags: [monitoring, node_exporter, node_exporter-configure]
+
+- name: Check for prometheus SELinux module
+  ansible.builtin.command: semodule -l | grep prometheus
+  register: module_exists
+  failed_when: module_exists.rc not in [0, 1]
+  when: ansible_selinux
+  changed_when: false
+  tags: [monitoring, node_exporter, node_exporter-configure]
+
+- name: Create tmpfs mountpoint for textfile dir and mount it (Linux)
+  ansible.posix.mount:
+    path: "{{ node_exporter_textfile_dir }}"
+    src: tmpfs
+    fstype: tmpfs
+    opts: size={{ node_exporter_ramdisk_size_mb }}m,mode=0770,nodev,nosuid,uid={{ node_exporter_user }},gid={{ node_exporter_group }}{% if module_exists.rc is defined and module_exists.rc == 0 %},context=system_u:object_r:node_exporter_data_t:s0{% endif %}
+    state: mounted
+  when: [node_exporter_textfile_is_ramdisk | bool, ansible_system == "Linux"]
+  tags: [monitoring, node_exporter, node_exporter-configure]
+
+- name: Create systemd service for node_exporter
+  ansible.builtin.template:
+    src: templates/node_exporter.service.j2
+    dest: /etc/systemd/system/node_exporter.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart nodeexporter
+  tags: [monitoring, node_exporter, node_exporter-configure]
+
+- name: Enable node_exporter service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: node_exporter
+    enabled: true
+  notify: Restart nodeexporter
+  tags: [monitoring, node_exporter, node_exporter-configure]

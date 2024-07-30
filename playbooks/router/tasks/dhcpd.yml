@@ -1,0 +1,57 @@
+---
+- name: Install dhcpd
+  ansible.builtin.package:
+    name: dhcp-server
+  when: ansible_os_family | lower == "redhat"
+  tags: [dhcp, dhcpd]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    dhcpd_config_dir: "{% if ansible_os_family | lower == 'redhat' %}/etc/dhcp{% else %}'/etc'{% endif %}"
+  when: dhcpd_config_dir | default("") | length == 0
+  tags: [dhcp, dhcpd]
+
+- name: Copy dhcpd config
+  ansible.builtin.template:
+    src: templates/dhcpd.conf.j2
+    dest: "{{ dhcpd_config_dir }}/dhcpd.conf"
+    owner: root
+    group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0644"
+  notify: Restart dhcpd
+  tags: [dhcp, dhcpd]
+
+- name: Copy dhcpd.interfaces
+  ansible.builtin.template:
+    src: templates/dhcpd.interfaces.j2
+    dest: "{{ dhcpd_config_dir }}/dhcpd.interfaces"
+    owner: root
+    group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0644"
+  notify: Restart dhcpd
+  tags: [dhcp, dhcpd]
+
+- name: Create systemd override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/dhcpd.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [dhcp, dhcpd]
+
+- name: Copy dhcpd.interfaces
+  ansible.builtin.template:
+    src: templates/dhcpd-override.conf.j2
+    dest: /etc/systemd/system/dhcpd.service.d/override.conf
+    owner: root
+    group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0644"
+  notify: Restart dhcpd
+  tags: [dhcp, dhcpd]
+
+- name: Enable dhcpd service
+  ansible.builtin.service:
+    enabled: true
+    name: dhcpd
+  tags: [dhcp, dhcpd]

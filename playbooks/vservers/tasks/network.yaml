@@ -1,0 +1,30 @@
+---
+- name: Create bridge br0
+  community.general.nmcli:
+    type: bridge
+    conn_name: br0
+    ifname: br0
+    stp: false
+    method4: auto
+    method6: auto
+    autoconnect: true
+    state: present
+  tags: [bridge, network]
+
+- name: Create bridge slave
+  community.general.nmcli:
+    type: ethernet
+    conn_name: "{{ bridge_slave_device }}"
+    ifname: "{{ bridge_slave_device }}"
+    master: br0
+    slave_type: bridge
+    autoconnect: true
+    method4: disabled
+    method6: disabled
+    state: present
+  tags: [bridge, network]
+
+- name: Inifite retries to get DHCP
+  ansible.builtin.command: nmcli connection modify br0 ipv4.dhcp-timeout infinity
+  changed_when: true
+  tags: [bridge, network]

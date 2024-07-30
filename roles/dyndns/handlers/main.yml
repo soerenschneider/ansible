@@ -1,0 +1,14 @@
+---
+- name: Restart dyndns-server
+  ansible.builtin.systemd:
+    name: dyndns-server
+    daemon_reload: true
+    state: restarted
+  when: ansible_system == "Linux"
+
+- name: Restart dyndns-client
+  ansible.builtin.systemd:
+    name: dyndns-client
+    daemon_reload: true
+    state: restarted
+  when: ansible_system == "Linux"

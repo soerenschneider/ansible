@@ -1,0 +1,7 @@
+$nrconf{verbosity} = 0;
+
+$nrconf{restart} = 'a';
+
+{% if ansible_lsb.id is defined and ansible_lsb.id == "Raspbian" %}
+$nrconf{kernelfilter} = qr(kernel{% if ansible_architecture == "armv7l" %}7{% endif %}\.img);
+{% endif %}

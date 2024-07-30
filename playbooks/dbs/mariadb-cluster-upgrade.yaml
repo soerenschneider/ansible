@@ -1,0 +1,37 @@
+---
+- name: Upgrade MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Test connectivity to hosts
+      ansible.builtin.ping:
+      ignore_errors: true
+      register: ping_result
+
+    - name: Fail the playbook if any host is unreachable
+      ansible.builtin.fail:
+        msg: Failed to reach all hosts.
+      when: ping_result.failed > 0
+
+- name: Upgrade MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  serial: 1
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ mariadb_user }}"
+      tags: [docker, mariadb, mysql]
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _mariadb_user_string: "{{ getent_passwd[mariadb_user][1] }}"
+      tags: [docker, mariadb, mysql]
+
+    - name: Include tasks
+      ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml

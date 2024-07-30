@@ -1,0 +1,12 @@
+---
+- name: Install fuse (CentOS)
+  ansible.builtin.dnf:
+    name: [fuse, fuse3]
+  when: ansible_distribution == 'CentOS' and ansible_distribution_version >= '8'
+  tags: [gocryptfs, gocryptfs-install]
+
+- name: Install fuse (Debian)
+  ansible.builtin.apt:
+    name: [fuse3]
+  when: ansible_os_family == 'Debian'
+  tags: [gocryptfs, gocryptfs-install]

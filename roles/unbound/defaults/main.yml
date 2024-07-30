@@ -1,0 +1,22 @@
+---
+unbound_adblocker_enabled: true
+unbound_adblocker_adblocker_file: "{{ unbound_config_conf_d_dir }}/adblocker.db"
+unbound_adblocker_update_user: unbound_adblock
+unbound_adblocker_update_cron_run_weekly: true
+unbound_adblocker_update_cron_hour: 4
+unbound_adblocker_update_cron_minute: 0
+unbound_adblocker_update_cron_weekday: 0
+
+unbound_root_key_file: "{% if ansible_os_family | lower == 'debian' %}/var/lib/unbound/anchor.key{% else %}/etc/unbound/root.key{% endif %}"
+
+unbound_blackhole_file: "{{ unbound_config_conf_d_dir }}/blackhole.db"
+unbound_blackhole_domains: []
+# by default, all interfaces unbound listens on are allowed to access unbound
+# define additional hosts / cidr ranges that are allowed to access unbound here
+unbound_additional_allowed_sources: []
+unbound_config_dir: "{% if ansible_system == 'OpenBSD' %}/var/unbound/etc{% else %}/etc/unbound{% endif %}"
+unbound_config_conf_d_dir: "{{ unbound_config_dir }}/{% if ansible_os_family | lower == 'debian' %}unbound.{% endif %}conf.d"
+unbound_config_file: "{{ unbound_config_dir }}/unbound.conf"
+unbound_config_group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}root{% endif %}"
+unbound_nameservers: [8.8.8.8]
+unbound_restart_delay_s: 20

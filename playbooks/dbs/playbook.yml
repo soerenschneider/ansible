@@ -1,0 +1,44 @@
+---
+- name: Install a database server
+  hosts: dbs
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: docker
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: minio
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: redpanda
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: restic
+      tags: always
+      when: restic_backups | length > 0
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      tags: always
+
+    - name: Install docker support
+      ansible.builtin.package:
+        name: python3-docker
+      tags: docker
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/mounts.yml
+      tags: always

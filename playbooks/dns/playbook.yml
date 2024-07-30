@@ -1,0 +1,9 @@
+---
+- name: Setup DNS
+  hosts: dns
+  become: true
+  tasks:
+    - name: Include role unbound
+      ansible.builtin.include_role:
+        name: unbound
+      tags: always

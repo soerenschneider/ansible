@@ -1,0 +1,12 @@
+---
+autobackup_user: autobackup
+autobackup_group: autobackup
+
+autobackup_root_dir: /var/lib/autobackup
+
+autobackup_cron_hour: "03"
+autobackup_cron_minute: "00"
+autobackup_cron_enabled: true
+
+autobackup_retention_days: 14
+autobackup_impl: s3

@@ -1,0 +1,24 @@
+---
+- name: Disable core dumps (sysctl)
+  ansible.builtin.lineinfile:
+    path: /etc/sysctl.conf
+    line: kernel.core_pattern=|/bin/true
+    regexp: ^kernel.core_pattern=
+  tags: [vault, vault-configure, vault-hardening]
+
+- name: Disable core dumps (systemd)
+  ansible.builtin.copy:
+    content: |
+      [Coredump]
+      Storage=none
+      ProcessSizeMax=0
+    dest: /etc/systemd/coredump.conf
+    mode: "0640"
+  tags: [vault, vault-configure, vault-hardening]
+
+- name: Disable core dumps (limits.conf)
+  ansible.builtin.copy:
+    content: "* hard core 0"
+    dest: /etc/security/limits.conf
+    mode: "0640"
+  tags: [vault, vault-configure, vault-hardening]

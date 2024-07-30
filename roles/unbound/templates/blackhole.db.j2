@@ -1,0 +1,4 @@
+{% for domain in unbound_blackhole_domains %}
+local-zone: "{{ domain }}" redirect
+local-data: "{{ domain }} A 0.0.0.0"
+{% endfor %}

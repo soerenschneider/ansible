@@ -1,0 +1,53 @@
+#!/bin/sh
+
+set -eu
+
+PREFIX=rclone_usage
+
+PROMETHEUS_TEXTDIR="/var/lib/node_exporter"
+FILENAME=""
+
+print_metrics() {
+    echo "# TYPE ${PREFIX}_bytes gauge"
+    echo "# HELP ${PREFIX}_bytes total bytes used by the drive"
+    for drive in "${@}"; do 
+        print_metric "${drive}"
+    done
+    
+    echo "# TYPE ${PREFIX}_heartbeat_seconds gauge"
+    echo "# HELP ${PREFIX}_heartbeat_seconds last run of the exporter"
+    echo "${PREFIX}_heartbeat_seconds $(date +%s)"
+}
+
+print_metric() {
+    DRIVE="$1"
+    OUTPUT=$(rclone about ${DRIVE}: --json)
+    
+    BYTES_USED=$(echo "${OUTPUT}" | grep -i used | awk -F'[, ]' '{print $2}')
+    echo "${PREFIX}_bytes{drive=\"${DRIVE}\",state=\"used\"} ${BYTES_USED}"
+
+    BYTES_TRASHED=$(echo "${OUTPUT}" | grep -i trashed | awk -F'[, ]' '{print $2}')
+    if [ ! -z "${BYTES_TRASHED}" ]; then
+        echo "${PREFIX}_bytes{drive=\"${DRIVE}\",state=\"trashed\"} ${BYTES_TRASHED}"
+    fi
+    
+    BYTES_TOTAL=$(echo "${OUTPUT}" | grep -i total | awk -F'[, ]' '{print $2}')
+    if [ ! -z "${BYTES_TOTAL}" ]; then
+        echo "${PREFIX}_bytes{drive=\"${DRIVE}\",state=\"available\"} ${BYTES_TOTAL}"
+    fi
+    
+    BYTES_FREE=$(echo "${OUTPUT}" | grep -i free | awk -F'[, ]' '{print $2}')
+    if [ ! -z "${BYTES_FREE}" ]; then
+        echo "${PREFIX}_bytes{drive=\"${DRIVE}\",state=\"free\"} ${BYTES_FREE}"
+    fi
+}
+
+if [ -d $PROMETHEUS_TEXTDIR ]; then
+    FILENAME="${PROMETHEUS_TEXTDIR}/rclone_usage.prom"
+fi
+
+if [ -z "${FILENAME}" ]; then
+    print_metrics "$@"
+else
+    print_metrics "$@" | sponge ${FILENAME}
+fi

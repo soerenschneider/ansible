@@ -1,0 +1,31 @@
+---
+- name: Set limits for 'audio' group
+  ansible.builtin.blockinfile:
+    path: /etc/security/limits.conf
+    block: |
+      @audio - rtprio 99
+      @audio - memlock unlimited
+      @audio - nice -10
+  tags: [mpd, mpd-configure]
+
+- name: Add user {{ mpd_user }} to group 'audio'
+  ansible.builtin.user:
+    name: "{{ mpd_user }}"
+    groups: audio
+    append: true
+  tags: [mpd, mpd-configure]
+
+- name: Write mpd config
+  ansible.builtin.template:
+    src: mpd.conf.j2
+    dest: /etc/mpd.conf
+    owner: "{{ mpd_user }}"
+    mode: "0640"
+  notify: Restart mpd
+  tags: [mpd, mpd-configure]
+
+- name: Enable mpd
+  ansible.builtin.service:
+    name: mpd
+    enabled: true
+  tags: [mpd, mpd-configure]

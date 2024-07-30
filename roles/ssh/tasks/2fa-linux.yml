@@ -1,0 +1,66 @@
+---
+- name: Install required packages (RHEL)
+  ansible.builtin.package:
+    name: epel-release
+  when: ansible_distribution == 'CentOS'
+  tags: [ssh, base, ssh-2fa]
+
+- name: Install required packages (RHEL)
+  ansible.builtin.package:
+    name: google-authenticator
+  when: ansible_os_family == 'RedHat'
+  tags: [ssh, base, ssh-2fa]
+
+- name: Install required packages (Debian)
+  ansible.builtin.package:
+    name: libpam-google-authenticator
+  when: ansible_os_family == 'Debian'
+  tags: [ssh, base, ssh-2fa]
+
+- name: Insert at top of the file
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: .*pam_google_authenticator.*
+    insertbefore: BOF
+    line: auth    required    pam_google_authenticator.so user=root secret=/home/${USER}/.ssh/google_authenticator
+  tags: [ssh, base, ssh-2fa]
+
+- name: Create group '{{ ssh_otp_only_group }}'
+  ansible.builtin.group:
+    name: "{{ ssh_otp_only_group }}"
+    state: present
+    system: true
+  tags: [ssh, base, ssh-2fa]
+
+- name: Populate group '{{ ssh_otp_only_group }}'
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: "{{ ssh_otp_only_group }}"
+    append: true
+  with_items: "{{ ssh_otp_only }}"
+  tags: [ssh, base, ssh-2fa]
+
+- name: Add conditional line rule before default auth (CentOS)
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: auth [success\=1 default\=ignore] pam_succeed_if.so group!=ssh_otp_only
+    insertbefore: ^auth\s+substack\s+password-auth
+    line: auth [success=1 default=ignore] pam_succeed_if.so group!=ssh_otp_only
+  when: ansible_distribution == 'CentOS'
+  tags: [ssh, base, ssh-2fa]
+
+- name: Add conditional line rule before default auth (Debian)
+  ansible.builtin.lineinfile:
+    path: /etc/pam.d/sshd
+    regexp: auth [success\=1 default\=ignore] pam_succeed_if.so group!=ssh_otp_only
+    insertbefore: ^@include\s+common-auth
+    line: auth [success=1 default=ignore] pam_succeed_if.so group!=ssh_otp_only
+  when: ansible_os_family == 'Debian'
+  tags: [ssh, base, ssh-2fa]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: 2fa-linux-users.yml
+  with_items: "{{ ssh_2fa_users }}"
+  loop_control:
+    loop_var: user
+  tags: [ssh, base, ssh-2fa]

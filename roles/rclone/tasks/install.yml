@@ -1,0 +1,5 @@
+---
+- name: Install rclone
+  ansible.builtin.package:
+    name: rclone
+  tags: [rclone, rclone-install]

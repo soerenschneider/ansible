@@ -1,0 +1,13 @@
+#!/bin/sh
+
+SRC=$1
+DIR=$2
+BUCKET={{ autobackup_s3_bucket }}
+DAYS={{ autobackup_retention_days | default(14) }}
+
+if [ -z ${SRC} ] || [ -z ${DIR} ]; then
+    exit 1
+fi
+
+EXPIRY="$(date -d '+'${DAYS}' days' --utc +'%Y-%m-%dT%H:%M:%SZ')"
+aws s3 sync ${SRC} s3://${BUCKET}/${DIR} --expires ${EXPIRY}

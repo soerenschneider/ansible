@@ -1,0 +1,19 @@
+---
+- name: Create autobackup script
+  ansible.builtin.template:
+    src: autobackup.j2
+    dest: /usr/local/bin/autobackup
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [autobackup, autobackup-install]
+
+- name: Create autobackup implementation for s3
+  ansible.builtin.template:
+    src: autobackup-impl-s3.j2
+    dest: /usr/local/bin/autobackup-impl-s3
+    owner: root
+    group: root
+    mode: "0755"
+  when: autossh_s3_bucket is defined
+  tags: [autobackup, autobackup-install]

@@ -1,0 +1,55 @@
+---
+- name: "Add ssh-update-listener script"
+  when: "ssh_update_listener_wg_up_ips | default([]) | length > 0"
+  tags: [ssh, ssh_update_listener]
+  block:
+    - name: "Define sshd override dir"
+      ansible.builtin.set_fact:
+        _sshd_systemd_unit_name: "{% if ansible_facts['os_family'] == 'Debian' %}ssh{% elif ansible_facts['os_family'] == 'RedHat' %}sshd{% endif %}"
+
+    - name: "Add override directory for sshd"
+      ansible.builtin.file:
+        name: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.d"
+        state: "directory"
+        owner: "root"
+        group: "root"
+        mode: "0755"
+
+    - name: "Add systemd override config"
+      ansible.builtin.template:
+        src: "sshd-override.conf.j2"
+        dest: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.d/override.conf"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+
+    - name: "Add ssh-update-listener script"
+      ansible.builtin.template:
+        src: "templates/ssh-update-listener.sh.j2"
+        dest: "/usr/local/sbin/ssh-update-listener"
+        owner: "root"
+        mode: "0755"
+
+    - name: "Add ssh-update-listener systemd unit"
+      ansible.builtin.template:
+        src: "templates/ssh-update-listener.service.j2"
+        dest: "/etc/systemd/system/ssh-update-listener.service"
+        owner: "root"
+        mode: "0644"
+
+    - name: "Add ssh-update-listener systemd timer"
+      ansible.builtin.template:
+        src: "templates/ssh-update-listener.timer.j2"
+        dest: "/etc/systemd/system/ssh-update-listener.timer"
+        owner: "root"
+        mode: "0644"
+
+    - name: "Enable systemd service"
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        enabled: true
+        state: "started"
+        daemon_reload: true
+      with_items:
+        - ssh-update-listener.service
+        - ssh-update-listener.timer

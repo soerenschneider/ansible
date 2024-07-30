@@ -1,0 +1,14 @@
+---
+# renovate: datasource=github-releases depName=smxi/acxi versioning=semver-coerced
+acxi_version: 3.3.29
+
+acxi_jobs: {}
+# - name: xxx
+#   source: xxx
+#   target: xxx
+#   type: xxx
+#   quality: 5
+#   minute: 30
+#   hour: 23
+# lets you define hooks to perform after conversion
+acxi_jobs_hooks: []

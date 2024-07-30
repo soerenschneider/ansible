@@ -1,0 +1,99 @@
+# Files and directories #######################################################
+music_directory     "{{ mpd_music_path | default('/var/lib/mpd/music') }}"
+playlist_directory  "/var/lib/mpd/playlists"
+
+database {
+{% if mpd_db.type == "proxy" %}
+    plugin           "proxy"
+    host             "{{ mpd_db.host }}"
+{% else %}
+    plugin           "simple"
+    path             "/var/lib/mpd/mpd.db"
+    cache_directory  "/var/lib/mpd/cache"
+{% endif %}
+}
+
+{% if mpd_input_cache_enabled -%}
+input_cache {
+    size "{{ mpd_input_cache_size }}"
+}
+{% endif -%}
+
+log_file            "/var/log/mpd.log"
+#pid_file           "/var/run/mpd/pid"
+#state_file         "/var/lib/mpd/state"
+#sticker_file       "/var/lib/mpd/sticker.sql"
+###############################################################################
+
+# General music daemon options ################################################
+user                    "{{ mpd_user | default('mpd') }}"
+group                   "audio"
+bind_to_address         "{{ mpd_bind_address | default('any') }}"
+port                    "{{ mpd_bind_port | default(6600) }}"
+log_level               "secure"
+gapless_mp3_playback    "no"
+metadata_to_use         "artist,album,title,track,name,genre,date,composer,performer,disc"
+auto_update             "yes"
+auto_update_depth       "7"
+save_absolute_paths_in_playlists    "no"
+
+###############################################################################
+# Symbolic link behavior ######################################################
+follow_outside_symlinks     "no"
+follow_inside_symlinks      "yes"
+###############################################################################
+
+###############################################################################
+# Passwords ###################################################################
+{% for pass in mpd_passwords %}
+password {{ pass.password }}@{{ pass.permissions }}
+{% endfor %}
+{% if mpd_default_permissions is defined or mpd_passwords | length > 0 %}
+default_permissions "read,add,control"
+{% endif %}
+
+# Input #######################################################################
+#
+
+###############################################################################
+
+# Decoder ################################################################
+
+###############################################################################
+
+# Audio Output ################################################################
+
+audio_output {
+{% if mpd_output_device == 'null' %}
+        type        "null"
+        name        "null output"
+{% else %}
+        type        "alsa"
+        name        "alsa"
+        device      "{{ mpd_output_device }}"
+        dop         "{{ mpd_output_device_dop }}"
+        mixer_type  "disabled"
+{% endif %}
+}
+
+replaygain              "off"
+volume_normalization    "no"
+###############################################################################
+
+# MPD Internal Buffering ######################################################
+audio_buffer_size       "{{ mpd_buffer_size | default(4096) }}"
+buffer_before_play      "{{ mpd_buffer_before_play | default('10%') }}"
+###############################################################################
+
+# Resource Limitations ########################################################
+#connection_timeout         "60"
+max_connections             "20"
+max_playlist_length         "81920"
+max_command_list_size       "81920"
+max_output_buffer_size      "81920"
+###############################################################################
+
+# Character Encoding ##########################################################
+filesystem_charset      "UTF-8"
+id3v1_encoding          "UTF-8"
+###############################################################################

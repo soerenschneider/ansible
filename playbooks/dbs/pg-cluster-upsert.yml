@@ -1,0 +1,70 @@
+---
+- name: Upsert Postgres cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ postgres_user }}"
+      tags: always
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _postgres_user_string: "{{ getent_passwd['postgres'][1] }}"
+      tags: always
+
+    - name: Create postgres docker network
+      community.docker.docker_network:
+        name: postgres-cluster
+      tags: [docker, postgres]
+
+    - name: Get infos about existing container
+      community.docker.docker_container_info:
+        name: "{{ postgres_container_name }}"
+      register: _container_result
+      tags: [docker, postgres]
+
+    - name: Stop postgres
+      community.docker.docker_container:
+        name: "{{ postgres_container_name }}"
+        state: stopped
+      when: _container_result.exists
+      tags: [docker, postgres]
+
+    - name: Run master
+      community.docker.docker_container:
+        name: "{{ postgres_container_name }}"
+        image: postgres:15.3-alpine
+        restart_policy: always
+        user: "{{ _postgres_user_string }}"
+        networks:
+          - name: postgres-cluster
+        ports: [0.0.0.0:5432:5432]
+        env:
+          POSTGRES_PASSWORD: "{{ postgres_root_password }}"
+          POSTGRES_ENABLE_TLS: "yes"
+          POSTGRES_TLS_CERT_FILE: /tls.crt
+          POSTGRES_TLS_KEY_FILE: /tls.key
+          PGDATA: /data/postgresql
+          TZ: UTC
+        healthcheck:
+          test: [CMD-SHELL, pg_isready -h localhost -U postgres]
+          interval: 10s
+          retries: 10
+        ansible.builtin.command: postgres -c ssl=on -c ssl_cert_file=/tls.crt -c ssl_key_file=/tls.key
+        volumes: [/etc/passwd:/etc/passwd:ro, "{{ postgres_certs_dir }}/ca.crt:/ca.crt:ro", "{{ postgres_certs_dir }}/tls.key:/tls.key:ro", "{{ postgres_certs_dir }}/tls.crt:/tls.crt:ro", "{{ postgres_storage_dir }}:/data/postgresql"]
+      tags: [docker, postgres]
+
+    - name: Wait for master to be ready
+      ansible.builtin.command: >
+        docker exec {{ postgres_container_name }} pg_isready -U postgres
+      register: _result
+      until: result.rc == 0
+      retries: 20
+      delay: 3
+      changed_when: false
+      when: [false]
+      tags: [docker, postgres]

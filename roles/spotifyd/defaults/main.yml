@@ -1,0 +1,8 @@
+---
+spotifyd_user: spotifyd
+spotifyd_version: {}
+spotifyd_username: {}
+spotifyd_password: {}
+spotifyd_device: hw:1,0
+spotifyd_devicename: {}
+spotifyd_bitrate: 160

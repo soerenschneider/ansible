@@ -1,0 +1,48 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ ip_plz_group }}"
+    system: true
+  tags: [ip-plz, ip-plz-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ ip_plz_user }}"
+    shell: /bin/false
+    system: true
+    groups: "{{ ip_plz_group }}"
+  tags: [ip-plz, ip-plz-install]
+
+- name: Add dir
+  ansible.builtin.file:
+    state: directory
+    path: /etc/ip-plz
+    owner: "{{ ip_plz_user }}"
+    group: "{{ ip_plz_group }}"
+    mode: "0750"
+  tags: [ip-plz, ip-plz-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: ip-plz
+    github_repo: soerenschneider/ip-plz
+    service_name: ip-plz
+    version_wanted: "{{ ip_plz_version }}"
+  tags: [ip-plz, ip-plz-install, deps]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: ip-plz.service.j2
+    dest: /etc/systemd/system/ip-plz.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ip-plz
+  tags: [ip-plz, ip-plz-install]
+
+- name: Enable/disable ip-plz
+  ansible.builtin.service:
+    name: "{{ ip_plz_service_name }}"
+    enabled: true
+  tags: [ip-plz, ip-plz-install]

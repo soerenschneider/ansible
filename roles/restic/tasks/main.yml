@@ -1,0 +1,105 @@
+---
+- name: Install restic
+  ansible.builtin.package:
+    name: [restic, git]
+  register: _init_restic
+  tags: [restic, backup]
+
+- name: Clone scripts
+  ansible.builtin.git:
+    repo: https://github.com/soerenschneider/scripts.git
+    dest: /opt/scripts
+    version: main
+  tags: [restic, backup]
+
+- name: Create environment files
+  ansible.builtin.template:
+    src: restic.env.j2
+    dest: /etc/restic-{{ item.key }}.conf
+    owner: root
+    group: root
+    mode: "0600"
+  with_items: "{{ restic_backups | dict2items }}"
+  no_log: true
+  tags: [restic, backup]
+
+- name: Disable old units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+  with_items: [/etc/systemd/system/restic@.service, /etc/systemd/system/restic@.timer]
+  failed_when: false
+  tags: [restic, backup]
+
+- name: Delete old service
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  with_items: [/etc/systemd/system/restic@.service, /etc/systemd/system/restic@.timer]
+  tags: [restic, backup]
+
+- name: Create systemd services
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: _restic_svcs
+  with_items: [restic-backup@.service, restic-init@.service, restic-prune@.service, restic-prune@.timer]
+  tags: [restic, backup]
+
+- name: Create systemd timers
+  ansible.builtin.template:
+    src: restic-backup.timer.j2
+    dest: /etc/systemd/system/restic-backup-{{ item.key }}.timer
+    owner: root
+    group: root
+    mode: "0644"
+  register: _restic_timers
+  when: item.value.enabled | bool
+  with_items: "{{ restic_backups | dict2items }}"
+  no_log: true
+  tags: [restic, backup]
+
+- name: Create restic-upsert script
+  ansible.builtin.copy:
+    src: restic-upsert
+    dest: /usr/local/bin/restic-upsert
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [restic, backup]
+
+- name: Systemd daemon reload
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: _restic_svcs is changed or _restic_timers is changed
+  tags: [restic, backup]
+
+- name: Schedule backups
+  ansible.builtin.systemd:
+    name: restic-backup-{{ item.key }}.timer
+    enabled: "{{ item.value.enabled | bool }}"
+    state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
+  with_items: "{{ restic_backups | dict2items }}"
+  no_log: true
+  tags: [restic, backup]
+
+- name: Schedule pruner
+  ansible.builtin.systemd:
+    name: restic-prune@{{ item.key }}.timer
+    enabled: "{{ item.value.enabled | bool }}"
+    state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
+  with_items: "{{ restic_backups | dict2items }}"
+  no_log: true
+  tags: [restic, backup]
+
+- name: Init restic repository
+  ansible.builtin.systemd:
+    name: restic-init@{{ item.key }}
+    state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
+  with_items: "{{ restic_backups | dict2items }}"
+  when: _init_restic is changed  # noqa: no-handler
+  no_log: true
+  tags: [restic, backup]

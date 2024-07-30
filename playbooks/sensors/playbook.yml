@@ -1,0 +1,88 @@
+---
+- name: Setup sensors
+  hosts: sensors
+  become: true
+  tasks:
+    - name: Run command
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Add user to node_exporter group
+      ansible.builtin.user:
+        name: "{{ ansible_user }}"
+        groups: node_exporter
+        append: true
+
+    - name: Create user "sensor"
+      ansible.builtin.user:
+        name: sensor
+        groups: [i2c, gpio, dialout]
+      tags: user
+
+    - name: Adapt logrotate.conf
+      ansible.builtin.copy:
+        src: logrotate.conf
+        dest: /etc/logrotate.conf
+        mode: "0640"
+      register: _logrotate
+      tags: [logrotate]
+
+    - name: Init Logrotate
+      tags: [logrotate]
+      when: _logrotate is changed  # noqa: no-handler
+      block:
+        - name: Run logrotate
+          ansible.builtin.command: logrotate /etc/logrotate.conf
+          changed_when: true
+
+        - name: Restart logrotate
+          ansible.builtin.systemd:
+            name: logrotate
+            state: restarted
+
+    - name: Run command
+      ansible.builtin.include_role:
+        name: vault_pki_cli
+      tags: always
+
+    - name: Run command
+      ansible.builtin.include_role:
+        name: gobot_pir
+      when: install_gobot_pir | default(true)
+      tags: always
+
+    - name: Run command
+      ansible.builtin.include_role:
+        name: gobot_bme280
+      when: install_gobot_bme280 | default(true)
+      tags: always
+
+    - name: Run command
+      ansible.builtin.include_role:
+        name: gobot_lux
+      when: install_gobot_lux | default(true)
+      tags: always
+
+    - name: Disable powersave mode
+      ansible.builtin.lineinfile:
+        path: /etc/rc.local
+        regexp: ^iwconfig wlan0
+        insertbefore: ^exit
+        line: iwconfig wlan0 power off
+      tags: powersave
+
+    - name: Gather list of groups
+      ansible.builtin.shell: set -o pipefail && /usr/bin/getent group | awk -F":" '{print $1}'
+      changed_when: false
+      register: _existing_groups
+      tags: user
+
+    - name: Add secondary groups to user
+      ansible.builtin.user:
+        name: sensor
+        groups: "{{ item }}"
+        append: true
+      when: item in _existing_groups.stdout_lines
+      with_items: [vault_pki]
+      tags: user

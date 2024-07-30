@@ -1,0 +1,44 @@
+---
+- name: Including role 'baseline'
+  ansible.builtin.include_role:
+    name: baseline
+  tags: always
+
+- name: Including role 'ssh'
+  ansible.builtin.include_role:
+    name: ssh
+  tags: always
+
+- name: Including role 'node_exporter'
+  ansible.builtin.include_role:
+    name: node_exporter
+  tags: always
+
+- name: Including role 'automatic_sysupdates'
+  ansible.builtin.include_role:
+    name: automatic_sysupdates
+  tags: always
+
+- name: Including role 'vault_ssh_cli'
+  ansible.builtin.include_role:
+    name: vault_ssh_cli
+  when: vault_ssh_cli_config is defined
+  tags: always
+
+- name: Including role 'vault_pki_cli'
+  ansible.builtin.include_role:
+    name: vault_pki_cli
+  when: vault_pki_cli_issue_config is defined or vault_pki_cli_acme_config is defined
+  tags: always
+
+- name: Including role 'vault_approle'
+  ansible.builtin.include_role:
+    name: vault_approle
+  when: vault_approles | default([]) | length > 0
+  tags: always
+
+- name: Including role 'vector'
+  ansible.builtin.include_role:
+    name: vector
+  when: ansible_architecture != 'armv6l'
+  tags: always

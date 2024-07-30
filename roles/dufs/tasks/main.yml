@@ -1,0 +1,38 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ dufs_group }}"
+    system: true
+  tags: [dufs, dufs-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ dufs_user }}"
+    shell: /bin/false
+    system: true
+    groups: "{{ dufs_group }}"
+  tags: [dufs, dufs-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: dufs
+    github_repo: sigoden/dufs
+    service_name: dufs
+  tags: [dufs, dufs-install, deps]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: "dufs.service.j2"
+    dest: "/etc/systemd/system/{{ dufs_service_name }}.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: Restart dufs
+  tags: [dufs, dufs-configure]
+
+- name: Enable/disable dufs
+  ansible.builtin.systemd:
+    name: "{{ dufs_service_name }}"
+    enabled: true
+  tags: [dufs, dufs-configure]

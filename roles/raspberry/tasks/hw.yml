@@ -1,0 +1,42 @@
+---
+- name: Setting bluetooth support
+  ansible.builtin.systemd:
+    state: "{% if raspberry_enable_bluetooth %}started{% else %}stopped{% endif %}"
+    enabled: "{{ raspberry_enable_bluetooth }}"
+    name: bluetooth
+  tags: [raspberry, bluetooth]
+
+- name: Set Bluetooth hw status to {% if raspberry_enable_bluetooth %}enabled{% else %}disabled{% endif %}
+  ansible.builtin.lineinfile:
+    path: /boot/config.txt
+    insertafter: EOF
+    line: dtoverlay=pi3-disable-bt
+    state: "{% if raspberry_enable_bluetooth %}absent{% else %}present{% endif %}"
+  when: raspberry_enable_bluetooth is defined
+  tags: [raspberry, bluetooth, hw]
+
+- name: Set LEDs status to {% if raspberry_enable_leds %}enabled{% else %}disabled{% endif %}
+  ansible.builtin.lineinfile:
+    path: /boot/config.txt
+    insertafter: EOF
+    line: "{{ item }}"
+    state: "{% if raspberry_enable_leds %}absent{% else %}present{% endif %}"
+  when: raspberry_enable_leds is defined
+  with_items: [dtparam=act_led_trigger=none, dtparam=act_led_activelow=on]
+  tags: [raspberry, leds, hw]
+
+- name: Set WiFi hardware to {% if raspberry_disable_wifi %}disabled{% else %}enabled{% endif %}
+  ansible.builtin.lineinfile:
+    path: /boot/config.txt
+    insertafter: EOF
+    line: dtoverlay=pi3-disable-wifi
+    state: "{% if raspberry_disable_wifi %}present{% else %}absent{% endif %}"
+  when: raspberry_disable_wifi is defined
+  tags: [raspberry, wifi, hw]
+
+- name: Disable swap
+  ansible.builtin.systemd:
+    name: dphys-swapfile.service
+    state: stopped
+    enabled: false
+  tags: [raspberry, base]

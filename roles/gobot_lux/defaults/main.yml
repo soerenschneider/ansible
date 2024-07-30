@@ -1,0 +1,14 @@
+---
+gobot_lux_user: sensor
+gobot_lux_group: sensor
+
+gobot_lux_config_file: /etc/gobot-lux.json
+
+gobot_lux_config:
+  location: undefined
+  metrics_addr: :9091
+  firmata_port: /dev/ttyUSB0
+  aio_pin: "7"
+  aio_polling_interval_ms: 300
+  mqtt_host: tcp://host:1883
+  mqtt_topic: bla

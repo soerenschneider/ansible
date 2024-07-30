@@ -1,0 +1,41 @@
+#!/bin/sh
+
+SRC="/srv/files/media/music-opus/"
+DEST="/srv/files/music/"
+HOST="{{ nas_sync_opus_collection_rsync_target_host }}"
+
+SYNC_JOB_NAME="opus-collection"
+METRICS_DIR="/var/lib/node_exporter"
+METRICS_FILE="${METRICS_DIR}/fileserver-sync-job-${SYNC_JOB_NAME}.prom"
+
+print_metrics() {
+    local PREFIX="fileserver_sync_job"
+    local SUCCESS="${PREFIX}_success{name=\"${SYNC_JOB_NAME}\"}"
+    local TIMESTAMP="${PREFIX}_timestamp_seconds{name=\"${SYNC_JOB_NAME}\"}"
+    echo "${SUCCESS} $1"
+    echo "${TIMESTAMP} $(date +%s)"
+}
+
+sync_music_folder() {
+    #rsync -thrv --delete --ignore-existing --exclude "*.png" --exclude "*.jpg" "${SRC}" "${HOST}":"${DEST}" > /tmp/sync-job-rootserver.log 2>&1
+    rsync -thrv --delete --ignore-existing "${SRC}" "${HOST}":"${DEST}" > /tmp/sync-job-rootserver.log 2>&1
+    local EXIT_CODE=$?
+
+    if [ ! -d "${METRICS_DIR}" ]; then
+        return
+    fi
+      
+    # twisted world we live in
+    if [ $EXIT_CODE -eq 0 ]; then
+        print_metrics 1 > "${METRICS_FILE}.tmp"
+    else
+        print_metrics 0 > "${METRICS_FILE}.tmp"
+    fi
+    mv "${METRICS_FILE}.tmp" "${METRICS_FILE}"
+}
+
+if [ ! -d "${SRC}" ]; then
+    exit 1
+fi
+
+sync_music_folder

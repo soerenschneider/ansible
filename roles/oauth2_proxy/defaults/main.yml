@@ -1,0 +1,7 @@
+---
+oauth2_proxy_group: oauthproxy
+oauth2_proxy_user: oauthproxy
+oauth2_proxy_config_dir: /etc/oauth2_proxy
+oauth2_proxy_config_file: "{{ oauth2_proxy_config_dir }}/default.yaml"
+
+oauth2_proxy_config: {}

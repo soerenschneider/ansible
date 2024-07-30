@@ -1,0 +1,44 @@
+{% for loc in (local_hosts | dict2items | selectattr('key', '==', location) | list) + (local_hosts | dict2items | selectattr('key', '!=', location) | list) -%}
+#############################################################################################
+# Datacenter {{ loc.key }}
+#############################################################################################
+{% for network_domain in network_domains %}
+# {{ network_domain }}
+# hosts
+{% for host in loc.value %}
+    local-data: "{{ host.host }}.{{ loc.key }}.{{ network_domain }}. IN A {{ host.logical }}"
+    local-data-ptr: "{{ host.logical }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
+{% for service in host.services | default([]) %}
+    local-data: "{{ service.name }}.{{ loc.key }}.{{network_domain}}.          IN SRV 0 10 {{ service.port }} {{ host.host }}.{{ loc.key }}.{{network_domain }}"
+{% endfor %}
+{% for record in host.ha_srv_records | default([]) %}
+    local-data: "{{ record.name }}.{{network_domain}}.          IN SRV 0 10 {{ record.port }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
+{% endfor %}
+{% for record in host.ha_records | default([]) %}
+    local-data: "{{ record }}.{{network_domain}}.          IN A {{ host.logical }}"
+{% endfor %}
+{% for alias in host.aliases | default([]) %}
+    # alias {{ alias }} for {{ host.host }}
+    local-data: "{{ alias }}.{{ loc.key }}.{{ network_domain }}. IN A {{ host.logical }}"
+{% endfor %}
+{% for alias in host.global_aliases | default([]) %}
+    # alias {{ alias }} for {{ host.host }}
+    local-data: "{{ alias }}.{{ network_domain }}. IN A {{ host.logical }}"
+{% endfor %}
+
+{% endfor %}
+{% endfor %}
+
+{% endfor %}
+    # end local hosts
+
+    # start additional hosts
+{% for host in additional_hosts | default([]) -%}
+{% if host.ip is defined %}
+    local-data: "{{ host.dns }}. IN A {{ host.ip }}"
+{% endif %}
+{% for service in host.services | default([]) %}
+    local-data: "{{ service.name }}.{{network_domain}}.          IN SRV 0 10 {{ service.port }} {{ host.dns }}"
+{% endfor %}
+{% endfor %}
+    # end additional hosts

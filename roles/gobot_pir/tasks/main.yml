@@ -1,0 +1,34 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: gobot-pir
+    github_repo: soerenschneider/gobot-pir
+    service_name: gobot-pir
+  tags: [gobot, gobot-pir, gobot-pir-install]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ gobot_pir_config | to_nice_json }}"
+    dest: "{{ gobot_pir_config_file }}"
+    owner: "{{ gobot_pir_user }}"
+    group: "{{ gobot_pir_group }}"
+    mode: "0644"
+  notify: Restart gobot-pir
+  tags: [gobot, gobot-pir, gobot-pir-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: gobot-pir.service.j2
+    dest: /etc/systemd/system/gobot-pir.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart gobot-pir
+  tags: [gobot, gobot-pir, gobot-pir-configure]
+
+- name: Enable/disable gobot-pir
+  ansible.builtin.service:
+    name: "{{ gobot_pir_service_name }}"
+    enabled: true
+  tags: [gobot, gobot-pir, gobot-pir-configure]

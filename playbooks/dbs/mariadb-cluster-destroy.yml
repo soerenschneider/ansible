@@ -1,0 +1,23 @@
+---
+- name: Destroy MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  vars_prompt:
+    - name: destroy_mariadb
+      prompt: Do you want to destroy MariaDB (yes/no)?
+      private: false
+  tasks:
+    - name: Run block
+      when: destroy_mariadb | bool
+      block:
+        - name: Delete docker container
+          community.docker.docker_container:
+            name: "{{ item }}"
+            state: absent
+          with_items: [mysqld-exporter, "{{ mariadb_container_name }}"]
+
+        - name: Delete data folder
+          ansible.builtin.file:
+            path: /etc/mariadb/storage
+            state: absent

@@ -1,0 +1,19 @@
+---
+- name: Install requirements
+  ansible.builtin.package:
+    name: [python3, python3-venv, make]
+  tags: [lootorganizer, lootorganizer-install]
+
+- name: Clone repository
+  ansible.builtin.git:
+    repo: https://github.com/soerenschneider/lootorganizer.git
+    dest: "{{ lootorganizer_git_dir }}"
+    version: main
+  tags: [lootorganizer, lootorganizer-install]
+
+- name: Install lootorganizer
+  ansible.builtin.command: make install
+  args:
+    chdir: "{{ lootorganizer_git_dir }}"
+  changed_when: true
+  tags: [lootorganizer, lootorganizer-install]

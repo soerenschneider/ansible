@@ -1,0 +1,11 @@
+[Unit]
+Description=Issue x509 certificates from the vault pki
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vault-pki-cli --config /etc/vault-pki-cli/issue.yaml issue
+
+[Install]
+WantedBy=multi-user.target

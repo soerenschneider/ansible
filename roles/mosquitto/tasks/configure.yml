@@ -1,0 +1,44 @@
+---
+- name: Create directory for systemd override
+  ansible.builtin.file:
+    path: /etc/systemd/system/mosquitto.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [mosquitto, mosquitto-configure]
+
+- name: Create override for systemd service
+  ansible.builtin.copy:
+    content: |
+      [Unit]
+                # restart forever
+      StartLimitIntervalSec=0
+
+      [Service]
+                # restart forever
+      Restart=always
+      RestartSec=30
+    dest: /etc/systemd/system/mosquitto.service.d/override.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload systemd
+  tags: [mosquitto, mosquitto-configure]
+
+- name: Adapt main config
+  ansible.builtin.lineinfile:
+    path: /etc/mosquitto/mosquitto.conf
+    line: allow_anonymous
+    state: absent
+  tags: [mosquitto, mosquitto-configure]
+
+- name: Create mosquitto custom conf
+  ansible.builtin.template:
+    src: custom.conf.j2
+    dest: /etc/mosquitto/conf.d/custom.conf
+    owner: root
+    group: mosquitto
+    mode: "0640"
+  notify: Restart mosquitto
+  tags: [mosquitto, mosquitto-configure]

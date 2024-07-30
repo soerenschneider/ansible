@@ -1,0 +1,12 @@
+[Unit]
+Description=Make sure vault audit file exists and is write
+Before=vault.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/touch {{ vault_audit_log }}
+ExecStart=/bin/chmod 640 {{ vault_audit_log }}
+ExecStart=/bin/chown {{ vault_user }}:{{ vault_group}} {{ vault_audit_log }}
+
+[Install]
+WantedBy=multi-user.target

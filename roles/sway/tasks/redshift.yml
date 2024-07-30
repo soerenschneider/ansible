@@ -1,0 +1,55 @@
+---
+- name: Install deps
+  ansible.builtin.dnf:
+    name: [intltool, libtool]
+  tags: [sway, redshift]
+
+- name: Install deps
+  ansible.builtin.dnf:
+    name: redshift
+    state: absent
+  tags: [sway, redshift]
+
+- name: Checkout redshift
+  become: false
+  ansible.builtin.git:
+    repo: https://github.com/minus7/redshift.git
+    dest: "{{ sway_sw_dir }}/redshift"
+    version: "{{ sway_redshift_version }}"
+  register: git_clone
+  tags: [sway, redshift]
+
+- name: Bootstrap
+  ansible.builtin.command: ./bootstrap
+  changed_when: true
+  become: false
+  args:
+    chdir: "{{ sway_sw_dir }}/redshift"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, redshift]
+
+- name: Configure redshift
+  ansible.builtin.command: ./configure
+  changed_when: true
+  become: false
+  args:
+    chdir: "{{ sway_sw_dir }}/redshift"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, redshift]
+
+- name: Make redshift
+  ansible.builtin.command: make -j4
+  changed_when: true
+  become: false
+  args:
+    chdir: "{{ sway_sw_dir }}/redshift"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, redshift]
+
+- name: Make install redshift
+  ansible.builtin.command: make install
+  changed_when: true
+  args:
+    chdir: "{{ sway_sw_dir }}/redshift"
+  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, redshift]

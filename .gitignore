@@ -1,0 +1,6 @@
+/.idea
+**/*.vagrant
+*.swp
+**/*.retry
+/venv/
+/inventory/**/credentials

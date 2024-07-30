@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+FILE="{{ disk.mountpoint }}/.last-successful-backup"
+METRIC_PREFIX="metrics_emitter_last_successful_offline_backup"
+
+echo "# HELP ${METRIC_PREFIX}_timestamp_seconds The timestamp of the last successful offline backup"
+echo "# TYPE ${METRIC_PREFIX}_timestamp_seconds gauge"
+
+if [ -f "${FILE}" ]; then
+	echo "${METRIC_PREFIX}_timestamp_seconds $(cat ${FILE})"
+else
+	echo "${METRIC_PREFIX}_timestamp_seconds -1"
+fi
+
+echo "# HELP ${METRIC_PREFIX}_heartbeat_seconds The timestamp of the hearbeat for this metric emitter"
+echo "# TYPE ${METRIC_PREFIX}_heartbeat_seconds gauge"
+echo "${METRIC_PREFIX}_heartbeat_seconds $(date +%s)"

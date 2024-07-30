@@ -1,0 +1,19 @@
+---
+# Minio binaries path
+minio_server_bin: /usr/local/bin/minio
+minio_client_bin: /usr/local/bin/mc
+# renovate: datasource=github-releases depName=minio/minio versioning="regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})"
+minio_server_version: RELEASE.2023-12-20T01-00-02Z
+minio_client_version: RELEASE.2023-12-20T01-00-02Z
+
+minio_group: minio
+minio_user: minio
+
+minio_address: :9000
+minio_console_address: :9009
+minio_base_dir: /var/lib/minio
+# minio_volumes: "{{ minio_local_volumes[0] }}{% if minio_local_volumes | length > 1 %}{1...{{ minio_local_volumes | length }}}{% else %}"
+minio_volumes: '{% if minio_local_volumes | length > 1 %}{{ minio_local_volumes[0][:-1] }}{1...{{ minio_local_volumes | length }}}{% else %}{{ minio_local_volumes[0] }}{% endif %}'
+minio_local_volumes: ["{{ minio_base_dir }}/ssd-1"]
+minio_root_user: root
+minio_root_password: changeme

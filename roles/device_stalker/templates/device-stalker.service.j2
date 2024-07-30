@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=device-stalker
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ device_stalker_user }}
+Group={{ device_stalker_group }}
+ExecStart=/usr/local/bin/device-stalker -config "{{ device_stalker_config_file }}"
+
+PrivateTmp=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=full
+AmbientCapabilities=CAP_NET_RAW
+SyslogIdentifier=device-stalker
+
+# restart forever
+Restart=always
+RestartSec=120
+
+
+[Install]
+WantedBy=multi-user.target

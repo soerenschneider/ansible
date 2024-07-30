@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+IP_PLZ_DIR=/etc/ip-plz
+DOMAIN="{{ ip_plz_tls_domain | default(inventory_hostname) }}"
+LIVE_DIR="/etc/letsencrypt/live/${DOMAIN}"
+
+if [ ! -d ${LIVE_DIR} ]; then
+    echo "dir doesn't exist"
+    exit 1
+fi
+
+cat "${LIVE_DIR}/privkey.pem"   > "${IP_PLZ_DIR}/${DOMAIN}_key.pem"
+cat "${LIVE_DIR}/fullchain.pem" > "${IP_PLZ_DIR}/${DOMAIN}_crt.pem"
+chown {{ ip_plz_user }}:{{ ip_plz_group }} ${IP_PLZ_DIR}/${DOMAIN}_*.pem

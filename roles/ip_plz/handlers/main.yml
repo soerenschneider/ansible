@@ -1,0 +1,6 @@
+---
+- name: Restart ip-plz
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ ip_plz_service_name }}"
+    state: restarted

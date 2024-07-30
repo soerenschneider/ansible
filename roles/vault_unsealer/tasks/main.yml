@@ -1,0 +1,49 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ vault_unsealer_group }}"
+    system: true
+  tags: [vault-unsealer, vault-unsealer-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ vault_unsealer_user }}"
+    shell: /bin/false
+    system: true
+    groups: "{{ vault_unsealer_group }}"
+  tags: [vault-unsealer, vault-unsealer-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: vault-unsealer
+    github_repo: soerenschneider/vault-unsealer
+    service_name: vault-unsealer
+    version_wanted: "{{ vault_unsealer_version }}"
+  tags: [vault-unsealer, vault-unsealer-install, deps]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ vault_unsealer_config | to_nice_json }}"
+    dest: "{{ vault_unsealer_config_file }}"
+    owner: "{{ vault_unsealer_user }}"
+    group: "{{ vault_unsealer_group }}"
+    mode: "0400"
+  notify: Restart vault-unsealer
+  tags: [vault-unsealer, vault-unsealer-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: vault-unsealer.service.j2
+    dest: /etc/systemd/system/vault-unsealer.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart vault-unsealer
+  tags: [vault-unsealer, vault-unsealer-configure]
+
+- name: Enable/disable vault-unsealer
+  ansible.builtin.service:
+    name: "{{ vault_unsealer_service_name }}"
+    enabled: true
+  tags: [vault-unsealer, vault-unsealer-configure]

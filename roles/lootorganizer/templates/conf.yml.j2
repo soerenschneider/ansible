@@ -1,0 +1,8 @@
+config:
+  prefix: {{ lootorganizer_base_dir }}
+  movie: {{ lootorganizer_movies_dir | default("movies") }}
+  show: {{ lootorganizer_shows_dir | default("shows") }}
+  music: {{ lootorganizer_music_dir | default("music") }}
+  ebook: {{ lootorganizer_ebook_dir | default("ebook") }}
+  unknown: {{ lootorganizer_unknown_dir | default("unknown") }}
+

@@ -1,0 +1,55 @@
+---
+- name: "Fail if storage value is invalid"
+  ansible.builtin.fail:
+    msg: "base_systemd_journal_storage must be either auto, persistent or volatile"
+  when: base_systemd_journal_storage not in ['persistent', 'volatile', 'auto']
+
+- name: "Create journald dir"
+  when: "base_systemd_journal_storage == 'persistent'"
+  tags: [base, systemd, journald, logs, logging]
+  block:
+    - name: "Check if journald dir exists"
+      ansible.builtin.stat:
+        path: "/var/log/journal"
+      register: "_systemd_journal_dir"
+
+    - name: "Create journald dir"
+      ansible.builtin.file:
+        path: "/var/log/journal"
+        state: "directory"
+        mode: "2755"
+        owner: "root"
+        group: "systemd-journal"
+      when: not _systemd_journal_dir.stat.exists
+
+- name: "Add system limits for auto/persistent setting"
+  when: base_systemd_journal_storage in ['persistent', 'auto']
+  tags: [base, systemd, journald, logs, logging]
+  block:
+    - name: "Limit the total size of journald logs"
+      ansible.builtin.lineinfile:
+        dest: "/etc/systemd/journald.conf"
+        regexp: "^SystemMaxUse="
+        line: "SystemMaxUse={{ base_systemd_journal_system_max_use }}"
+
+    - name: "Limit the size of each journald log file"
+      ansible.builtin.lineinfile:
+        dest: "/etc/systemd/journald.conf"
+        regexp: "^SystemMaxFileSize="
+        line: "SystemMaxFileSize={{ base_systemd_journal_system_max_file_size }}"
+
+- name: "Add runtime limits for auto/volatile setting"
+  when: base_systemd_journal_storage in ['volatile', 'auto']
+  tags: [base, systemd, journald, logs, logging]
+  block:
+    - name: "Limit the total size of journald logs"
+      ansible.builtin.lineinfile:
+        dest: "/etc/systemd/journald.conf"
+        regexp: "^RuntimeMaxUse="
+        line: "RuntimeMaxUse={{ base_systemd_journal_runtime_max_use }}"
+
+    - name: "Limit the size of each journald log file"
+      ansible.builtin.lineinfile:
+        dest: "/etc/systemd/journald.conf"
+        regexp: "^RuntimeMaxFileSize="
+        line: "RuntimeMaxFileSize={{ base_systemd_journal_runtime_max_file_size }}"

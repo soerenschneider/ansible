@@ -1,0 +1,19 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart mosquitto
+  ansible.builtin.systemd:
+    state: restarted
+    name: mosquitto
+  failed_when: false
+
+- name: Restart mosquitto_exporter
+  ansible.builtin.systemd:
+    state: restarted
+    name: mosquitto_exporter
+
+- name: Run certbot hook
+  ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/certbot-hook-post-mosquitto.sh
+  changed_when: false

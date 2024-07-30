@@ -1,0 +1,11 @@
+---
+directory_exporter_user: direxporter
+directory_exporter_group: direxporter
+directory_exporter_service_name: directory-exporter
+
+directory_exporter_config_file: /etc/directory-exporter.json
+
+directory_exporter_config:
+  dirs:
+    - dir: /tmp
+      only_files: true

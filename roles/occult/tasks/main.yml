@@ -1,0 +1,36 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: occult
+    github_repo: soerenschneider/occult
+    service_name: occult
+  tags: [occult, occult-install, deps]
+
+- name: Configure occult
+  ansible.builtin.copy:
+    content: "{{ occult_config | to_nice_yaml }}"
+    dest: "{{ occult_config_file }}"
+    owner: "{{ occult_user }}"
+    group: "{{ occult_group }}"
+    mode: "0600"
+  when: occult_config is defined and occult_config
+  register: _occult_config
+  tags: [occult, occult-configure]
+
+- name: Install systemd unit
+  ansible.builtin.template:
+    src: occult.service.j2
+    dest: /etc/systemd/system/occult-{{ occult_service_identifier }}.service
+    owner: root
+    group: root
+    mode: "0644"
+  register: _occult_svc
+  tags: [occult, occult-configure]
+
+- name: Schedule systemd unit
+  ansible.builtin.systemd:
+    name: occult-{{ occult_service_identifier }}.service
+    enabled: "{% if occult_service_enabled and occult_config is defined and occult_config %}true{% else %}false{% endif %}"
+    daemon_reload: "{% if _occult_config is defined and _occult_config is changed or _occult_svc is changed %}true{% else %}false{% endif %}"
+  tags: [occult, occult-configure]

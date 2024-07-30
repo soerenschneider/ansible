@@ -1,0 +1,5 @@
+---
+- name: Install cryptsetup
+  ansible.builtin.package:
+    name: cryptsetup
+  tags: [packages]

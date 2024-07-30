@@ -1,0 +1,6 @@
+{% for network in networks[location].devices %}
+{% if network.dhcp is defined %}
+{% if network.vlantag is defined %}vlan{{ network.vlantag }}{% else %}{{ network.device }}{% endif %}
+
+{% endif %}
+{% endfor %}

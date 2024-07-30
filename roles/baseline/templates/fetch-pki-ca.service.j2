@@ -1,0 +1,9 @@
+[Unit]
+Description=Fetch PKI CA
+
+[Service]
+Type=simple
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/etc /var/lib/node_exporter/
+ExecStart=/usr/local/sbin/fetch-pki-ca.sh

@@ -1,0 +1,33 @@
+---
+- name: Install verify-flacs
+  ansible.builtin.git:
+    repo: https://gitlab.com/soerenschneider/verify-flacs.git
+    dest: /opt/verify-flacs
+    version: master
+  register: verfiy_flacs
+  tags: [mediastats, verify-flacs]
+
+- name: Copy script
+  ansible.builtin.copy:
+    src: /opt/verify-flacs/verify-flacs
+    dest: /usr/local/bin/verify-flacs
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when: verfiy_flacs is changed  # noqa: no-handler
+  tags: [mediastats, verify-flacs]
+
+- name: Add user for mediastats
+  ansible.builtin.user:
+    name: mediastats
+    group: node_exporter
+  tags: [mediastats, verify-flacs]
+
+- name: Schedule verify-flacs
+  ansible.builtin.cron:
+    name: verify-flacs
+    special_time: monthly
+    job: /usr/local/bin/verify-flacs {{ media_dir }}/music {{ node_exporter_textfile_dir }}
+    user: mediastats
+  tags: [mediastats, verify-flacs]

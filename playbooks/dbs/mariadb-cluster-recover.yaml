@@ -1,0 +1,114 @@
+---
+- name: Recover MariaDB cluster
+  hosts: dbs
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Get UID for generated user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ mariadb_user }}"
+      tags: always
+
+    - name: Build user string
+      ansible.builtin.set_fact:
+        _mariadb_user_string: "{{ getent_passwd[mariadb_user][1] }}"
+        # _mariadb_user_string: "{{ getent_passwd[mariadb_pass][1] }}:{{ getent_passwd[mariadb_user][2] }}"
+      tags: always
+
+    - name: Create mariadb docker network
+      community.docker.docker_network:
+        name: mariadb-cluster
+      tags: [docker, mariadb, mysql]
+
+    - name: Get infos about existing container
+      community.docker.docker_container_info:
+        name: "{{ mariadb_container_name }}"
+      register: _container_result
+      tags: [docker, mariadb, mysql]
+
+    - name: Fail if container is not running
+      ansible.builtin.fail:
+        msg: Please delete cluster before
+      when: false and not _container_result.exists
+      tags: [docker, mariadb, mysql]
+
+    - name: Figure out most recent commit
+      community.docker.docker_container:
+        name: "{{ mariadb_container_name }}"
+        image: "{{ mariadb_image }}"
+        restart_policy: "no"
+        user: "{{ _mariadb_user_string }}"
+        networks:
+          - name: mariadb-cluster
+        env:
+          MARIADB_EXTRA_FLAGS: --wsrep_recover
+          ALLOW_EMPTY_PASSWORD: "yes"
+          TZ: UTC
+        volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/sst.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
+
+    - name: Pause to Allow Container to Generate Logs
+      ansible.builtin.pause:
+        seconds: 5
+
+    - name: Fetch logs
+      ansible.builtin.command: docker logs --since=1m {{ mariadb_container_name }}
+      changed_when: false
+      register: container_logs
+
+    - name: Find correct logline
+      ansible.builtin.set_fact:
+        relevant_log_line: "{{ container_logs.stdout_lines | select('search', 'Recovered position') | last }}"
+
+    - name: Extract recovered position
+      ansible.builtin.set_fact:
+        extracted_number: "{{ relevant_log_line.split(':')[-1] }}"
+
+    - name: Extracted position
+      ansible.builtin.debug:
+        var: extracted_number
+
+    - name: Including tasks
+      ansible.builtin.set_fact:
+        _data: "{{groups.dbs | map('extract', hostvars) | list | json_query('[].{host: inventory_hostname, pos: extracted_number }') }}"
+
+    - name: Including tasks
+      ansible.builtin.command: "python3 -c 'import sys, json; data = json.load(sys.stdin); sorted_data = sorted(data, key=lambda x: int(x[\"pos\"]), reverse=True); print(sorted_data[0][\"host\"])'"
+      args:
+        stdin: "{{ _data | to_json }}"
+      changed_when: false
+      register: _highest
+
+    - name: Find Highest Extracted Number and Corresponding Host
+      ansible.builtin.set_fact:
+        host_with_highest_number: "{{ _highest.stdout }}"
+      run_once: true
+
+    - name: Display Highest Extracted Number and Host
+      ansible.builtin.debug:
+        var: host_with_highest_number
+      run_once: true
+
+    - name: Set bootstrap variable
+      ansible.builtin.lineinfile:
+        path: "{{ mariadb_storage_dir }}/data/grastate.dat"
+        regexp: "^safe_to_bootstrap:"
+        line: "safe_to_bootstrap: 1"
+      when: inventory_hostname == host_with_highest_number
+      tags: [docker, mariadb, mysql]
+
+    - name: Run master with startdb sql
+      ansible.builtin.include_tasks: tasks/mariadb_run_master.yaml
+      when: inventory_hostname == host_with_highest_number
+      tags: [docker, mariadb, mysql]
+
+    - name: Run slaves
+      ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+      when: inventory_hostname != host_with_highest_number
+      tags: [docker, mariadb, mysql]
+
+    - name: Run initial master as slave
+      ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+      when: inventory_hostname == host_with_highest_number
+      tags: [docker, mariadb, mysql]

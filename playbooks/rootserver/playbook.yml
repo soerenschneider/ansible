@@ -1,0 +1,80 @@
+---
+- name: Setup rootserver
+  hosts: rootserver
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/music.yaml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: unbound
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/unbound.yaml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: certbot
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
+        name: ip_plz
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/ip-plz.yaml
+      tags: always
+
+    - name: Allow incoming wireguard
+      community.general.ufw:
+        rule: allow
+        interface: wg0
+        direction: in
+      tags: firewall
+
+    - name: Create systemd resolved config.d
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d/
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+      when: false
+      tags: [resolved, systemd-resolved]
+
+    - name: Create drop-in config for resolved
+      ansible.builtin.template:
+        src: resolved-dns.conf.j2
+        dest: /etc/systemd/resolved.conf.d/resolved-dns.conf
+        owner: root
+        group: root
+        mode: "0755"
+      when: false
+      notify: _restart resolved
+      tags: [resolved]
+
+  handlers:
+    - name: _restart resolved
+      ansible.builtin.systemd:
+        name: systemd-resolved
+        state: restarted
+
+    - name: Run ip-plz renewal hook
+      ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
+      changed_when: true

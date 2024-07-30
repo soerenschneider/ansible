@@ -1,0 +1,67 @@
+---
+- name: Run block
+  when: ansible_system | lower == "linux"
+  tags: [ntp, ntpd, chrony]
+  block:
+    - name: Install chrony
+      ansible.builtin.package:
+        name: chrony
+
+    - name: Create systemd override directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/chronyd.service.d/
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Create override for service
+      ansible.builtin.copy:
+        content: |
+          [Unit]
+                  # restart forever
+          StartLimitIntervalSec=0
+
+          [Service]
+                  # restart forever
+          Restart=always
+          RestartSec=120
+        dest: /etc/systemd/system/chronyd.service.d/override.conf
+        owner: root
+        group: root
+        mode: "0644"
+      register: _chronyd_override
+
+    - name: Set allow directive
+      ansible.builtin.blockinfile:
+        path: /etc/chrony.conf
+        block: |
+          {% for network in networks[location].devices if network.ntp is defined %}
+          allow {{ network.address | ansible.utils.ipaddr('subnet') | ansible.utils.ipaddr('private') }}
+          {% endfor %}
+      register: _chronyd_conf
+
+    - name: Enable and start chronyd
+      ansible.builtin.systemd:
+        name: chronyd
+        daemon_reload: "{% if _chronyd_override is changed or _chronyd_conf is changed %}true{% else %}false{% endif %}"
+        state: "{% if _chronyd_override is changed or _chronyd_conf is changed %}restarted{% else %}started{% endif %}"
+        enabled: true
+
+- name: Run block
+  when: ansible_system | lower == "openbsd"
+  tags: [ntpd, ntp]
+  block:
+    - name: Copy ntpd.conf
+      ansible.builtin.template:
+        src: templates/ntpd.conf.j2
+        dest: /etc/ntpd.conf
+        owner: root
+        group: wheel
+        mode: "0644"
+      notify: Restart ntpd
+
+    - name: Enable ntpd service
+      ansible.builtin.service:
+        enabled: true
+        name: ntpd

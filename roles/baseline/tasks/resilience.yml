@@ -1,0 +1,8 @@
+---
+- name: Auto reboot on kernel panic
+  ansible.posix.sysctl:
+    name: kernel.panic
+    value: "{{ sysctl.kernel_panic | default('10') }}"
+    sysctl_set: true
+  when: [ansible_system == "Linux"]
+  tags: [base, base-resilience]

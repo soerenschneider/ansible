@@ -1,0 +1,175 @@
+---
+- name: Setup Fileserver
+  hosts: nas
+  become: true
+  gather_facts: true
+  vars:
+    node_exporter_add_users: ["{{ nas_media_user }}"]
+    metrics_emitter_bins: /var/lib/metrics-emitter
+    node_exporter_systemd_whitelist: (acmevault.*|apparmor|cron|mpd|occult.*|ssh|ssh-key-signer|syncthing.*|smbd|unattended-upgrades)\.service
+    mpd_music_path: /srv/files/media/music
+    acmevault_client_config: "{{ acmevault_default_client_config }}"
+
+    # renovate: datasource=github-releases depName=rfjakob/gocryptfs versioning=semver-coerced
+    gocryptfs_version: v2.4.0
+
+  tasks:
+    - name: Read specific settings file
+      ansible.builtin.include_vars:
+        file: settings-{{ fileserver_mode | default('passive') }}.yml
+      tags: [always]
+
+    - name: Include dufs
+      ansible.builtin.include_role:
+        name: dufs
+      tags: always
+
+    - name: Include role platform
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Include role minio
+      ansible.builtin.include_role:
+        name: minio
+      tags: always
+
+    - name: Include role conditional_reboot
+      ansible.builtin.include_role:
+        name: conditional_reboot
+      tags: always
+
+    - name: Include role mpd
+      ansible.builtin.include_role:
+        name: mpd
+      vars:
+        mpd_output_device: "null"
+      tags: always
+
+    - name: Include role samba
+      ansible.builtin.include_role:
+        name: samba
+      tags: always
+
+    - name: Include role rclone
+      ansible.builtin.include_role:
+        name: rclone
+      when: fileserver_mode == "active"
+      tags: always
+
+    - name: Include role gocryptfs
+      ansible.builtin.include_role:
+        name: gocryptfs
+      tags: always
+
+    - name: Include role restic
+      ansible.builtin.include_role:
+        name: restic
+      when: restic_backups | default([]) | length > 0
+      tags: always
+
+    - name: Include role acxi
+      ansible.builtin.include_role:
+        name: acxi
+      when: fileserver_mode == "active"
+      tags: always
+
+    - name: Include role magnetotactic
+      ansible.builtin.include_role:
+        name: magnetotactic
+      when: fileserver_mode == "active"
+      tags: always
+
+    - name: Include role occult
+      ansible.builtin.include_role:
+        name: occult
+      vars:
+        occult_run_on_boot: "{{ fileserver_mode == 'active' }}"
+      tags: always
+
+    - name: Include role mpd
+      ansible.builtin.include_role:
+        name: syncthing
+      vars:
+        syncthing_user: "{{ nas_media_user }}"
+        syncthing_dirs_metrics_config:
+          - identifier: "{{ nas_media_user }}"
+            config_file: /home/"{{ nas_media_user }}"/.config/syncthing/config.xml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/disk.yml
+      tags: always
+
+    - name: Include role fetcharr
+      ansible.builtin.include_role:
+        name: fetcharr
+      when: fileserver_mode == "active"
+      tags: always
+
+    - name: Add template file
+      ansible.builtin.copy:
+        content: "{{ fetcharr_webhook_template }}"
+        dest: "{{ fetcharr_webhook_template_file }}"
+        owner: "{{ fetcharr_user }}"
+        group: root
+        mode: "0640"
+      tags: [fetcharr, fetcharr-configure]
+      when: fileserver_mode == "active"
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/media.yml
+      when: false
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/verify_flacs.yml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/aliases.yml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/webserver.yml
+      tags: always
+
+    - name: Include role metrics_emitter
+      ansible.builtin.include_role:
+        name: metrics_emitter
+      tags: always
+
+    - name: Include role directory_exporter
+      ansible.builtin.include_role:
+        name: directory_exporter
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/metrics.yml
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      tags: always
+
+  handlers:
+    - name: Mount_all_disks
+      ansible.builtin.command: mount -a  # noqa: command-instead-of-module
+      changed_when: true
+
+    - name: Restart webserver
+      ansible.builtin.systemd:
+        state: restarted
+        name: nginx
+
+    - name: Restart haproxy
+      ansible.builtin.systemd:
+        state: restarted
+        name: haproxy
+      failed_when: false
+
+    - name: Restart samba
+      ansible.builtin.systemd:
+        state: restarted
+        name: "{{ item }}"
+      with_items: [smb, nmb]

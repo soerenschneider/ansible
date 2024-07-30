@@ -1,0 +1,39 @@
+---
+fail2ban_config_dir: /etc/fail2ban
+
+fail2ban_exporter_path: /opt/fail2ban-exporter
+
+fail2ban_ignoreip: [127.0.0.1/8]
+fail2ban_bantime: 3600
+fail2ban_findtime: 600
+fail2ban_maxretry: 5
+fail2ban_backend: auto
+fail2ban_usedns: "no"
+fail2ban_logencoding: auto
+fail2ban_enabled: "false"
+fail2ban_banaction: iptables-multiport
+# use special value 'auto' in enabled to auto enable jail if logpath exists
+fail2ban_services:
+  - name: sshd
+    port: ssh
+    enabled: true
+    logpath: "%(sshd_log)s"
+    backend: "%(sshd_backend)s"
+  - name: traefik-auth
+    port: 80,443,8080,8443
+    logpath: "{{ traefik_access_log | default('/var/log/traefik/access.log') }}"
+    bantime: 7200
+    maxretry: 10
+    enabled: auto
+  - name: traefik-bots
+    port: 80,443,8080,8443
+    logpath: "{{ traefik_access_log | default('/var/log/traefik/access.log') }}"
+    bantime: 7200
+    maxretry: 20
+    enabled: auto
+  - name: hass
+    port: 80,443,8080,8123,8443
+    logpath: /var/log/hass/home-assistant.log
+    bantime: 7200
+    maxretry: 5
+    enabled: auto

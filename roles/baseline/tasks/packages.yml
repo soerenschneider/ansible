@@ -1,0 +1,59 @@
+---
+- name: Remove unwanted packages
+  ansible.builtin.package:
+    name: [snapd, bluez, modemmanager]
+    state: absent
+  tags: [base, base-packages]
+
+- name: Install packages
+  when: ansible_os_family == "Debian"
+  tags: [base, base-packages]
+  block:
+    - name: Configure apt
+      ansible.builtin.copy:
+        content: |
+          APT::Install-Recommends "0";
+          APT::Install-Suggests "0";
+        dest: /etc/apt/apt.conf.d/01norecommend
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install debian-only packages
+      ansible.builtin.package:
+        name: [ufw, signify-openbsd]
+
+    - name: Detect binary for signify-openbsd
+      ansible.builtin.command: which signify-openbsd
+      register: signify_openbsd_location
+      changed_when: false
+
+    - name: Add link for signify
+      ansible.builtin.file:
+        src: "{{ signify_openbsd_location.stdout }}"
+        path: /usr/bin/signify
+        state: link
+        owner: root
+        group: root
+
+- name: Install packages
+  when: ansible_os_family | lower == "redhat"
+  tags: [base, base-packages]
+  block:
+    - name: Enable crb/powertools repo for redhat
+      ansible.builtin.command: dnf config-manager --set-enabled crb
+      changed_when: false
+
+    - name: Install epel release
+      ansible.builtin.dnf:
+        name: epel-release
+
+    - name: Install redhat-only packages
+      ansible.builtin.package:
+        name: [signify, policycoreutils-python-utils]
+
+- name: Install utilities
+  ansible.builtin.package:
+    name: "{{ base_packages }}"
+  when: base_install_packages
+  tags: [base, base-packages, base-packages-utils]

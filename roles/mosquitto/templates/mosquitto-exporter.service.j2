@@ -1,0 +1,20 @@
+[Unit]
+Description=mosquitto Prometheus exporter
+After=network.target
+After=systemd-user-sessions.service
+After=network-online.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ mosquitto_exporter_user }}
+ExecStart=/usr/local/bin/mosquitto-exporter
+
+# restart forerver
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

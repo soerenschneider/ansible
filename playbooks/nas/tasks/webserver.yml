@@ -1,0 +1,53 @@
+---
+- name: Install nginx
+  ansible.builtin.package:
+    name: nginx
+  tags: webserver
+
+- name: Delete default config
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  tags: webserver
+
+- name: Add webserver config
+  ansible.builtin.blockinfile:
+    create: true
+    path: /etc/nginx/sites-enabled/webserver
+    mode: "0640"
+    block: |
+      server {
+          charset       utf-8;
+          server_tokens off;
+          root          /var/www/html;
+
+          listen                        8080;
+          server_name                   {{ inventory_hostname }};
+          client_header_buffer_size     1k;
+          large_client_header_buffers   2 1k;
+
+          location /media/ {
+            root                    {{ srv_dir }};
+            limit_except            GET HEAD { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+          location /pub {
+            root                    /mnt/wdred;
+            limit_except            GET HEAD { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+      }
+  notify: Restart webserver
+  tags: [webserver, nginx]

@@ -1,0 +1,16 @@
+---
+- name: Add cert authorities
+  ansible.builtin.lineinfile:
+    path: "/home/{{ default_user }}/.ssh/known_hosts"
+    regexp: ^@cert-authority
+    state: absent
+  tags: [ssh, ssh-ca]
+
+- name: Add cert authorities
+  ansible.builtin.lineinfile:
+    path: "/home/{{ default_user }}/.ssh/known_hosts"
+    line: "@cert-authority {{ item.domain }} {{ item.cert }}"
+    regexp: ^@cert-authority {{ item.domain }}
+    insertbefore: BOF
+  with_items: "{{ ssh_ca_certs | default([]) }}"
+  tags: [ssh, ssh-ca]

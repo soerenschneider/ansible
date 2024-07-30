@@ -1,0 +1,21 @@
+#!/bin/sh
+
+PROM_TEXTFILE_DIR="${1:-/var/node_exporter}"
+EMITTERS_DIR="/etc/scripts/emitters"
+SLEEP_TIME=45
+FILE="${PROM_TEXTFILE_DIR}/emitter.prom"
+
+if [ ! -d ${PROM_TEXTFILE_DIR} ]; then
+    echo "Configured dir ${PROM_TEXTFILE_DIR} does not exist"
+    exit 1
+fi
+
+collect() {
+    find "${EMITTERS_DIR}" -iname "*.sh" | xargs -L1 -P4 sh -c 2> /dev/null
+}
+
+while :; do
+    collect > ${FILE}.tmp
+    mv ${FILE}.tmp ${FILE}
+    sleep ${SLEEP_TIME}
+done

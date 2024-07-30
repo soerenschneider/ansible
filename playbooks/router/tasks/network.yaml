@@ -1,0 +1,47 @@
+---
+- name: Create physical connection
+  community.general.nmcli:
+    conn_name: "{{ item.device }}"
+    type: ethernet
+    ip4: "{{ item.address }}"
+    gw4: "{{ item.gateway | default(omit) }}"
+    dns4: [127.0.0.1, 192.168.200.1]
+    state: "{{ item.state | default('present') }}"
+    autoconnect: true
+  with_items: "{{ networks[location].devices }}"
+  when: item.vlantag is not defined
+  tags: [network, vlan]
+
+- name: Create VLAN connection
+  community.general.nmcli:
+    conn_name: vlan{{ item.vlantag }}
+    type: vlan
+    vlandev: "{{ item.device }}"
+    vlanid: "{{ item.vlantag }}"
+    ip4: "{{ item.address }}"
+    dns4: "['127.0.0.1', '192.168.200.1', {% if location in ['dd', 'ez'] %}'192.168.72.1'{% else %}'192.168.65.1'{% endif %}]"
+    gw4: "{{ item.gateway | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    autoconnect: true
+  with_items: "{{ networks[location].devices }}"
+  when: item.vlantag is defined
+  tags: [network, vlan]
+
+- name: Run block
+  when: networks[location].uplink.type | default("") | lower == "dhcp"
+  tags: [network, isp, vlan]
+  block:
+    - name: Configure Uplink interface to use DHCP
+      community.general.nmcli:
+        conn_name: "{{ networks[location].uplink.device }}"
+        type: ethernet
+        ifname: "{{ networks[location].uplink.device }}"
+        autoconnect: true
+        method4: auto
+        dns4_ignore_auto: true
+        dns6_ignore_auto: true
+        state: present
+
+    - name: Set inifinite retries for DHCP
+      ansible.builtin.command: nmcli connection modify {{ networks[location].uplink.device }} ipv4.dhcp-timeout infinity
+      changed_when: true

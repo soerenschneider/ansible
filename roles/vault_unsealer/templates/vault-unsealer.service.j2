@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=vault-unsealer
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ vault_unsealer_user }}
+Group={{ vault_unsealer_group }}
+ExecStart=/usr/local/bin/vault-unsealer -conf "{{ vault_unsealer_config_file }}"
+
+PrivateTmp=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=full
+
+SyslogIdentifier=vault-unsealer
+
+# restart forever
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run fetch-pki-ca.service once a day
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+Unit=fetch-pki-ca.service
+
+[Install]
+WantedBy=timers.target

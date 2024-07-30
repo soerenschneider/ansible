@@ -1,0 +1,13 @@
+---
+occult_service_enabled: false
+
+occult_repo_dest: /opt/occult-git
+occult_user: root
+occult_group: root
+occult_run_on_boot: true
+# renovate: datasource=github-releases depName=soerenschneider/occult
+occult_version: v2.0.1
+
+occult_config_file: /root/.occult.conf
+occult_service_identifier: default
+# occult_config: {}

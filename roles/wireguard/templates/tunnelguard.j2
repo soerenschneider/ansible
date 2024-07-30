@@ -1,0 +1,70 @@
+#!/bin/bash
+# SPDX-License-Identifier: GPL-2.0
+#
+# Copyright (C) 2015-2020 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+
+set -e
+shopt -s nocasematch
+shopt -s extglob
+export LC_ALL=C
+
+CONFIG_FILE="$1"
+[[ $CONFIG_FILE =~ ^[a-zA-Z0-9_=+.-]{1,15}$ ]] && CONFIG_FILE="/etc/wireguard/$CONFIG_FILE.conf"
+[[ $CONFIG_FILE =~ /?([a-zA-Z0-9_=+.-]{1,15})\.conf$ ]]
+INTERFACE="${BASH_REMATCH[1]}"
+
+NODE_EXPORTER_DIR="/var/lib/node_exporter"
+METRICS_FILE="${NODE_EXPORTER_DIR}/tunnelguard.prom"
+TMP_METRICS_FILE="${METRICS_FILE}.tmp"
+
+print_metrics_header() {
+	echo "# HELP wireguard_tunnelguard_peer_reset_bool Bool that indicates whether the tunnel has been reset" > "${TMP_METRICS_FILE}"
+	echo "# TYPE wireguard_tunnelguard_peer_reset_bool gauge" >> "${TMP_METRICS_FILE}"
+	echo "# HELP wireguard_tunnelguard_invocation_timestamp_seconds Timestamp of last invocation of tunnelguard" >> "${TMP_METRICS_FILE}"
+	echo "# TYPE wireguard_tunnelguard_invocation_timestamp_seconds gauge" >> "${TMP_METRICS_FILE}"
+	echo "wireguard_tunnelguard_invocation_timestamp_seconds{device=\"${CONFIG_FILE}\"} $(date +%s)" >> "${TMP_METRICS_FILE}"
+}
+
+print_metrics() {
+	[[ $PEER_SECTION -ne 1 || -z $PUBLIC_KEY || -z $ENDPOINT ]] && return 0
+	echo "wireguard_tunnelguard_peer_reset_bool{device=\"${CONFIG_FILE}\",pubkey=\"$PUBLIC_KEY\",endpoint=\"$ENDPOINT\"} ${1:-0}" >> ${TMP_METRICS_FILE}
+}
+
+flush_metrics() {
+	mv "${TMP_METRICS_FILE}" "${METRICS_FILE}"
+}
+
+process_peer() {
+	[[ $PEER_SECTION -ne 1 || -z $PUBLIC_KEY || -z $ENDPOINT ]] && return 0
+	[[ $(wg show "$INTERFACE" latest-handshakes) =~ ${PUBLIC_KEY//+/\\+}\	([0-9]+) ]] || return 0
+	(( ($EPOCHSECONDS - ${BASH_REMATCH[1]}) > 135 )) || return 0
+	wg set "$INTERFACE" peer "$PUBLIC_KEY" endpoint "$ENDPOINT"
+	print_metrics 1
+	reset_peer_section
+}
+
+reset_peer_section() {
+	PEER_SECTION=0
+	PUBLIC_KEY=""
+	ENDPOINT=""
+}
+
+reset_peer_section
+while :; do
+	print_metrics_header
+	while read -r line || [[ -n $line ]]; do
+		stripped="${line%%\#*}"
+		key="${stripped%%=*}"; key="${key##*([[:space:]])}"; key="${key%%*([[:space:]])}"
+		value="${stripped#*=}"; value="${value##*([[:space:]])}"; value="${value%%*([[:space:]])}"
+		[[ $key == "["* ]] && { process_peer; print_metrics; reset_peer_section; }
+		[[ $key == "[Peer]" ]] && PEER_SECTION=1
+		if [[ $PEER_SECTION -eq 1 ]]; then
+			case "$key" in
+			PublicKey) PUBLIC_KEY="$value"; continue ;;
+			Endpoint) ENDPOINT="$value"; continue ;;
+			esac
+		fi
+	done < "$CONFIG_FILE"
+	process_peer; print_metrics; reset_peer_section; flush_metrics;
+	sleep 30
+done

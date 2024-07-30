@@ -1,0 +1,14 @@
+---
+gobot_pir_user: sensor
+gobot_pir_group: sensor
+gobot_pir_service_name: gobot-pir
+
+gobot_pir_config_file: /etc/gobot-pir.json
+
+gobot_pir_config:
+  location: undefined
+  metrics_addr: :9091
+  gpio_pin: "7"
+  polling_interval_ms: 100
+  mqtt_host: tcp://host:1883
+  mqtt_topic: bla

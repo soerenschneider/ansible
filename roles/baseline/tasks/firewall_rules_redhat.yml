@@ -1,0 +1,36 @@
+---
+- name: Run block
+  ansible.builtin.set_fact:
+    firewall_rules: "{{ [{'from': ['any'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"
+  tags: [firewall]
+
+- name: Run block
+  when: firewall_rules | length > 1
+  tags: [firewall]
+  block:
+    - name: Collect TCP rules
+      ansible.builtin.set_fact:
+        fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+      loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'tcp') | list }}"
+
+    - name: Collect UDP rules
+      ansible.builtin.set_fact:
+        fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+      loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'udp') | list }}"
+
+    - name: Allow TCP rules
+      ansible.posix.firewalld:
+        port: "{{ item.0 }}/tcp"
+        state: enabled
+        immediate: true
+        permanent: true
+      loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
+      tags: [firewall]
+
+    - name: Allow UDP rules
+      ansible.posix.firewalld:
+        port: "{{ item.0 }}/udp"
+        immediate: true
+        state: enabled
+        permanent: true
+      loop: "{{ fw_udp_rules | default([]) | flatten(levels=1) }}"

@@ -1,0 +1,6 @@
+---
+- name: Restart vault-unsealer
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ vault_unsealer_service_name }}"
+    state: restarted

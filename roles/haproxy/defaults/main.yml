@@ -1,0 +1,2 @@
+---
+haproxy_systemd_restart_s: 20

@@ -1,0 +1,136 @@
+---
+- name: Install desktop
+  hosts: localhost
+  become: true
+  vars:
+    default_user: "soeren"
+    vault_configure_server: false
+  tasks:
+    - name: Determine hostname (without ansible facts)
+      ansible.builtin.command: hostname
+      register: _hostname_output
+      changed_when: false
+      tags: always
+
+    - name: Run block
+      ansible.builtin.set_fact:
+        hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
+        inventory_hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
+      tags: always
+    - name: Run block
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }}"
+      tags: always
+
+    - name: Load vault-approles config...
+      ansible.builtin.include_vars:
+        file: ../../inventory/prod/group_vars/desktop/vault-approles.yaml
+      tags: always
+
+    - name: Load vault-pki-cli config...
+      ansible.builtin.include_vars:
+        file: ../../inventory/prod/group_vars/desktop/vault-pki-cli.yaml
+      tags: always
+
+    - name: Load host-based settings
+      ansible.builtin.include_vars:
+        file: settings-{{ hostname }}.yml
+      ignore_errors: true
+      register: ignore_errors_register
+      tags: always
+
+    - name: Add private CA
+      ansible.builtin.copy:
+        content: "{{ pki_soerenschneider_ca_crt }}"
+        dest: "{{ pki_soerenschneider_ca_file }}"
+        owner: root
+        group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
+        mode: "0644"
+      tags: [base, pki]
+
+    - name: Load syncthing config...
+      ansible.builtin.include_vars:
+        file: ../../inventory/prod/group_vars/desktop/syncthing.yaml
+      ignore_errors: false
+      tags: syncthing
+
+    - name: Create folders
+      become: false
+      ansible.builtin.file:
+        state: directory
+        path: "{{ item.path }}"
+        owner: "{{ default_user }}"
+        group: "{{ default_user }}"
+        mode: "0700"
+      with_items: "{{ syncthing_folders }}"
+      tags: syncthing
+
+    - name: Run block
+      ansible.builtin.include_role:
+        name: syncthing
+      vars:
+        syncthing_collect_metrics: false
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_tasks: tasks/ssh-ca.yaml
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_tasks: tasks/signify.yml
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_role:
+        name: vault_approle
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_role:
+        name: vault_pki_cli
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_tasks: tasks/vault-pki-cli.yaml
+      tags: always
+
+    - name: Load syncthing config...
+      ansible.builtin.include_vars:
+        file: ../../inventory/prod/group_vars/desktop/vault-ssh-cli.yaml
+      ignore_errors: false
+      tags: vault-ssh-cli
+
+    - name: Run block
+      ansible.builtin.include_role:
+        name: vault_ssh_cli
+      tags: always
+
+    - name: Run block
+      ansible.builtin.include_tasks: tasks/vault-ssh-cli.yaml
+      tags: always
+
+    - name: Run block
+      when: use_wireguard | default(False)
+      tags: always
+      block:
+        - name: Load wireguard pubkeys...
+          ansible.builtin.include_vars:
+            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-pubkeys.yaml
+          ignore_errors: false
+
+        - name: Load wireguard networks...
+          ansible.builtin.include_vars:
+            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-nets.yaml
+          ignore_errors: false
+
+        - name: Load wireguard psk keys
+          community.sops.load_vars:
+            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-psks.sops.yaml
+
+        - name: Load wireguard private key...
+          community.sops.load_vars:
+            file: wg-{{ hostname }}.sops.yaml
+
+        - name: Include role
+          ansible.builtin.include_role:
+            name: wireguard

@@ -1,0 +1,8 @@
+[Unit]
+Description=Read and save CRL from the vault pki
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vault-pki-cli read-crl -o /etc/pki_soerenschneider_crl.crt

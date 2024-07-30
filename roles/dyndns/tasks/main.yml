@@ -1,0 +1,30 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install.yml
+  vars:
+    binary_name: dyndns-{{ dyndns_mode }}
+    github_repo: soerenschneider/dyndns
+    service_name: dyndns-{{ dyndns_mode }}
+  tags: [dyndns, dyndns-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: dyndns-server
+    github_repo: soerenschneider/dyndns
+    service_name: dyndns-server
+  when: dyndns_server_config is defined
+  tags: [dyndns, dyndns-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: dyndns-client
+    github_repo: soerenschneider/dyndns
+    service_name: dyndns-client
+  when: dyndns_client_config is defined
+  tags: [dyndns, dyndns-install, deps]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: configure.yml
+  tags: [dyndns, dyndns-configure]

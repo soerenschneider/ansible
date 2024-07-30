@@ -1,0 +1,25 @@
+---
+vault_user: vault
+vault_group: vault
+
+vault_address: http://localhost:{{ vault_port }}
+vault_listen_address: 0.0.0.0:{{ vault_port }}
+vault_port: 8200
+vault_dir: /etc/vault.d
+vault_storage_dir: "{{ vault_dir }}/storage"
+vault_ui: true
+vault_gpg_keys: []
+vault_allow_insecure: false
+vault_tls_key: ""
+vault_tls_crt: ""
+vault_ansible_group_name: vault
+# renovate: datasource=github-releases depName=hashicorp/vault
+vault_version: v1.16.3
+
+vault_configure_server: true
+
+vault_audit_log: /var/log/vault-audit.log
+
+vault_cluster_name: prod
+vault_cluster_nodes_group: vault
+vault_cluster_first_node: "{{ groups[vault_cluster_nodes_group][0] }}"

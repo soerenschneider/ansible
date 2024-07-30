@@ -1,0 +1,6 @@
+---
+- name: Restart gobot-bme280
+  ansible.builtin.systemd:
+    name: gobot-bme280
+    state: restarted
+    daemon_reload: true

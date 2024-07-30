@@ -1,0 +1,162 @@
+---
+- name: Manage group to share pki keys
+  ansible.builtin.group:
+    name: "{{ vault_pki_cli_group }}"
+    system: true
+    state: "{% if vault_pki_cli_create_group %}present{% else %}absent{% endif %}"
+  tags: [vault-pki-cli, vault-pki-cli-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: vault-pki-cli
+    github_repo: soerenschneider/vault-pki-cli
+    service_name: vault-pki-cli
+  tags: [vault-pki-cli, vault-pki-cli-install]
+
+- name: Stop old services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  with_items: [vault-pki-cli.service, vault-pki-cli.timer, vault-pki-cli-crl.timer, vault-pki-cli-crl.service]
+  when: false
+  failed_when: false
+  tags: [vault-pki-cli, vault-pki-cli-configure, vault-pki-cli-install]
+
+- name: Delete old configs
+  ansible.builtin.file:
+    path: /etc/systemd/system/{{ item }}
+    state: absent
+  with_items: [vault-pki-cli.service, vault-pki-cli.timer, vault-pki-cli-crl.timer, vault-pki-cli-crl.service]
+  when: false
+  tags: [vault-pki-cli, vault-pki-cli-configure, vault-pki-cli-install]
+
+- name: Create config directory
+  ansible.builtin.file:
+    path: /etc/vault-pki-cli
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Create issue config
+  ansible.builtin.copy:
+    content: "{{ vault_pki_cli_issue_config | to_nice_yaml(indent=2) }}"
+    dest: /etc/vault-pki-cli/issue.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  when: vault_pki_cli_issue_config is defined
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Create acme config
+  ansible.builtin.copy:
+    content: "{{ vault_pki_cli_acme_config | to_nice_yaml(indent=2) }}"
+    dest: /etc/vault-pki-cli/acme.yaml
+    owner: root
+    group: root
+    mode: "0600"
+  when: vault_pki_cli_acme_config is defined
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Create systemd timers and units for issue subcmd
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: _vault_pki_cli_unit
+  when: vault_pki_cli_issue_config is defined
+  with_items: [vault-pki-cli-issue.service, vault-pki-cli-issue.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Create systemd timers and units for acme subcmd
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: _vault_pki_cli_unit
+  when: vault_pki_cli_acme_config is defined
+  with_items: [vault-pki-cli-acme.service, vault-pki-cli-acme.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Create systemd timers and units for read-crl subcmd
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: "0644"
+  register: _vault_pki_cli_timer
+  when: vault_pki_cli_crl_enabled
+  with_items: [vault-pki-cli-crl.service, vault-pki-cli-crl.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: _vault_pki_cli_timer.changed | default(false) or _vault_pki_cli_unit.change | default(false)
+  with_items: [service, timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Enable issue units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: "{% if _vault_pki_cli_timer.changed | default(False) or _vault_pki_cli_unit.changed | default(False) %}true{% else %}false{% endif %}"
+    enabled: true
+  when: vault_pki_cli_issue_config is defined
+  with_items: [vault-pki-cli-issue.service, vault-pki-cli-issue.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Enable acme units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: "{% if _vault_pki_cli_timer.changed | default(False) or _vault_pki_cli_unit.changed | default(False) %}true{% else %}false{% endif %}"
+    enabled: true
+  when: vault_pki_cli_acme_config is defined
+  with_items: [vault-pki-cli-acme.service, vault-pki-cli-acme.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Enable crl units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    daemon_reload: "{% if _vault_pki_cli_timer.changed | default(False) or _vault_pki_cli_unit.changed | default(False) %}true{% else %}false{% endif %}"
+    enabled: true
+  when: vault_pki_cli_crl_enabled
+  with_items: [vault-pki-cli-crl.service, vault-pki-cli-crl.timer]
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Start issue timers and units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: restarted
+  with_items: [vault-pki-cli-issue.service, vault-pki-cli-issue.timer]
+  when: vault_pki_cli_issue_config is defined
+  failed_when: false
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Start acme timers and units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: restarted
+  with_items: [vault-pki-cli-acme.service, vault-pki-cli-acme.timer]
+  when: vault_pki_cli_acme_config is defined
+  failed_when: false
+  tags: [vault-pki-cli, vault-pki-cli-configure]
+
+- name: Start crl timers and units
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: restarted
+  when: vault_pki_cli_crl_enabled
+  with_items: [vault-pki-cli-crl.service, vault-pki-cli-crl.timer]
+  failed_when: false
+  tags: [vault-pki-cli, vault-pki-cli-configure]

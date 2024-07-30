@@ -1,0 +1,29 @@
+# {{ ansible_managed }}
+[Unit]
+Description=shutdown-listener
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/smartctl_exporter --smartctl.interval={{ smartctl_exporter_interval }}
+
+PrivateTmp=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=full
+
+SyslogIdentifier=shutdown-listener
+
+# restart forever
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

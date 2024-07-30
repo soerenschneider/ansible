@@ -1,0 +1,25 @@
+---
+- name: Set hardware parameters
+  ansible.builtin.include_tasks: hw.yml
+  when: ansible_distribution != "Ubuntu"
+  tags: always
+
+- name: Delete microsoft stuff
+  ansible.builtin.include_tasks: microsoft.yml
+  tags: always
+
+- name: Delete avahi-daemon
+  ansible.builtin.package:
+    name: avahi-daemon
+    state: absent
+  tags: [raspberry, base]
+
+- name: Log to ramdisk
+  ansible.posix.mount:
+    path: /var/log
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,noatime,nosuid,nodev,noexec,mode=0755
+    state: present
+  when: raspberry.ramdisk_log
+  tags: [raspberry, base]

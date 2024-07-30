@@ -1,0 +1,40 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: fetcharr
+    github_repo: soerenschneider/fetcharr
+    service_name: fetcharr
+  tags: [fetcharr, fetcharr-install, deps]
+
+- name: Add config
+  ansible.builtin.copy:
+    content: "{{ fetcharr_config | to_nice_yaml }}"
+    dest: "{{ fetcharr_config_file }}"
+    owner: "{{ fetcharr_user }}"
+    group: root
+    mode: "0640"
+  notify: Restart fetcharr
+  tags: [fetcharr, fetcharr-configure]
+
+- name: Add systemd units
+  ansible.builtin.template:
+    src: fetcharr.service.j2
+    dest: /etc/systemd/system/fetcharr.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart fetcharr
+  tags: [fetcharr, fetcharr-configure]
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  tags: [fetcharr, fetcharr-configure]
+
+- name: Enable/disable fetcharr
+  ansible.builtin.systemd:
+    name: fetcharr.service
+    enabled: true
+    state: started
+  tags: [fetcharr, fetcharr-configure]

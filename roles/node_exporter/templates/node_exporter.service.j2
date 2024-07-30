@@ -1,0 +1,73 @@
+[Unit]
+Description=Prometheus Node Exporter
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ node_exporter_user }}
+Group={{ node_exporter_user }}
+ExecStart=/usr/local/bin/node_exporter \
+{% for collector in node_exporter_enabled_collectors -%}
+{%   if not collector is mapping %}
+    --collector.{{ collector }} \
+{%   else -%}
+{%     set name, options = (collector.items()|list)[0] -%}
+{%     for k,v in options|dictsort %}
+    --collector.{{ name }}.{{ k }}={{ v }} \
+{%     endfor -%}
+{%   endif -%}
+{% endfor -%}
+{% if node_exporter_additional_collectors is defined %}
+{% for collector in node_exporter_additional_collectors -%}
+{%   if not collector is mapping %}
+    --collector.{{ collector }} \
+{%   else -%}
+{%     set name, options = (collector.items()|list)[0] -%}
+{%     for k,v in options|dictsort %}
+    --collector.{{ name }}.{{ k }}={{ v }} \
+{%     endfor -%}
+{%   endif -%}
+{% endfor -%}
+{% endif %}
+{% for collector in node_exporter_disabled_collectors %}
+    --no-collector.{{ collector }} \
+{% endfor %}
+{% if 'systemd' in node_exporter_enabled_collectors and node_exporter_systemd_whitelist | length > 0 %}
+    --collector.systemd.unit-include='{{ node_exporter_systemd_whitelist }}' \
+{% endif %}
+    --web.listen-address={{ node_exporter_web_listen_address }}
+
+SyslogIdentifier=node_exporter
+
+# Security
+##########
+NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictSUIDSGID=true
+MemoryDenyWriteExecute=yes
+
+# Network
+IPAddressAllow=192.168.0.0/16
+
+# Paths
+PrivateTmp=yes
+ReadOnlyPaths={{ node_exporter_textfile_dir }}
+ProtectControlGroups=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectProc=yes
+
+PrivateDevices=no
+DevicePolicy=auto
+
+# restart forerver
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

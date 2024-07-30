@@ -1,0 +1,11 @@
+[Unit]
+Description=Making double sure wg tunnel %i is started
+After=network-online.target
+
+[Timer]
+Unit=wg-quick@%i.service
+OnBootSec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

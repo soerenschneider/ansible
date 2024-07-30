@@ -1,0 +1,32 @@
+option domain-name "{{ location }}.{{ network_domain }}";
+default-lease-time 43200;
+max-lease-time 86400;
+option rfc3442-classless-static-routes code 121 = array of integer 8;
+option ms-classless-static-routes code 249 = array of integer 8;
+
+{% for network in networks[location].devices %}
+{% if network.dhcp is defined %}
+subnet {{ network.address | ansible.utils.ipaddr('network') }} netmask {{ network.address | ansible.utils.ipaddr('netmask') }} {
+    option routers {{ network['dhcp'].routers | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }};
+    option domain-name-servers {{ network['dhcp'].dns | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }}; 
+{% if network.ntp is defined %}
+    option ntp-servers {{ network.address | ansible.utils.ipaddr('address') }};
+{% endif %}
+{% if network.dhcp.static_routes is defined and network.dhcp.static_routes | length > 0 %}
+    option rfc3442-classless-static-routes {{ network.dhcp.static_routes | join(",  ") }};
+    option ms-classless-static-routes      {{ network.dhcp.static_routes | join(",  ") }};
+{% endif %}
+
+    range {{ network['dhcp'].from }} {{ network['dhcp'].to }};
+}
+{% endif %}
+{% endfor %}
+
+{% for host in local_hosts[location] | default([]) %}
+{% if host.physical is defined %}
+host {{ host.host }} {
+    fixed-address {{ host.logical }};
+    hardware ethernet {{ host.physical }};
+}
+{% endif %}
+{% endfor %}

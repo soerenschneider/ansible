@@ -1,0 +1,26 @@
+---
+- name: Add aliases for mounting encrypted samba shares
+  ansible.builtin.lineinfile:
+    path: /home/"{{ nas_media_user }}"/.bash_aliases
+    line: alias c-mount-{{ item }}='gocryptfs {% if fileserver_mode == 'passive' %}-ro {% endif %}-allow_other -config {{ disk.mountpoint }}/.keys/{{ item }}.conf {{ disk.mountpoint }}/{{ item }}-crypt {{ srv_dir }}/{{ item }}'
+    owner: "{{ nas_media_user }}"
+    regexp: ^alias c-mount-{{ item }}=*.
+    state: present
+    insertafter: EOF
+    create: true
+    mode: "0640"
+  with_items: [media, games]
+  tags: aliases
+
+- name: Add alias for mounting private encrypted dirs
+  ansible.builtin.lineinfile:
+    path: /home/"{{ nas_media_user }}"/.bash_aliases
+    line: alias c-mount-{{ item }}='gocryptfs {% if fileserver_mode == 'passive' %}-ro {% endif %} -config {{ disk.mountpoint }}/.keys/{{ item }}.conf }}/{{ item }}-crypt {{ srv_dir }}/{{ item }}'
+    owner: "{{ nas_media_user }}"
+    regexp: ^alias c-mount-{{ item }}=*.
+    state: present
+    insertafter: EOF
+    create: true
+    mode: "0640"
+  with_items: [photos]
+  tags: aliases

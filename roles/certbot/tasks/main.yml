@@ -1,0 +1,49 @@
+---
+- name: Install certbot
+  ansible.builtin.package:
+    name: certbot
+  when: ansible_os_family == "Debian"
+  tags: [certbot, certbot-install]
+
+- name: Install certbot route53 plugin
+  ansible.builtin.package:
+    name: python3-certbot-dns-route53
+  when: [ansible_os_family == "Debian", "certbot_dns_domains | default([]) | length > 0"]
+  tags: [certbot, certbot-install]
+
+- name: Run certbot once (creates 'renewal-hooks' dir)
+  ansible.builtin.command: certbot
+  failed_when: false
+  changed_when: false
+  tags: [certbot, certbot-configure, certbot-hooks]
+
+- name: Install haproxy hooks
+  ansible.builtin.template:
+    src: "{{ item.name }}.j2"
+    dest: /etc/letsencrypt/renewal-hooks/{{ item.type }}/{{ item.name }}
+    owner: root
+    group: root
+    mode: "0755"
+  with_items:
+    - type: post
+      name: hook-start-haproxy.sh
+    - type: pre
+      name: hook-stop-haproxy.sh
+  tags: [certbot, certbot-configure, certbot-hooks]
+
+- name: Retrieve http certs
+  ansible.builtin.command: certbot certonly --non-interactive --expand --agree-tos --email={{ certbot_email }} --standalone --preferred-challenges http -d }} -n
+  with_items: "{{ certbot_http_domains | default([]) }}"
+  changed_when: false
+  tags: [certbot, certbot-configure, certbot-hooks]
+
+- name: Retrieve dns certs
+  ansible.builtin.command: certbot certonly --non-interactive --expand --agree-tos --email={{ certbot_email }} --dns-route53 -d {{ item }} -n
+  with_items: "{{ certbot_dns_domains | default([]) }}"
+  changed_when: false
+  tags: [certbot, certbot-configure, certbot-hooks]
+
+- name: Run post hooks
+  ansible.builtin.command: find /etc/letsencrypt/renewal-hooks/post/ -type f -exec bash {} \;
+  changed_when: false
+  tags: [certbot, certbot-configure, certbot-hooks]

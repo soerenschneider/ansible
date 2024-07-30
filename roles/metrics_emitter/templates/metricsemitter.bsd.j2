@@ -1,0 +1,10 @@
+#!/bin/ksh
+
+daemon="/usr/local/bin/metrics-emitter"
+
+. /etc/rc.d/rc.subr
+
+pexp="/bin/sh ${daemon}"
+rc_reload=NO
+rc_bg=YES
+rc_cmd $1

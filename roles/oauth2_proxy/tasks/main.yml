@@ -1,0 +1,59 @@
+---
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: oauth2-proxy
+    github_repo: oauth2-proxy/oauth2-proxy
+    service_name: oauth2-proxy
+  tags: [oauth2-proxy, oauth2-proxy-install]
+
+- name: Create oauth2-proxy system group
+  ansible.builtin.group:
+    name: "{{ oauth2_proxy_group }}"
+    system: true
+    state: present
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
+- name: Create oauth2-proxy system user
+  ansible.builtin.user:
+    name: "{{ oauth2_proxy_user }}"
+    system: true
+    shell: /sbin/nologin
+    group: "{{ oauth2_proxy_group }}"
+    createhome: false
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
+- name: Generate oauth2-proxy config dir
+  ansible.builtin.file:
+    path: "{{ oauth2_proxy_config_dir }}"
+    owner: "{{ oauth2_proxy_user }}"
+    group: "{{ oauth2_proxy_group }}"
+    mode: "0750"
+    state: directory
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
+- name: Add config
+  ansible.builtin.template:
+    src: config.cfg.j2
+    dest: "{{ oauth2_proxy_config_dir }}/{{ oauth2_proxy_config.name }}.cfg"
+    owner: "{{ oauth2_proxy_user }}"
+    group: "{{ oauth2_proxy_group }}"
+    mode: "0600"
+  notify: Restart oauth2-proxy
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: oauth2_proxy.service.j2
+    dest: /etc/systemd/system/oauth2_proxy@.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: [Restart oauth2-proxy, Daemon reload]
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
+- name: Enable/disable oauth2-proxy
+  ansible.builtin.systemd:
+    name: oauth2_proxy@{{ oauth2_proxy_config.name }}
+    enabled: true
+  tags: [oauth2-proxy, oauth2-proxy-configure]

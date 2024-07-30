@@ -1,0 +1,5 @@
+---
+- name: Restart gobot-pir
+  ansible.builtin.service:
+    name: "{{ gobot_pir_service_name }}"
+    state: restarted

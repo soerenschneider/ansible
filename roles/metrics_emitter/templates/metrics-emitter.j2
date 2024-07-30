@@ -1,0 +1,29 @@
+#!/bin/sh
+
+PROM_TEXTFILE_DIR="${1:-/var/lib/node_exporter}"
+EMITTERS_DIR="{{ metrics_emitter_bins }}"
+SLEEP_TIME=60
+
+FILE=""
+
+if [ -d ${PROM_TEXTFILE_DIR} ]; then
+    FILE="${PROM_TEXTFILE_DIR}/emitter.prom"
+fi
+
+collect() {
+    find "${EMITTERS_DIR}" -iname "*.sh" | xargs -L1 -P4 sh -c 2> /dev/null
+}
+
+if command -v sponge > /dev/null; then
+    while :; do
+        collect | sponge "${FILE}"
+        sleep ${SLEEP_TIME}
+    done
+else
+    while :; do
+        collect > "${FILE}.tmp"
+        mv "${FILE}.tmp" "${FILE}"
+        sleep ${SLEEP_TIME}
+    done
+fi
+

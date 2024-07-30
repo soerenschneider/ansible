@@ -1,0 +1,22 @@
+---
+- name: Make sure to create ssh system group
+  ansible.builtin.group:
+    name: "{{ ssh_users_group }}"
+    system: true
+    state: present
+
+- name: Create 'music' user
+  ansible.builtin.user:
+    name: music
+    groups: ["{{ ssh_users_group }}"]
+    append: true
+  tags: [android]
+
+- name: Create dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ rootserver_music_dir }}"
+    owner: music
+    group: root
+    mode: "0755"
+  tags: [android]

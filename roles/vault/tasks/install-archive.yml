@@ -1,0 +1,148 @@
+---
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/vault
+  register: vault_binary
+  tags: [vault, vault-install, deps]
+- name: Debug
+  ansible.builtin.debug:
+    var: vault_version
+  tags: [vault, vault-install, deps]
+
+- name: Run block
+  when: vault_binary.stat.exists
+  tags: [vault, vault-install, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell: set -o pipefail && /usr/local/bin/vault -version | awk '{print $2}' | cut -c2-
+      register: vault_installed_version
+      changed_when: false
+
+    - name: Set facts
+      ansible.builtin.set_fact:
+        vault_installed_version: "{{ vault_installed_version.stdout }}"
+
+- name: Fetch latest release information from github
+  when: vault_version is not defined or not vault_version
+  tags: [vault, vault-install, deps]
+  block:
+    - name: Set facts
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/hashicorp/vault/releases/latest
+        return_content: true
+      register: github_release
+      retries: 3
+      delay: 5
+      until: github_release is not failed
+
+    - name: Set vault release
+      ansible.builtin.set_fact:
+        vault_version: "{{ github_release.json.tag_name | regex_replace('^v?(.*)$', '\\1') }}"
+
+- name: Run block
+  ansible.builtin.debug:
+    msg: "Installed version: {{ vault_installed_version }}, available version: {{ vault_version }}"
+  tags: [vault, vault-install, deps]
+
+- name: Import Hashicorp GPG key
+  become: false
+  tags: [vault, vault-install, deps]
+  block:
+    - name: Check if key is already in keyring
+      ansible.builtin.command: gpg2 --list-keys C874011F0AB405110D02105534365D9472D7468F
+      changed_when: false
+  rescue:
+    - name: Copy GPG pub key
+      become: false
+      ansible.builtin.copy:
+        src: hashicorp-signing-key.pub
+        dest: /tmp/hashicorp-signing-key.pub
+        mode: "0644"
+
+    - name: Import GPG public key
+      become: false
+      ansible.builtin.command: gpg2 --import /tmp/hashicorp-signing-key.pub
+      changed_when: false
+
+    - name: Clean up key
+      ansible.builtin.file:
+        state: absent
+        path: /tmp/vault-signing-key.pub
+
+- name: Set arch
+  ansible.builtin.set_fact:
+    vault_arch_name: "{% if ansible_architecture == 'x86_64' %}amd64{% else %}arm{% endif %}"
+  # vault_arch_name: "{% if ansible_architecture == 'amd64' %}amd64{% elif ansible_architecture.startswith('armv') %}arm{% elif ansible_architecture.startswith('armv7l') %}arm{% endif %}"
+  tags: [vault, vault-install, deps]
+
+- name: Set filenames
+  ansible.builtin.set_fact:
+    vault_archive: vault_{{ vault_version[1:] }}_{{ ansible_system | lower }}_{{ vault_arch_name }}.zip
+    vault_checksum: vault_{{ vault_version[1:] }}_SHA256SUMS
+    vault_checksum_gpg: vault_{{ vault_version[1:] }}_SHA256SUMS.sig
+    vault_download_dir: /tmp/vault
+  tags: [vault, vault-install, deps]
+
+- name: Run block
+  when: not vault_binary.stat.exists or vault_version[1:] != vault_installed_version
+  tags: [vault, vault-install, deps]
+  block:
+    - name: Create download directory
+      become: false
+      ansible.builtin.file:
+        path: "{{ vault_download_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Download archive
+      become: false
+      ansible.builtin.get_url:
+        url: https://releases.hashicorp.com/vault/{{ vault_version[1:] }}/{{ item.file }}
+        dest: "{{ item.dest }}"
+        mode: "0640"
+      register: download_vault
+      retries: 5
+      delay: 2
+      with_items:
+        - file: "{{ vault_archive }}"
+          dest: "{{ vault_download_dir }}/{{ vault_archive }}"
+        - file: "{{ vault_checksum }}"
+          dest: "{{ vault_download_dir }}/{{ vault_checksum }}"
+        - file: "{{ vault_checksum_gpg }}"
+          dest: "{{ vault_download_dir }}/{{ vault_checksum_gpg }}"
+
+    - name: Verify checksum integrity
+      become: false
+      ansible.builtin.command: gpg2 --verify {{ vault_download_dir }}/{{ vault_checksum_gpg }} {{ vault_download_dir }}/{{ vault_checksum }}
+      changed_when: false
+
+    - name: Verify archive
+      become: false
+      ansible.builtin.command: sha256sum --ignore-missing -c {{ vault_download_dir }}/{{ vault_checksum }}
+      changed_when: false
+      args:
+        chdir: "{{ vault_download_dir }}"
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: "{{ vault_download_dir }}/{{ vault_archive }}"
+        dest: "{{ vault_download_dir }}"
+        creates: "{{ vault_download_dir }}/vault"
+        remote_src: true
+      check_mode: false
+
+    - name: Copy vault binary
+      ansible.builtin.copy:
+        src: "{{ vault_download_dir }}/vault"
+        dest: /usr/local/bin/vault
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+      notify: Restart vault
+
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ vault_download_dir }}"

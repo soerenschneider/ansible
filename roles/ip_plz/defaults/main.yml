@@ -1,0 +1,12 @@
+---
+ip_plz_user: ip-plz
+ip_plz_group: ip-plz
+ip_plz_service_name: ip-plz
+
+ip_plz_metrics_addr: 127.0.0.1:9166
+ip_plz_path: /ip-plz
+ip_plz_addr: 0.0.0.0:8000
+ip_plz_tls_cert_file: ""
+ip_plz_tls_key_file: ""
+# renovate: datasource=github-releases depName=soerenschneider/ip-plz
+ip_plz_version: v1.3.1

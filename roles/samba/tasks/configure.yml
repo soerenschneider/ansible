@@ -1,0 +1,36 @@
+---
+- name: Configure samba
+  ansible.builtin.template:
+    src: smb.conf.j2
+    dest: /etc/samba/smb.conf
+    mode: "0640"
+  when: samba is defined and samba.shares is defined
+  notify: [Restart samba]
+  tags: [samba, samba-configure]
+
+- name: Allow samba to export fusefs
+  ansible.posix.seboolean:
+    name: samba_share_fusefs
+    state: true
+    persistent: true
+  when: [samba.export_fusefs | default(false), ansible_selinux]
+  tags: [samba, samba-configure]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    samba_services: [smb, nmb]
+  when: ansible_os_family == "RedHat"
+  tags: [samba, samba-configure]
+
+- name: Set facts
+  ansible.builtin.set_fact:
+    samba_services: [smbd]
+  when: ansible_os_family == "Debian"
+  tags: [samba, samba-configure]
+
+- name: Enable smb and nmb
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+  with_items: "{{ samba_services }}"
+  tags: [samba, samba-configure]

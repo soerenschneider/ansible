@@ -1,0 +1,56 @@
+---
+- name: Install syncthing
+  ansible.builtin.package:
+    name: syncthing
+  become: true
+  tags: [syncthing]
+
+- name: Check if conf exists
+  ansible.builtin.stat:
+    path: /home/{{ syncthing_user }}/.config/syncthing/config.xml
+  register: _syncthing_config
+  tags: [syncthing, syncthing-configure]
+
+- name: Add config
+  ansible.builtin.file:
+    path: /home/{{ syncthing_user }}/.config/syncthing
+    state: directory
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    mode: "0700"
+  tags: [syncthing, syncthing-configure]
+
+- name: Including tasks
+  ansible.builtin.set_fact:
+    syncthing_local_devices: "{{ syncthing_local_devices | default([]) + item.devices }} "
+  with_items: "{{ syncthing_folders | default([]) }}"
+  tags: [syncthing, syncthing-configure]
+
+- name: Make sure syncthing is stopped
+  ansible.builtin.systemd:
+    name: syncthing@{{ syncthing_user }}
+    state: stopped
+  become: true
+  tags: [syncthing, syncthing-configure]
+
+- name: Add config
+  ansible.builtin.template:
+    src: syncthing-config.xml.j2
+    dest: /home/{{ syncthing_user }}/.config/syncthing/config.xml
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    mode: "0600"
+  tags: [syncthing, syncthing-configure]
+
+- name: Enable and start syncthing
+  ansible.builtin.systemd:
+    name: syncthing@{{ syncthing_user }}
+    enabled: "{{ syncthing_enabled | default(true) }}"
+    state: "{% if syncthing_enabled | default(true) %}started{% else %}stopped{% endif %}"
+  become: true
+  tags: [syncthing, syncthing-configure]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: metrics.yml
+  when: syncthing_collect_metrics | default(true)
+  tags: [syncthing, syncthing-metrics]

@@ -1,0 +1,7 @@
+[Unit]
+Description=Restic backup service
+
+[Service]
+Type=oneshot
+ExecStart=python3 /opt/scripts/restic/restic_backup.py -i %I
+EnvironmentFile=/etc/restic-%I.conf

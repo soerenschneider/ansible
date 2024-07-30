@@ -1,0 +1,42 @@
+---
+- name: slurp | Install deps
+  ansible.builtin.dnf:
+    name: [cairo, libjpeg]
+  tags: [sway, slurp]
+
+- name: slurp | Checkout slurp
+  become: false
+  ansible.builtin.git:
+    repo: https://github.com/emersion/slurp.git
+    dest: "{{ sway_sw_dir }}/slurp"
+    version: "{{ sway_slurp_version }}"
+  register: git_clone
+  tags: [sway, slurp]
+
+- name: slurp | Meson build
+  environment:
+    PKG_CONFIG_PATH: /usr/local/lib64/pkgconfig
+  ansible.builtin.command: meson build -Dsysconfdir=/etc
+  become: false
+  changed_when: true
+  args:
+    chdir: "{{ sway_sw_dir }}/slurp"
+    #  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, slurp]
+
+- name: slurp | Ninja build
+  ansible.builtin.command: ninja -C build
+  changed_when: true
+  become: false
+  args:
+    chdir: "{{ sway_sw_dir }}/slurp"
+    #  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, slurp]
+
+- name: slurp | Ninja install
+  ansible.builtin.command: ninja -C build install
+  changed_when: true
+  args:
+    chdir: "{{ sway_sw_dir }}/slurp"
+    #  when: git_clone.remote_url_changed is not defined or git_clone.remote_url_changed
+  tags: [sway, slurp]

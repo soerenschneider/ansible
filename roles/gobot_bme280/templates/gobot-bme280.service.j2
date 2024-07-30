@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=gobot-bme280
+After=network.target
+# restart forerver
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ gobot_bme280_user }}
+Group={{ gobot_bme280_group | default(gobot_bme280_user) }}
+ExecStart=/usr/local/bin/gobot-bme280 -config "{{ gobot_bme280_config_file }}"
+
+#PrivateTmp=true
+#ProtectHome=true
+#NoNewPrivileges=true
+#ProtectSystem=strict
+#ProtectControlGroups=true
+#ProtectKernelModules=true
+#ProtectKernelTunables=true
+#ProtectSystem=full
+
+SyslogIdentifier=gobot-bme280
+# restart forerver
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

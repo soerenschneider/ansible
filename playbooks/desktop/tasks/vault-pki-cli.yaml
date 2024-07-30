@@ -1,0 +1,10 @@
+---
+- name: Add vault-pki-cli config for taskwarrior
+  become: false
+  ansible.builtin.copy:
+    content: "{{ vault_pki_cli_issue_task_config }}"
+    dest: ~/.vault-pki-cli.yaml
+    owner: "{{ default_user }}"
+    group: "{{ default_user }}"
+    mode: "0600"
+  tags: [task, taskwarrior, vault-pki-cli-configure, vault-pki-cli]

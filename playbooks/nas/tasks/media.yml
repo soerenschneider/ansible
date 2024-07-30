@@ -1,0 +1,91 @@
+---
+- name: Install jq
+  ansible.builtin.package:
+    name: jq
+  tags: [media, remote_move]
+
+- name: Copy remote_move
+  ansible.builtin.template:
+    src: templates/remote_move.j2
+    dest: /usr/local/bin/remote_move
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [media, remote_move]
+
+- name: Create remote_move wrapper script
+  ansible.builtin.template:
+    src: templates/remote_move-cron.sh.j2
+    dest: /usr/local/bin/remote_move_wrapper
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [media, remote_move]
+
+- name: Copy script to sync opus collection
+  ansible.builtin.template:
+    src: templates/sync-opus-collection.j2
+    dest: /usr/local/bin/sync-opus-collection
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [media, music]
+
+- name: Add SSH keys
+  when: fileserver_mode == 'active'
+  tags: [media, remote_move]
+  become_user: "{{ nas_media_user }}"
+  become: true
+  block:
+    - name: Make sure ssh dir exists
+      ansible.builtin.file:
+        path: ~/.ssh
+        state: directory
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0700"
+
+    - name: Set public key
+      ansible.builtin.copy:
+        dest: ~/.ssh/id_ed25519.pub
+        content: "{{ remote_move_credentials.pub }}\n"
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0644"
+
+    - name: Set private key
+      ansible.builtin.copy:
+        dest: ~/.ssh/id_ed25519
+        content: "{{ remote_move_credentials.priv }}\n"
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0600"
+
+    - name: Add ssh config entry for remotemove host
+      ansible.builtin.copy:
+        content: |
+          Host {{ remotemove_remote_name }}
+            Port 2222
+        dest: /home/"{{ nas_media_user }}"/.ssh/config
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0600"
+
+- name: Add remote host public key to known_hosts
+  ansible.builtin.known_hosts:
+    name: "[{{ remotemove_remote_name }}]:2222"
+    key: "{{ remotemove_remote_fingerprint }}"
+    path: /etc/ssh/ssh_known_hosts
+    state: present
+  when: fileserver_mode == 'active'
+  tags: [media, remote_move]
+
+- name: Schedule cronjob for remote move
+  ansible.builtin.cron:
+    name: remotemove
+    hour: "{{ remote_move.hour }}"
+    minute: "{{ remote_move.minute }}"
+    ansible.builtin.user: "{{ ansible_user }}"
+    job: /usr/local/bin/remote_move_wrapper
+    state: "{% if fileserver_mode == 'active' %}present{% else %}absent{% endif %}"
+  tags: [media, remote_move]

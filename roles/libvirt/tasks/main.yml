@@ -1,0 +1,43 @@
+---
+- name: Install libvirt
+  ansible.builtin.package:
+    name: [qemu-kvm, libvirt-daemon-system, libvirt-clients, bridge-utils, virtinst, qemu-utils, prometheus-libvirt-exporter, ncat]
+  tags: [libvirt]
+  when: ansible_os_family == 'Debian'
+
+- name: Install libvirt
+  ansible.builtin.package:
+    name: [qemu-kvm, libvirt, virt-install, virt-viewer]
+  tags: [libvirt]
+  when: ansible_os_family | lower == 'redhat'
+
+- name: Add virsh-autostart script
+  ansible.builtin.copy:
+    src: files/virsh-autostart.sh
+    dest: /usr/local/bin/virsh-autostart.sh
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [libvirt]
+
+- name: Add users to group kvm
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: [libvirt]
+    append: true
+  with_items: "{{ libvirt_kvm_users | default([]) }}"
+  tags: [libvirt]
+
+- name: Fix apparmor for Debian / Ubuntu
+  ansible.builtin.lineinfile:
+    path: /etc/apparmor.d/local/abstractions/libvirt-qemu
+    line: "  /var/lib/libvirt/images/* rkw,"
+    regexp: ^\s*/var/lib/libvirt/images
+  when: ansible_os_family == "Debian"
+  tags: [libvirt]
+
+- name: Enable libvirtd
+  ansible.builtin.systemd:
+    name: libvirtd
+    enabled: true
+  tags: [libvirt]

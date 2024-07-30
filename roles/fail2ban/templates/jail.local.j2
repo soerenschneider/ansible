@@ -1,0 +1,28 @@
+[DEFAULT]
+
+ignoreip = {{ fail2ban_ignoreip | join(' ') }} 
+bantime  = {{ fail2ban_bantime }}
+findtime  = {{ fail2ban_findtime }}
+maxretry = {{ fail2ban_maxretry }}
+backend = {{ fail2ban_backend }}
+usedns = {{ fail2ban_usedns }}
+logencoding = {{ fail2ban_logencoding }}
+enabled = {{ fail2ban_enabled }}
+banaction = {{ fail2ban_banaction }}
+
+filter = %(__name__)s
+action = %(action_)s
+
+# jails
+
+{% for service in fail2ban_services %}
+[{{ service.name }}]
+enabled = {% if existing_logpaths is defined and service.enabled == "auto" %}{{ (service.name in existing_logpaths) | bool | string | lower }}{% else %}{{ service.enabled | default(true) | string | lower }}{% endif %}
+
+{% for option, value in service.items()|sort %}
+{% if option not in ['name', 'enabled'] %}
+{{ option }} = {{ value }}
+{% endif %}
+{% endfor %}
+
+{% endfor %}

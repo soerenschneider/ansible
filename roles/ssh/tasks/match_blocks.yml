@@ -1,0 +1,10 @@
+---
+- name: Insert match blocks
+  ansible.builtin.blockinfile:
+    path: /etc/ssh/sshd_config
+    insertafter: EOF
+    marker: "# {mark} ANSIBLE MANAGED BLOCK {{ item.name }}"
+    block: "{{ item.val }}"
+  with_items: "{{ match_blocks }}"
+  notify: Restart_sshd
+  tags: [ssh, base, ssh-blocks]

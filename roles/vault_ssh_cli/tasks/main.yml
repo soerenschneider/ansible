@@ -1,0 +1,78 @@
+---
+- name: Delete old stuff
+  ansible.builtin.systemd:
+    enabled: false
+    name: "{{ item }}"
+    state: stopped
+  failed_when: false
+  tags: [vault-ssh-cli, vault-ssh-cli-configure]
+  with_items: [ssh-key-signer.service, ssh-key-signer.timer]
+
+- name: Run block
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: vault-ssh-cli
+    github_repo: soerenschneider/vault-ssh-cli
+    service_name: vault-ssh-cli
+  tags: [vault-ssh-cli, vault-ssh-cli-configure]
+
+- name: Run block
+  when: vault_ssh_cli_config is defined
+  tags: [vault-ssh-cli, vault-ssh-cli-configure]
+  block:
+    - name: Create config directory
+      ansible.builtin.file:
+        path: /etc/vault-ssh-cli
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Create config
+      ansible.builtin.copy:
+        content: "{{ vault_ssh_cli_config | to_nice_yaml(indent=2) }}"
+        dest: /etc/vault-ssh-cli/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Create systemd unit
+      ansible.builtin.template:
+        src: vault-ssh-cli.service.j2
+        dest: /etc/systemd/system/vault-ssh-cli.service
+        owner: root
+        group: root
+        mode: "0644"
+      register: _vault_ssh_cli_unit
+
+    - name: Create systemd timer
+      ansible.builtin.template:
+        src: vault-ssh-cli.timer.j2
+        dest: /etc/systemd/system/vault-ssh-cli.timer
+        owner: root
+        group: root
+        mode: "0644"
+      register: _vault_ssh_cli_timer
+
+    - name: Add host
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: HostCertificate {{ vault_ssh_cli_config['signed-key-file'] }}
+        regexp: "^HostCertificate "
+        insertafter: ^#?HostKey
+      notify: Reload sshd
+
+    - name: Enable units
+      ansible.builtin.systemd:
+        name: vault-ssh-cli.{{ item }}
+        daemon_reload: "{% if _vault_ssh_cli_timer.changed | default(False) or _vault_ssh_cli_unit.changed | default(False) %}true{% else %}false{% endif %}"
+        enabled: true
+      with_items: [service, timer]
+
+    - name: Start units
+      ansible.builtin.systemd:
+        name: vault-ssh-cli.{{ item }}
+        enabled: true
+        state: restarted
+      with_items: [timer, service]
+      failed_when: false

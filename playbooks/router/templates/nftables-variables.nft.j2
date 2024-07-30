@@ -1,0 +1,21 @@
+{% for tag in fw_tags %}
+{% if vars['fw_tags_local_' + tag ] | length > 0 %}
+define LOCAL_{{ tag | upper }} = { {% for item in vars['fw_tags_local_' + tag ] %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
+{% endif %}
+{% if vars['fw_tags_global_' + tag ] | length > 0 %}
+define GLOBAL_{{ tag | upper }} = { {% for item in vars['fw_tags_global_' + tag ] %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
+{% endif %}
+{% endfor %}
+
+
+define DEV_PRIVATE = enp2s0
+define DEV_WORLD = {{ networks[location].uplink.device }}
+
+define ROOTSERVERS = { 45.136.28.72, 176.10.127.124 }
+
+define NET_PRIVATE = 192.168.0.0/16
+define WORLD_SSH_SOURCES = { $ROOTSERVERS }
+define WG_NET = {192.168.2.0/24, 192.168.65.0/21, 192.168.72.0/21, 192.168.200.200/32 }
+
+define WG_IF = wg0
+define WIREGUARD_PORT = 12686

@@ -1,0 +1,3 @@
+---
+restic_backups: {}
+restic_command: python3 /opt/scripts/restic/restic_backup.py -i %I

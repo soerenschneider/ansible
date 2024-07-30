@@ -1,0 +1,5 @@
+---
+- name: Install mpd
+  ansible.builtin.package:
+    name: [mpd]
+  tags: [mpd, mpd-install]

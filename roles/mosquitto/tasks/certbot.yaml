@@ -1,0 +1,14 @@
+---
+- name: Install mosquitto hooks
+  ansible.builtin.template:
+    src: "{{ item.name }}.j2"
+    dest: /etc/letsencrypt/renewal-hooks/{{ item.type }}/{{ item.name }}
+    owner: root
+    group: root
+    mode: "0755"
+  with_items:
+    - type: post
+      name: certbot-hook-post-mosquitto.sh
+  when: mosquitto_install_certbot_hooks
+  notify: run certbot hook
+  tags: [certbot, certbot-configure, certbot-hooks, mosquitto, mosquitto-certbot]

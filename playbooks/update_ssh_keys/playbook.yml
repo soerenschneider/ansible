@@ -1,0 +1,12 @@
+---
+- name: Update ssh keys
+  hosts: all
+  gather_facts: true
+  become: true
+  vars:
+    ansible_ssh_common_args: -o StrictHostKeyChecking=no
+  tasks:
+    - name: Including role
+      ansible.builtin.include_role:
+        name: base
+      tags: always

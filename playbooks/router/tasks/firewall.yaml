@@ -1,0 +1,65 @@
+---
+- name: Disable firewalld
+  ansible.builtin.systemd:
+    name: firewalld
+    state: stopped
+    enabled: false
+  failed_when: false
+  tags: [firewall]
+
+- name: Add nftables firewall variables
+  ansible.builtin.template:
+    src: nftables-variables.nft.j2
+    dest: "{{ nftables_variables_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  notify: Reload nftables
+  tags: [firewall]
+
+- name: Run block
+  tags: [firewall]
+  block:
+    - name: Set nft firewall files
+      ansible.builtin.set_fact:
+        nft_file: /etc/sysconfig/nftables.conf
+        nft_file_cmp: /etc/sysconfig/nftables.conf.ansible
+
+    - name: Get cksum of nft file
+      ansible.builtin.stat:
+        path: "{{ nft_file }}"
+      register: _stat_nft_file
+
+    - name: Get cksum of nft cmp file
+      ansible.builtin.stat:
+        path: "{{ nft_file_cmp }}"
+      register: _stat_nft_cmp_file
+
+    - name: Set checksums...
+      ansible.builtin.set_fact:
+        _nft_file_sha: "{{ _stat_nft_file.stat.checksum }}"
+        _nft_file_cmp_sha: "{{ _stat_nft_cmp_file.stat.checksum }}"
+      when: _stat_nft_cmp_file.stat.exists
+
+    - name: Fail if files differ
+      ansible.builtin.debug:
+        msg: Uncommitted local changes, check diff between {{ nft_file }} and {{ nft_file_cmp }}
+      failed_when: _nft_file_sha != _nft_file_cmp_sha
+      when: _stat_nft_cmp_file.stat.exists
+
+- name: Add NFT firewall conf
+  ansible.builtin.template:
+    src: nftables.conf-{{ location }}.j2
+    dest: "{{ item }}"
+    owner: root
+    group: root
+    mode: "0640"
+  notify: Reload nftables
+  with_items: ["{{ nft_file }}", /etc/sysconfig/nftables.conf.ansible]
+  tags: [firewall]
+
+- name: Enable firewall
+  ansible.builtin.systemd:
+    name: nftables
+    enabled: true
+  tags: [firewall]
