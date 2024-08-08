@@ -10,7 +10,7 @@ StartLimitIntervalSec=0
 Type=simple
 User={{ dufs_user }}
 Group={{ dufs_group | default('root') }}
-ExecStart=/usr/local/bin/dufs "{{ dufs_dir }}"
+ExecStart=/usr/local/bin/dufs --config "{{ dufs_config_file }}"
 
 PrivateTmp=true
 ProtectHome=true

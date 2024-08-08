@@ -76,8 +76,8 @@ else
 fi
 
 MD5_AFTER=$(md5sum "${SSHD_CONFIG}")
-if [[ "${MD5}" != "${MD5_AFTER}" ]]; then
-  echo "Detected update, restarting {{ _sshd_systemd_unit_name | default('sshd') }}"
+if ! systemctl is-active --quiet sshd || [[ "${MD5}" != "${MD5_AFTER}" ]]; then
+  echo "Restarting {{ _sshd_systemd_unit_name | default('sshd') }}"
   systemctl restart {{ _sshd_systemd_unit_name | default('sshd') }}
 fi
 
