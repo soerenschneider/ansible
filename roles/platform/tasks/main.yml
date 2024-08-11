@@ -14,6 +14,11 @@
     name: node_exporter
   tags: always
 
+- name: Including role 'sc_agent'
+  ansible.builtin.include_role:
+    name: sc_agent
+  tags: always
+
 - name: Including role 'automatic_sysupdates'
   ansible.builtin.include_role:
     name: automatic_sysupdates
