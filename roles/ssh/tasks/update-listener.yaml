@@ -9,7 +9,7 @@
 
     - name: "Add override directory for sshd"
       ansible.builtin.file:
-        name: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.d"
+        name: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.service.d"
         state: "directory"
         owner: "root"
         group: "root"
@@ -18,7 +18,7 @@
     - name: "Add systemd override config"
       ansible.builtin.template:
         src: "sshd-override.conf.j2"
-        dest: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.d/override.conf"
+        dest: "/etc/systemd/system/{{ _sshd_systemd_unit_name }}.service.d/override.conf"
         owner: "root"
         group: "root"
         mode: "0644"
