@@ -8,7 +8,7 @@
 
 - name: Create client config file
   ansible.builtin.copy:
-    content: "{{ dyndns_client_config | ansible.builtin.to_nice_yaml(indent=2,width=800) }}"
+    content: "{{ dyndns_client_config | ansible.builtin.to_nice_yaml(indent=2, width=800) }}"
     dest: "{{ dyndns_client_config_file }}"
     owner: "{{ dyndns_user }}"
     group: "{{ dyndns_group }}"
@@ -19,7 +19,7 @@
 
 - name: Create server config file
   ansible.builtin.copy:
-    content: "{{ dyndns_server_config | ansible.builtin.to_nice_yaml(indent=2,width=800) }}"
+    content: "{{ dyndns_server_config | ansible.builtin.to_nice_yaml(indent=2, width=800) }}"
     dest: "{{ dyndns_server_config_file }}"
     owner: "{{ dyndns_user }}"
     group: "{{ dyndns_group }}"
