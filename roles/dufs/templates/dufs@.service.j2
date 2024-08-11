@@ -1,6 +1,6 @@
 # {{ ansible_managed }}
 [Unit]
-Description=dufs fileserver
+Description=dufs fileserver %i
 After=network.target
 
 # restart forever
@@ -10,7 +10,7 @@ StartLimitIntervalSec=0
 Type=simple
 User={{ dufs_user }}
 Group={{ dufs_group | default('root') }}
-ExecStart=/usr/local/bin/dufs --config "{{ dufs_config_file }}"
+ExecStart=/usr/local/bin/dufs --config /etc/dufs-%i.yaml
 
 PrivateTmp=true
 ProtectHome=true
@@ -19,7 +19,7 @@ ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectSystem=full
 
-SyslogIdentifier=shutdown-listener
+SyslogIdentifier=dufs
 
 # restart forever
 Restart=always

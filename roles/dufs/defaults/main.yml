@@ -1,9 +1,46 @@
 ---
-dufs_dir: "/srv"
-
 # renovate: datasource=github-releases depName=sigoden/dufs versioning=semver-coerced
 dufs_version: "v0.41.0"
 
 dufs_group: dufs
 dufs_user: dufs
 dufs_service_name: dufs
+
+dufs_serve_path: "/srv"
+dufs_bind: "127.0.0.1"
+dufs_port: 5000
+dufs_path_prefix: ""
+dufs_allow_all: false
+dufs_allow_upload: false
+dufs_allow_delete: false
+dufs_allow_search: false
+dufs_allow_symlink: false
+dufs_allow_archive: false
+dufs_enable_cors: false
+dufs_render_index: false
+dufs_render_try_index: false
+dufs_render_spa: false
+dufs_log_format: '$remote_addr "$request" $status $http_user_agent'
+dufs_tls_cert: ""
+dufs_tls_key: ""
+dufs_compress: none
+
+dufs_config:
+  serve-path: "{{ dufs_serve_path }}"
+  bind: "{{ dufs_bind }}"
+  port: "{{ dufs_port }}"
+  path-prefix: "{{ dufs_path_prefix }}"
+  allow-all: "{{ dufs_allow_all }}"
+  allow-upload: "{{ dufs_allow_upload }}"
+  allow-delete: "{{ dufs_allow_delete }}"
+  allow-search: "{{ dufs_allow_search }}"
+  allow-symlink: "{{ dufs_allow_symlink }}"
+  allow-archive: "{{ dufs_allow_archive }}"
+  enable-cors: "{{ dufs_enable_cors }}"
+  render-index: "{{ dufs_render_index }}"
+  render-try-index: "{{ dufs_render_try_index }}"
+  render-spa: "{{ dufs_render_spa }}"
+  log-format: "{{ dufs_log_format }}"
+  compress: "{{ dufs_compress }}"
+  tls-cert: "{{ dufs_tls_cert | default(omit) }}"
+  tls-key: "{{ dufs_tls_key | default(omit) }}"

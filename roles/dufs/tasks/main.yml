@@ -13,7 +13,7 @@
     groups: "{{ dufs_group }}"
   tags: [dufs, dufs-install]
 
-- name: Including tasks
+- name: "Including tasks"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: dufs
@@ -21,18 +21,44 @@
     service_name: dufs
   tags: [dufs, dufs-install, deps]
 
-- name: Add systemd service
-  ansible.builtin.template:
-    src: "dufs.service.j2"
-    dest: "/etc/systemd/system/{{ dufs_service_name }}.service"
+- name: "Validate config"
+  tags: [dufs, dufs-configure]
+  block:
+    - name: "Remove 'tls-cert' if empty"
+      ansible.builtin.set_fact:
+        dufs_config: "{{ dufs_config | dict2items | rejectattr('key', 'eq', 'tls-cert') | list | items2dict }}"
+      when: not dufs_tls_cert
+
+    - name: "Remove 'tls-key' if empty"
+      ansible.builtin.set_fact:
+        dufs_config: "{{ dufs_config | dict2items | rejectattr('key', 'eq', 'tls-key') | list | items2dict }}"
+      when: not dufs_tls_key
+
+- name: "Add dufs config"
+  ansible.builtin.copy:
+    content: "{{ dufs_config | to_nice_yaml(indent=2) }}"
+    dest: "/etc/dufs-{{ dufs_identifier | default('default') }}.yaml"
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: Restart dufs
+  register: _dufs_config
   tags: [dufs, dufs-configure]
 
-- name: Enable/disable dufs
+- name: "Add systemd service"
+  ansible.builtin.template:
+    src: "dufs@.service.j2"
+    dest: "/etc/systemd/system/{{ dufs_service_name }}@.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: _dufs_systemd
+  tags: [dufs, dufs-configure]
+
+- name: "Enable and start dufs service"
   ansible.builtin.systemd:
-    name: "{{ dufs_service_name }}"
+    name: "{{ dufs_service_name }}@{{ dufs_identifier | default('default') }}"
+    daemon_reload: true
+    state: "{% if _dufs_config is changed %}restarted{% else %}started{% endif %}"
     enabled: true
+  when: _dufs_systemd is changed or _dufs_config is changed
   tags: [dufs, dufs-configure]
