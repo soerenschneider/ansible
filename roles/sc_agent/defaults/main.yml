@@ -1,0 +1,14 @@
+---
+# renovate: datasource=github-releases depName=soerenschneider/sc-agent
+sc_agent_version: v1.0.0
+
+sc_agent_conf_dir: "/etc/sc-agent/conf.d"
+
+sc_agent_config:
+  config_dir: "{{ sc_agent_conf_dir }}"
+  metrics_listen_addr: 127.0.0.1:9199
+
+sc_agent_conf_d:
+  01-http.yaml:
+    http:
+      address: "{{ ansible_default_ipv4.address }}:9999"

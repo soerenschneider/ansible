@@ -1,0 +1,5 @@
+---
+- name: Restart sc-agent
+  ansible.builtin.systemd:
+    name: "sc-agent"
+    state: restarted

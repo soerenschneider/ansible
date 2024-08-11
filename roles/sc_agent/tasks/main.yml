@@ -1,0 +1,65 @@
+---
+- name: Delete old stuff
+  ansible.builtin.systemd:
+    enabled: false
+    name: "{{ item }}"
+    state: stopped
+  failed_when: false
+  tags: [sc-agent, sc-agent-configure]
+  with_items: [ssh-key-signer.service, ssh-key-signer.timer]
+
+- name: Run block
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: sc-agent
+    github_repo: soerenschneider/sc-agent
+    service_name: sc-agent
+  tags: [sc-agent, sc-agent-configure]
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: sc-agent.service.j2
+    dest: /etc/systemd/system/sc-agent.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: "Restart sc-agent"
+  tags: [sc-agent, sc-agent-configure]
+
+- name: Run block
+  when: sc_agent_config is defined
+  tags: [sc-agent, sc-agent-configure]
+  block:
+    - name: Create config directory
+      ansible.builtin.file:
+        path: "{{ sc_agent_conf_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Create conf.d entries
+      ansible.builtin.copy:
+        content: "{{ item.value | to_nice_yaml(indent=2) }}"
+        dest: "{{ sc_agent_conf_dir }}/{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0600"
+      notify: "Restart sc-agent"
+      with_dict: "{{ sc_agent_conf_d }}"
+
+    - name: Create config
+      ansible.builtin.copy:
+        content: "{{ sc_agent_config | to_nice_yaml(indent=2) }}"
+        dest: /etc/sc-agent.yaml
+        owner: root
+        group: root
+        mode: "0600"
+      notify: "Restart sc-agent"
+
+    - name: Enable and start units
+      ansible.builtin.systemd:
+        name: sc-agent.service
+        daemon_reload: true
+        enabled: true
+        state: started

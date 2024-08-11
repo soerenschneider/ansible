@@ -1,0 +1,18 @@
+[Unit]
+Description=Runs the sc agent
+After=network-online.target
+Wants=network-online.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/sc-agent
+
+# restart forerver
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
