@@ -20,23 +20,6 @@
     mode: "0555"
   tags: [vault-approle, vault-approle-install]
 
-- name: Create systemd timer and service
-  ansible.builtin.template:
-    src: vault-approle@.{{ item }}.j2
-    dest: /etc/systemd/system/vault-approle@.{{ item }}
-    owner: root
-    group: root
-    mode: "0644"
-  with_items: [service, timer]
-  register: _vault_approle_systemd_units
-  tags: [vault-approle, vault-approle-install]
-
-- name: Reload systemd
-  ansible.builtin.systemd:
-    daemon_reload: true
-  when: _vault_approle_systemd_units.changed | default(true)  # noqa: no-handler
-  tags: [vault-approle, vault-approle-install]
-
 - name: Create config dir
   ansible.builtin.file:
     path: /etc/vault-approle
