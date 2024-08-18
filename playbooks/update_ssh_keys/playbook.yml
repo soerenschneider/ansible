@@ -8,5 +8,5 @@
   tasks:
     - name: Including role
       ansible.builtin.include_role:
-        name: base
+        name: platform
       tags: always
