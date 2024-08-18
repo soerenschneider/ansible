@@ -1,0 +1,5 @@
+---
+- name: Restart dufs
+  ansible.builtin.systemd:
+    name: dufs
+    state: restarted
