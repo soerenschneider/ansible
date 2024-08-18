@@ -20,6 +20,11 @@
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
     block: |
+      frontend media
+        bind {{ haproxy_listen_addr }}:443
+        mode http
+        default_backend media
+
        frontend samba
          bind {{ haproxy_listen_addr }}:445
          mode tcp
@@ -31,6 +36,20 @@
          mode tcp
          option tcplog
          default_backend mpd
+
+       backend media
+         server nas-{{ location }} nas.{{ location }}.{{ primary_domain }}:443 ssl verify none check
+         # backup servers
+         {% if location == 'dd' -%}
+         server nas-pt nas.pt.{{ primary_domain }}:443 ssl verify none check backup weight 200
+         server nas-ez nas.ez.{{ primary_domain }}:443 ssl verify none check backup weight 1
+         {% elif location == 'ez' -%}
+         server nas-pt nas.pt.{{ primary_domain }}:443 ssl verify none check backup weight 200
+         server nas-dd nas.dd.{{ primary_domain }}:443 ssl verify none check backup weight 1
+         {% elif location == 'pt' -%}
+         server nas-dd nas.dd.{{ primary_domain }}:443 ssl verify none check backup weight 20
+         server nas-ez nas.ez.{{ primary_domain }}:443 ssl verify none check backup weight 10
+         {% endif -%}
 
        backend smb
          mode tcp
