@@ -1,7 +1,9 @@
 ---
 - name: Install nginx
   ansible.builtin.package:
-    name: nginx
+    name:
+      - nginx
+      - libnginx-mod-http-dav-ext
   tags: webserver
 
 - name: Delete default config
@@ -28,7 +30,9 @@
 
           location /media/ {
             root                    {{ srv_dir }};
-            limit_except            GET HEAD { deny all; }
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
             client_body_buffer_size 1k;
             client_max_body_size    1k;
             autoindex               on;
@@ -39,7 +43,9 @@
           }
           location /pub {
             root                    /mnt/wdred;
-            limit_except            GET HEAD { deny all; }
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
             client_body_buffer_size 1k;
             client_max_body_size    1k;
             autoindex               on;
