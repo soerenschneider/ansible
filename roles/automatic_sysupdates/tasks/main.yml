@@ -13,8 +13,3 @@
   ansible.builtin.include_role:
     name: needrestart
   tags: always
-
-- name: Including role
-  ansible.builtin.include_role:
-    name: conditional_reboot
-  tags: always
