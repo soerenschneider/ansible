@@ -21,7 +21,7 @@ vector_config:
       type: loki
       tenant_id: default
       out_of_order_action: accept
-      endpoint: https://loki.svc.{{ location }}.{{ primary_domain }}
+      endpoint: "https://loki.svc.{{ location }}.{{ primary_network_domain }}"
       encoding:
         codec: json
       inputs: [journald_trans]
