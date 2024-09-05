@@ -54,6 +54,6 @@
 
 - name: Install utilities
   ansible.builtin.package:
-    name: "{{ base_packages }}"
-  when: base_install_packages
+    name: "{{ baseline_packages }}"
+  when: baseline_install_packages
   tags: [base, base-packages, base-packages-utils]

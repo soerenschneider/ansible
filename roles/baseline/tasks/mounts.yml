@@ -17,7 +17,7 @@
   when:
     # disable for now
     - false
-    - base_mount_set_noatime
+    - baseline_mount_set_noatime
     - item.options.find(",") >= 0
     - item.options.find("noatime") == -1
     - item.fstype not in ["vfat", "fuse.gocryptfs", "fuse"]
