@@ -47,7 +47,7 @@
         occult_service_identifier: "{{ item.occult_service_identifier }}"
         occult_config: "{{ item.occult_config }}"
         occult_service_enabled: "{{ item.occult_service_enabled | default(false) }}"
-      loop: "{{ occult_configs }}"
+      loop: "{{ occult_configs | default([]) }}"
       tags: always
 
     - name: Copy virsh autostart
