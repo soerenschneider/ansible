@@ -48,6 +48,15 @@
         direction: in
       tags: firewall
 
+    - name: Enable routing
+      ansible.posix.sysctl:
+        name: net.ipv4.ip_forward
+        value: "1"
+        sysctl_set: true
+        state: present
+        reload: true
+      tags: [wireguard, wg, sysctl, firewall]
+
     - name: Create systemd resolved config.d
       ansible.builtin.file:
         path: /etc/systemd/resolved.conf.d/
