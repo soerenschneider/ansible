@@ -21,7 +21,7 @@
     path: /etc/haproxy/haproxy.cfg
     block: |
       frontend media
-        bind {{ haproxy_listen_addr }}:443
+        bind {{ haproxy_listen_addr }}:80
         mode http
         default_backend media
 
@@ -38,35 +38,36 @@
          default_backend mpd
 
        backend media
-         server nas-{{ location }} nas.{{ location }}.{{ primary_domain }}:443 ssl verify none check
+         server nas-{{ location }} nas.{{ location }}.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt
          # backup servers
          {% if location == 'dd' -%}
-         server nas-pt nas.pt.{{ primary_domain }}:443 ssl verify none check backup weight 200
-         server nas-ez nas.ez.{{ primary_domain }}:443 ssl verify none check backup weight 1
+         server nas-pt nas.pt.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 200
+         server nas-ez nas.ez.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 1
          {% elif location == 'ez' -%}
-         server nas-pt nas.pt.{{ primary_domain }}:443 ssl verify none check backup weight 200
-         server nas-dd nas.dd.{{ primary_domain }}:443 ssl verify none check backup weight 1
+         server nas-pt nas.pt.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 200
+         server nas-dd nas.dd.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 1
          {% elif location == 'pt' -%}
-         server nas-dd nas.dd.{{ primary_domain }}:443 ssl verify none check backup weight 20
-         server nas-ez nas.ez.{{ primary_domain }}:443 ssl verify none check backup weight 10
+         server nas-dd nas.dd.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 20
+         server nas-ez nas.ez.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 10
          {% endif -%}
+
 
        backend smb
          mode tcp
          timeout check 5000
          timeout server 30000
          timeout connect 5000
-         server smb-{{ location }} nas.{{ location }}.{{ primary_domain }}:445 check
+         server smb-{{ location }} nas.{{ location }}.{{ primary_network_domain }}:445 check
          # backup servers
          {% if location == 'dd' -%}
-         server smb-pt nas.pt.{{ primary_domain }}:445 check backup weight 200
-         server smb-ez nas.ez.{{ primary_domain }}:445 check backup weight 1
+         server smb-pt nas.pt.{{ primary_network_domain }}:445 check backup weight 200
+         server smb-ez nas.ez.{{ primary_network_domain }}:445 check backup weight 1
          {% elif location == 'ez' -%}
-         server smb-pt nas.pt.{{ primary_domain }}:445 check backup weight 200
-         server smb-dd nas.dd.{{ primary_domain }}:445 check backup weight 1
+         server smb-pt nas.pt.{{ primary_network_domain }}:445 check backup weight 200
+         server smb-dd nas.dd.{{ primary_network_domain }}:445 check backup weight 1
          {% elif location == 'pt' -%}
-         server smb-dd nas.dd.{{ primary_domain }}:445 check backup weight 20
-         server smb-ez nas.ez.{{ primary_domain }}:445 check backup weight 10
+         server smb-dd nas.dd.{{ primary_network_domain }}:445 check backup weight 20
+         server smb-ez nas.ez.{{ primary_network_domain }}:445 check backup weight 10
          {% endif -%}
 
 
@@ -76,17 +77,17 @@
          timeout check 5000
          timeout server 30000
          timeout connect 5000
-         server mpd-{{ location }} nas.{{ location }}.{{ primary_domain }}:6600 check
+         server mpd-{{ location }} nas.{{ location }}.{{ primary_network_domain }}:6600 check
          # backup servers
          {% if location == 'dd' -%}
-         server mpd-pt nas.pt.{{ primary_domain }}:6600 check backup weight 200
-         server mpd-ez nas.ez.{{ primary_domain }}:6600 check backup weight 1
+         server mpd-pt nas.pt.{{ primary_network_domain }}:6600 check backup weight 200
+         server mpd-ez nas.ez.{{ primary_network_domain }}:6600 check backup weight 1
          {% elif location == 'ez' -%}
-         server mpd-pt nas.pt.{{ primary_domain }}:6600 check backup weight 200
-         server mpd-dd nas.dd.{{ primary_domain }}:6600 check backup weight 1
+         server mpd-pt nas.pt.{{ primary_network_domain }}:6600 check backup weight 200
+         server mpd-dd nas.dd.{{ primary_network_domain }}:6600 check backup weight 1
          {% elif location == 'pt' -%}
-         server mpd-dd nas.dd.{{ primary_domain }}:6600 check backup weight 20
-         server mpd-ez nas.ez.{{ primary_domain }}:6600 check backup weight 10
+         server mpd-dd nas.dd.{{ primary_network_domain }}:6600 check backup weight 20
+         server mpd-ez nas.ez.{{ primary_network_domain }}:6600 check backup weight 10
          {% endif -%}
   notify: Restart haproxy
   tags: haproxy
