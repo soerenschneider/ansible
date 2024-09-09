@@ -39,14 +39,12 @@
           http-request redirect code 301 prefix / drop-query append-slash if { path /syncthing }
 
           acl media path_beg,url_dec -m beg /media/
-          http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
-          use_backend nginx if media
+          #http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+          acl pub path_beg,url_dec -m beg /pub/
+          use_backend nginx if media or pub
 
           acl minio-ui path_beg,url_dec -m beg /minio-ui/
           use_backend minio-ui if minio-ui
-
-          acl pub path_beg,url_dec -m beg /pub/
-          use_backend nginx if media or pub
 
           acl syncthing path_beg,url_dec -m beg /syncthing/
           http-request deny if syncthing !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
@@ -57,7 +55,7 @@
       frontend directory_exporter
           bind *:2443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
-                  # only allow the following CNs
+          # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
           default_backend directory_exporter
@@ -65,7 +63,7 @@
       frontend node_exporter
           bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
-                  # only allow the following CNs
+          # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
           default_backend node_exporter
@@ -74,7 +72,7 @@
         option httpchk
         option forwardfor
         http-check send meth GET uri /health
-        http-check expect status 404
+        http-check expect status 200
         server fileserver-dd 127.0.0.1:8080 check inter 30s
 
       backend minio
@@ -102,6 +100,11 @@
         # http-request set-path '%[path,regsub("^/syncthing/","/")]'
         http-request set-path '%[path,regsub("^/syncthing(/|$)","/")]'
         server syncthing 127.0.0.1:8384 check inter 30s
+
+      backend dufs_media
+        option httpchk
+        http-check send meth HEAD uri /media
+        server dufs 127.0.0.1:5000 check inter 1m
 
       backend node_exporter
         option httpchk

@@ -41,6 +41,7 @@
             tcp_nopush              on;
             keepalive_timeout       65;
           }
+
           location /pub {
             root                    /mnt/wdred;
             dav_methods             PUT DELETE MKCOL COPY MOVE;
@@ -53,6 +54,12 @@
             sendfile_max_chunk      1m;
             tcp_nopush              on;
             keepalive_timeout       65;
+          }
+
+          location = /health {
+            access_log              off;
+            add_header              'Content-Type' 'application/json';
+            return                  200 '{"status":"OK"}';
           }
       }
   notify: Restart webserver
