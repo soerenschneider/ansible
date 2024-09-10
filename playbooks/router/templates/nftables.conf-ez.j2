@@ -21,9 +21,9 @@ table ip global {
             udp . 123 : accept
         }
 
-        ip saddr $LOCAL_PROMETHEUS_SERVER tcp dport { 9100, 9192 } accept
+        ip saddr $LOCAL_PROMETHEUS_SERVER tcp dport { 8405, 9100, 9192, 15283 } accept
         ip saddr $SSH_SOURCES tcp dport ssh accept
-        ip saddr 192.168.2.0/24 tcp dport {445, 6600} accept
+        ip saddr 192.168.2.0/24 tcp dport {80, 443, 445, 6600 } accept
         udp dport $WIREGUARD_PORT accept
     }
 
