@@ -20,6 +20,13 @@
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
     block: |
+      frontend metrics
+        bind {{ haproxy_listen_addr }}:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+        mode http
+        http-request use-service prometheus-exporter if { path /metrics }
+        no log
+        stats hide-version
+
       frontend media
         bind {{ haproxy_listen_addr }}:80
         mode http
@@ -50,7 +57,6 @@
          server nas-dd nas.dd.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 20
          server nas-ez nas.ez.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 10
          {% endif -%}
-
 
        backend smb
          mode tcp
