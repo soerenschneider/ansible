@@ -1,0 +1,53 @@
+---
+- name: Install rclone
+  ansible.builtin.package:
+    name: rclone
+  tags: rclone
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ rclone_mount_user | default('rclone') }}"
+    system: true
+  tags: rclone
+
+- name: Create mountpoint
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ rclone_mount_user | default('rclone') }}"
+    group: "root"
+    mode: "0755"
+  with_items:
+    - "/mnt/media"
+    - "/var/rclone"
+  tags: rclone
+
+- name: Add configuration block
+  ansible.builtin.copy:
+    dest: /etc/rclone-webdav.conf
+    owner: "{{ rclone_mount_user | default('rclone') }}"
+    group: root
+    mode: "0644"
+    content: |
+      [webdav]
+      type = webdav
+      url = http://localhost/media/
+      vendor = other
+  notify: "restart rclone mount"
+  tags: rclone
+
+- name: Add configuration block
+  ansible.builtin.template:
+    src: "templates/media-mount.service.j2"
+    dest: "/etc/systemd/system/mnt-media.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: "restart rclone mount"
+  tags: rclone
+
+- name: Enable mount
+  ansible.builtin.systemd:
+    name: "mnt-media.service"
+    enabled: true
+  tags: rclone
