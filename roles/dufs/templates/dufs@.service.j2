@@ -17,9 +17,9 @@ ProtectHome=true
 ProtectControlGroups=true
 ProtectKernelModules=true
 ProtectKernelTunables=true
-ProtectSystem=full
-
+ProtectSystem=strict
 SyslogIdentifier=dufs
+InaccessiblePaths=/root /home /var
 
 # restart forever
 Restart=always
