@@ -14,25 +14,14 @@
     path: /etc/haproxy/haproxy.cfg
     block: |
       listen stats
-        bind *:9000 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
-        mode http
+        bind *:8405 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
         # only allow the following CNs
         http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-        acl is_prom ssl_c_s_dn(cn) -m beg sauron
-        http-request use-service prometheus-exporter if is_prom
-
-        stats enable
+        mode http
+        http-request use-service prometheus-exporter if { path /metrics }
+        no log
         stats hide-version
-        stats realm Haproxy\ Statistics
-        stats uri /stats if
-
-      frontend node_exporter
-        bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
-        mode http
-        # only allow the following CNs
-        http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
-        default_backend node_exporter
 
       # Vault has a http health endpoint on /v1/sys/health that returns different http codes
       # depending on the status of the running vault instance.
