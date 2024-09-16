@@ -1,20 +1,6 @@
 ---
 - name: Run block
-  when: location is not defined
-  tags: always
-
-  block:
-    - name: Detect if we are on an internal system
-      ansible.builtin.set_fact:
-        location: "{{ item.location }}"
-      when: item.domain in ansible_host
-      with_items: "{{ internal_domains }}"
-
-    - name: Print debug information
-      ansible.builtin.debug:
-        msg: "Detected location: {{ location | default('') }}"
-- name: Run block
-  when: location is defined
+  when: datacenter | default('') | length > 0
   tags: [firewall, base]
   block:
     - name: Assemble list of fw_tags
@@ -27,8 +13,8 @@
 
     - name: Assemble local fw_tags
       ansible.builtin.set_fact:
-        fw_tags_local_{{ item }}: "{{ local_hosts[location] | selectattr('fw_tags', 'defined') | selectattr('fw_tags', 'contains', item) | map(attribute='logical') | list }}"  # noqa: var-naming[no-jinja]
-        fw_tags_global_{{ item }}: "{{ local_hosts | dict2items | rejectattr('key', 'equalto', location) | map(attribute='value') | flatten | selectattr('fw_tags', 'defined') | selectattr('fw_tags', 'contains', item) | map(attribute='logical') | list }}"  # noqa: var-naming[no-jinja]
+        fw_tags_local_{{ item }}: "{{ local_hosts[datacenter] | selectattr('fw_tags', 'defined') | selectattr('fw_tags', 'contains', item) | map(attribute='logical') | list }}"  # noqa: var-naming[no-jinja]
+        fw_tags_global_{{ item }}: "{{ local_hosts | dict2items | rejectattr('key', 'equalto', datacenter) | map(attribute='value') | flatten | selectattr('fw_tags', 'defined') | selectattr('fw_tags', 'contains', item) | map(attribute='logical') | list }}"  # noqa: var-naming[no-jinja]
       with_items: "{{ fw_tags }}"
 
     - name: Assemble combined fw_tags
