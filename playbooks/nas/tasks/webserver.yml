@@ -29,6 +29,10 @@
           large_client_header_buffers   2 1k;
 
           location /media/ {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
             root                    {{ srv_dir }};
             dav_methods             PUT DELETE MKCOL COPY MOVE;
             dav_ext_methods         PROPFIND OPTIONS;
