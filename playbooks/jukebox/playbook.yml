@@ -14,11 +14,6 @@
         file: tasks/hifiberry.yml
       tags: [dac, hifiberry]
 
-    - name: Include role shutdown_listener
-      ansible.builtin.include_role:
-        name: shutdown_listener
-      tags: always
-
     - name: Include role mpd
       ansible.builtin.include_role:
         name: mpd
