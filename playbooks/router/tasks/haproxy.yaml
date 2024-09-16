@@ -16,12 +16,17 @@
     persistent: true
   tags: haproxy
 
+- name: Set ca-cert file
+  ansible.builtin.set_fact:
+    ca_cert_file: "{% if ansible_facts['os_family'] == 'Debian' %}/etc/ssl/certs/ca-certificates.crt{% else %}/etc/ssl/certs/ca-bundle.crt{% endif %}"
+  tags: haproxy
+
 - name: Add configuration block
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
-    block: |
+    block: >
       frontend metrics
-        bind {{ haproxy_listen_addr }}:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+        bind {{ haproxy_listen_addr }}:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
         mode http
         http-request use-service prometheus-exporter if { path /metrics }
         no log
@@ -45,17 +50,19 @@
          default_backend mpd
 
        backend media
-         server nas-{{ location }} nas.{{ location }}.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt
+         option httpchk HEAD /media/
+
+         server nas-{{ location }} nas.{{ location }}.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }}
          # backup servers
          {% if location == 'dd' -%}
-         server nas-pt nas.pt.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 200
-         server nas-ez nas.ez.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 1
+         server nas-pt nas.pt.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 200
+         server nas-ez nas.ez.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 1
          {% elif location == 'ez' -%}
-         server nas-pt nas.pt.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 200
-         server nas-dd nas.dd.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 1
+         server nas-pt nas.pt.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 200
+         server nas-dd nas.dd.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 1
          {% elif location == 'pt' -%}
-         server nas-dd nas.dd.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 20
-         server nas-ez nas.ez.{{ primary_network_domain }}:443 check ssl ca-file /etc/ssl/certs/ca-bundle.crt backup weight 10
+         server nas-dd nas.dd.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 20
+         server nas-ez nas.ez.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 10
          {% endif -%}
 
        backend smb
