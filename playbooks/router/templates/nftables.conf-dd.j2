@@ -36,8 +36,9 @@ table ip global {
             udp . 123 : accept
         }
 
-        ip saddr { 192.168.67.0/24, 192.168.64.0/24 } tcp dport { 445, 6600 } accept
-        ip saddr { 192.168.64.0/24, $LOCAL_PROMETHEUS_SERVER } tcp dport { 9000, 9100, 9192 } accept
+        # todo: add variable for devices to tighten this rule
+        ip saddr { 192.168.67.0/24, 192.168.64.0/24 } tcp dport { 80, 445, 6600 } accept
+        ip saddr { 192.168.64.0/24, $LOCAL_PROMETHEUS_SERVER } tcp dport { 8405, 9100, 9192 } accept
         ip saddr $NET_PRIVATE tcp dport 42222 accept
     }
 
@@ -92,8 +93,9 @@ table ip global {
         iifname "vlan67" oifname { "vlan65", "vlan66" } accept
         iifname "vlan67" ip saddr 192.168.67.15 oifname "vlan64" ip daddr 192.168.64.5 tcp dport { 27036, 27037 } accept
         iifname "vlan67" ip saddr 192.168.67.15 oifname "vlan64" ip daddr 192.168.64.5 udp dport { 27031, 27036 } accept
-        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.2.229, 192.168.65.12, 192.168.65.250, $LOCAL_VAULT_SERVER, $GLOBAL_VAULT_SERVER } accept
-        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.2.0/24, 192.168.65.0/24, 192.168.73.0/24 } tcp dport 22 accept
+        # TODO: this is horrible, add vars
+        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.2.229, 192.168.65.12, 192.168.2.253, 192.168.65.32, 192.168.73.250, 192.168.65.250, $LOCAL_VAULT_SERVER, $GLOBAL_VAULT_SERVER } accept
+        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65", "vlan67" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.0.0/16, 192.168.67.0/24, 192.168.2.0/24, 192.168.65.0/24, 192.168.73.0/24 } tcp dport 22 accept
         iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.65.0/24, 192.168.2.0/24, 192.168.73.0/24 } tcp dport 6443 accept
         iifname "wg0"    ip saddr $WG_ROADWARRIORS          oifname { "vlan65", "vlan67", "vlan68" } accept
 

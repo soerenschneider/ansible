@@ -70,7 +70,7 @@ table ip global {
         ip saddr { $GLOBAL_DEVICE_SOEREN, 192.168.200.200/32, 192.168.64.0/24, 192.168.65.0/24, 192.168.72.0/24, 192.168.73.0/24 } iifname $WG_IF accept
         ip saddr { $LOCAL_DEVICE_SOEREN, $GLOBAL_DEVICE_SOEREN } oifname $IPMI_IF accept
         # allow routers to have a HA nas backend
-        ip saddr { 192.168.200.3, 192.168.200.4 } ip daddr 192.168.2.216 tcp dport { 445, 6600 } accept
+        ip saddr { 192.168.200.3, 192.168.200.4 } ip daddr 192.168.2.216 tcp dport { 443, 445, 6600 } accept
 
         ip saddr 192.168.0.0/16 iifname $WG_IF ip daddr { $LOCAL_VAULT_SERVER, $LOCAL_PROMETHEUS_SERVER }   tcp dport 443 accept
         ip saddr $GLOBAL_DEVICE_SOEREN_WORK iifname $WG_IF ip daddr { 192.168.2.229 }                       tcp dport { 80, 443 } accept

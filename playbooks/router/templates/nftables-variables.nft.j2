@@ -11,7 +11,7 @@ define GLOBAL_{{ tag | upper }} = { {% for item in vars['fw_tags_global_' + tag 
 define DEV_PRIVATE = enp2s0
 define DEV_WORLD = {{ networks[location].uplink.device }}
 
-define ROOTSERVERS = { 45.136.28.72, 176.10.127.124 }
+define ROOTSERVERS = { {% for ip in enclave_ips | dict2items %}{{ ip.value }}{% if not loop.last %}, {% endif %}{% endfor %} }
 
 define NET_PRIVATE = 192.168.0.0/16
 define WORLD_SSH_SOURCES = { $ROOTSERVERS }
