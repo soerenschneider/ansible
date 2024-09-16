@@ -22,6 +22,13 @@
     - name: Include dufs
       ansible.builtin.include_role:
         name: dufs
+      vars:
+        dufs_identifier: media
+        dufs_bind: "0.0.0.0"
+        dufs_port: 5000
+        dufs_allow_search: true
+        dufs_path_prefix: "/media"
+        dufs_serve_path: "/srv/files/media"
       tags: always
 
     - name: Include role platform
