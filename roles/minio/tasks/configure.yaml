@@ -38,7 +38,7 @@
     owner: "{{ minio_user }}"
     group: "{{ minio_group }}"
     mode: "0600"
-  notify: restart minio
+  notify: Restart minio
   tags: [minio, minio-install]
 
 - name: Add minio systemd file
@@ -48,7 +48,7 @@
     owner: root
     group: root
     mode: "0644"
-  notify: restart minio
+  notify: Restart minio
   tags: [minio, minio-install]
 
 - name: Enable/disable minio
