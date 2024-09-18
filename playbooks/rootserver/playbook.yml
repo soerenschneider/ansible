@@ -91,7 +91,7 @@
       ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
       changed_when: true
 
-    - name: "restart rclone mount"
+    - name: "Restart rclone mount"
       ansible.builtin.systemd:
         name: "mnt-media.service"
         state: "restarted"

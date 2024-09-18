@@ -33,7 +33,7 @@
       type = webdav
       url = http://localhost/media/
       vendor = other
-  notify: "restart rclone mount"
+  notify: "Restart rclone mount"
   tags: rclone
 
 - name: Add configuration block
@@ -43,7 +43,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  notify: "restart rclone mount"
+  notify: "Restart rclone mount"
   tags: rclone
 
 - name: Enable mount
