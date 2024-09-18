@@ -3,7 +3,7 @@ dyndns_group: dyndns
 dyndns_user: dyndns
 dyndns_config_dir: /etc/dyndns
 # renovate: datasource=github-releases depName=soerenschneider/dyndns
-dyndns_version: v1.20.0
+dyndns_version: v1.21.0
 
 dyndns_server_config_file: "{{ dyndns_config_dir }}/server.yaml"
 dyndns_client_config_file: "{{ dyndns_config_dir }}/client.yaml"
