@@ -74,7 +74,9 @@
     owner: root
     group: root
     mode: "0644"
-  when: ansible_system == "Linux"
+  when:
+    - ansible_system == "Linux"
+    - dyndns_client_config is defined
   notify: Restart dyndns-client
   tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
 
@@ -83,7 +85,9 @@
     name: dyndns-client
     enabled: "{% if dyndns_client_config is defined %}true{% else %}false{% endif %}"
     daemon_reload: true
-  when: ansible_system == "Linux"
+  when:
+    - ansible_system == "Linux"
+    - dyndns_client_config is defined
   tags: [dyndns, dyndns-client, dyndns-configure, dyndns-client-configure]
 
 - name: Add server systemd unit
@@ -93,7 +97,9 @@
     owner: root
     group: root
     mode: "0644"
-  when: ansible_system == "Linux"
+  when:
+    - ansible_system == "Linux"
+    - dyndns_server_config is defined
   notify: Restart dyndns-server
   tags: [dyndns, dyndns-server, dyndns-configure, dyndns-server-configure]
 
@@ -102,5 +108,7 @@
     name: dyndns-server
     enabled: "{% if dyndns_server_config is defined %}true{% else %}false{% endif %}"
     daemon_reload: true
-  when: ansible_system == "Linux"
+  when:
+    - ansible_system == "Linux"
+    - dyndns_server_config is defined
   tags: [dyndns, dyndns-server, dyndns-configure, dyndns-server-configure]
