@@ -39,10 +39,10 @@
     group: root
     mode: "0644"
   notify: Restart ip-plz
-  tags: [ip-plz, ip-plz-install]
+  tags: [ip-plz, ip-plz-install, ip-plz-configure]
 
 - name: Enable/disable ip-plz
   ansible.builtin.service:
     name: "{{ ip_plz_service_name }}"
     enabled: true
-  tags: [ip-plz, ip-plz-install]
+  tags: [ip-plz, ip-plz-install, ip-plz-configure]
