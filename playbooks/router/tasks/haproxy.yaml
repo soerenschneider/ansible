@@ -26,10 +26,12 @@
     path: /etc/haproxy/haproxy.cfg
     block: >
       frontend metrics
-        bind {{ haproxy_listen_addr }}:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+        bind {{ haproxy_listen_addr }}:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
         mode http
-        http-request use-service prometheus-exporter if { path /metrics }
         no log
+        http-request use-service prometheus-exporter if { path /metrics } { ssl_c_used 1 } { ssl_c_verify 0 }
+        stats uri /stats
+        stats refresh 10s
         stats hide-version
 
       frontend media
