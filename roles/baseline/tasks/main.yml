@@ -60,3 +60,7 @@
   ansible.builtin.include_tasks: wake_on_lan.yaml
   when: baseline_wol_enable
   tags: [base, wol, wake-on-lan]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: dns.yaml
+  tags: [base, dns, resolv]

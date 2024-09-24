@@ -1,0 +1,15 @@
+---
+- name: Set resolv.conf
+  ansible.builtin.copy:
+    dest: "/etc/resolv.conf"
+    owner: "root"
+    mode: "0644"
+    content: |
+      {% if resolv_conf_search is defined and resolv_conf_search | length > 0 %}
+      search {{ resolv_conf_search | join(' ') }}
+      {% endif %}
+      {% for nameserver in resolv_conf_nameservers %}
+      nameserver {{ nameserver }}
+      {% endfor %}
+    when: resolv_conf_nameservers | default([]) | length > 0
+    tags: [resolv, dns]
