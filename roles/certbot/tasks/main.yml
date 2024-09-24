@@ -32,7 +32,7 @@
   tags: [certbot, certbot-configure, certbot-hooks]
 
 - name: Retrieve http certs
-  ansible.builtin.command: certbot certonly --non-interactive --expand --agree-tos --email={{ certbot_email }} --standalone --preferred-challenges http -d }} -n
+  ansible.builtin.command: certbot certonly --non-interactive --expand --agree-tos --email={{ certbot_email }} --standalone --preferred-challenges http -d {{ item }} -n
   with_items: "{{ certbot_http_domains | default([]) }}"
   changed_when: false
   tags: [certbot, certbot-configure, certbot-hooks]
