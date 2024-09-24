@@ -34,16 +34,6 @@
         dufs_config: "{{ dufs_config | dict2items | rejectattr('key', 'eq', 'tls-key') | list | items2dict }}"
       when: not dufs_tls_key
 
-- name: "Add dufs config"
-  ansible.builtin.copy:
-    content: "{{ dufs_config | to_nice_yaml(indent=2) }}"
-    dest: "/etc/dufs-{{ dufs_identifier | default('default') }}.yaml"
-    owner: "root"
-    group: "root"
-    mode: "0644"
-  register: _dufs_config
-  tags: [dufs, dufs-configure]
-
 - name: "Add systemd service"
   ansible.builtin.template:
     src: "dufs@.service.j2"
@@ -54,11 +44,23 @@
   register: _dufs_systemd
   tags: [dufs, dufs-configure]
 
-- name: "Enable and start dufs service"
-  ansible.builtin.systemd:
-    name: "{{ dufs_service_name }}@{{ dufs_identifier | default('default') }}"
-    daemon_reload: true
-    state: "{% if _dufs_config is changed %}restarted{% else %}started{% endif %}"
-    enabled: true
-  when: _dufs_systemd is changed or _dufs_config is changed
+- name: Block
   tags: [dufs, dufs-configure]
+  when: dufs_identifier | default('') | length > 0
+  block:
+    - name: "Add dufs config"
+      ansible.builtin.copy:
+        content: "{{ dufs_config | to_nice_yaml(indent=2) }}"
+        dest: "/etc/dufs-{{ dufs_identifier }}.yaml"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      register: _dufs_config
+
+    - name: "Enable and start dufs service"
+      ansible.builtin.systemd:
+        name: "{{ dufs_service_name }}@{{ dufs_identifier }}"
+        daemon_reload: true
+        state: "{% if _dufs_config is changed %}restarted{% else %}started{% endif %}"
+        enabled: true
+      when: _dufs_systemd is changed or _dufs_config is changed
