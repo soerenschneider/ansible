@@ -4,8 +4,6 @@
   become: true
   strategy: free
   gather_facts: true
-  vars:
-    node_exporter_web_listen_address: 0.0.0.0:9100
   tasks:
     - name: Including tasks
       ansible.builtin.include_role:
