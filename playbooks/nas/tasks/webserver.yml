@@ -47,6 +47,28 @@
           }
 
           location /pub {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
+            root                    /mnt/wdred;
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+
+          location /videos {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
             root                    /mnt/wdred;
             dav_methods             PUT DELETE MKCOL COPY MOVE;
             dav_ext_methods         PROPFIND OPTIONS;

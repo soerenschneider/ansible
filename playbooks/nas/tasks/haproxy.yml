@@ -27,16 +27,18 @@
           # http-request deny if !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
 
           http-request redirect code 301 prefix / drop-query append-slash if { path /media }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /minio-ui }
           http-request redirect code 301 prefix / drop-query append-slash if { path /pub }
+          http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
+          http-request redirect code 301 prefix / drop-query append-slash if { path /minio-ui }
           http-request redirect code 301 prefix / drop-query append-slash if { path /syncthing }
 
           acl media path_beg,url_dec -m beg /media/
-          #http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+          acl videos path_beg,url_dec -m beg /videos/
           acl pub path_beg,url_dec -m beg /pub/
           acl is_soeren src 192.168.2.206 192.168.64.0/24 192.168.72.0/24 192.168.200.100/28
+          #http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
           use_backend dufs_media if media is_soeren
-          use_backend nginx if media || pub
+          use_backend nginx if media || pub || videos
 
           acl minio-ui path_beg,url_dec -m beg /minio-ui/
           use_backend minio-ui if minio-ui
