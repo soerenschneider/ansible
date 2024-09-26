@@ -1,0 +1,97 @@
+---
+- name: Check for existing alertmanager binary
+  ansible.builtin.stat:
+    path: "/usr/local/bin/alertmanager"
+  register: alertmanager_binary
+  tags: [monitoring, alertmanager, alertmanager-install]
+
+- name: Check installed version
+  when: alertmanager_binary.stat.exists
+  tags: [monitoring, alertmanager, alertmanager-install]
+  block:
+    - name: Get version
+      ansible.builtin.shell: "set -o pipefail && /usr/local/bin/alertmanager --version 2>&1 | head -n1 | awk '{print $3}'"
+      changed_when: false
+      register: alertmanager_installed_version
+
+    - name: Set version
+      ansible.builtin.set_fact:
+        alertmanager_installed_version: "{{ alertmanager_installed_version.stdout }}"
+
+    - name: Debug
+      ansible.builtin.debug:
+        msg: "Installed version: {{ alertmanager_installed_version }}"
+
+- name: Fetch latest release information from github
+  when: alertmanager_version is not defined or not alertmanager_version
+  tags: [monitoring, alertmanager, alertmanager-install]
+  block:
+    - name: Get latest release
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/prometheus/alertmanager/releases/latest"
+        return_content: true
+      register: github_release
+      retries: 3
+      delay: 5
+      until: github_release is succeeded
+
+    - name: Set release
+      ansible.builtin.set_fact:
+        alertmanager_version: "{{ github_release.json.tag_name | regex_replace('^v?(.*)$', '\\1') }}"
+
+- name: "Install alertmanager {{ alertmanager_version }}"
+  when: not alertmanager_binary.stat.exists or alertmanager_version != alertmanager_installed_version
+  tags: [monitoring, alertmanager, alertmanager-install]
+  block:
+    - name: "Set OS for generating download link"
+      ansible.builtin.set_fact:
+        go_os: "{{ ansible_system | lower }}"
+        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+
+    - name: Get checksum for archive
+      ansible.builtin.set_fact:
+        alertmanager_checksum: "{{ item.split(' ')[0] }}"
+      with_items:
+        - "{{ lookup('url', 'https://github.com/prometheus/alertmanager/releases/download/v' + alertmanager_version + '/sha256sums.txt', wantlist=True) | list }}"
+      when: "((go_os) + '-' + (go_arch) + '.tar.gz') in item and (not alertmanager_binary.stat.exists or alertmanager_installed_version != alertmanager_version)"
+
+    - name: Download alertmanager archive
+      become: false
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}.tar.gz"
+        dest: "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}.tar.gz"
+        mode: "0640"
+        checksum: "sha256:{{ alertmanager_checksum }}"
+      register: download_archive
+      until: download_archive is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}.tar.gz"
+        dest: "/tmp"
+        creates: "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}/alertmanager"
+        remote_src: true
+      check_mode: false
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        remote_src: true
+        mode: "0755"
+        owner: "root"
+        group: "root"
+      with_items:
+        - alertmanager
+      notify: [restart alertmanager]
+
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: "absent"
+        path: "{{ item }}"
+      with_items:
+        - "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}"
+        - "/tmp/alertmanager-{{ alertmanager_version }}.{{ go_os }}-{{ go_arch }}.tar.gz"

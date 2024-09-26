@@ -1,0 +1,27 @@
+---
+- name: Copy alertmanager configuration
+  ansible.builtin.copy:
+    content: "{{ alertmanager_config }}"
+    dest: "{{ alertmanager_config_dir }}/alertmanager.yaml"
+    owner: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_user }}"
+    mode: "0640"
+  notify: Restart alertmanager
+  tags: [monitoring, alertmanager, alertmanager-configure]
+
+- name: Create systemd service for alertmanager
+  ansible.builtin.template:
+    src: alertmanager.service.j2
+    dest: /etc/systemd/system/alertmanager.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart alertmanager
+  tags: [monitoring, alertmanager, alertmanager-configure]
+
+- name: Enable alertmanager service
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: alertmanager
+    enabled: true
+  tags: [monitoring, alertmanager, alertmanager-configure]

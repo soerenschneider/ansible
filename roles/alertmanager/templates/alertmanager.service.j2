@@ -1,0 +1,42 @@
+[Unit]
+Description=Prometheus Alertmanager
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+PIDFile=/run/alertmanager.pid
+User=alertmanager
+Group=alertmanager
+ExecReload=/bin/kill -HUP $MAINPID
+ExecStart=/usr/local/bin/alertmanager \
+{% for peer in alertmanager_cluster_peers %}
+  --cluster.peer={{ peer }}:9094 \
+{% endfor %}
+{% if alertmanager_cluster_listen_address | length > 0 %}
+  --cluster.gossip-interval={{ alertmanager_cluster_gossip_interval }} \
+  --cluster.settle-timeout={{ alertmanager_cluster_settle_timeout }} \
+  --cluster.probe-timeout={{ alertmanager_cluster_probe_timeout }} \
+  --cluster.probe-interval={{ alertmanager_cluster_probe_interval }} \
+  --cluster.pushpull-interval={{ alertmanager_cluster_pushpull_interval }} \
+  --cluster.reconnect-interval={{ alertmanager_cluster_reconnect_interval }} \
+{% endif %}
+  --cluster.listen-address={{ alertmanager_cluster_listen_address }} \
+  --config.file={{ alertmanager_config_dir }}/alertmanager.yaml \
+{%if alertmanager_web_external_url is defined %}  --web.external-url={{ alertmanager_web_external_url }}{% endif %}
+  --storage.path={{ alertmanager_db_dir }} \
+{% if alertmanager_config_flags_extra | length > 0 %}
+{% for flag, flag_value in alertmanager_config_flags_extra.items() %} \
+  --{{ flag }}={{ flag_value }}{% endfor %} \ {% endif %}
+  --web.listen-address={{ alertmanager_web_listen_address }}
+
+SyslogIdentifier=alertmanager
+
+# restart forever
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

@@ -25,6 +25,11 @@
 
     - name: Including role
       ansible.builtin.include_role:
+        name: alertmanager
+      tags: always
+
+    - name: Including role
+      ansible.builtin.include_role:
         name: device_stalker
       tags: always
 

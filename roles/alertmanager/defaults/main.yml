@@ -1,0 +1,24 @@
+---
+# renovate: datasource=github-releases depName=prometheus/alertmanager
+alertmanager_version: "0.27.0"
+
+alertmanager_user: alertmanager
+alertmanager_group: alertmanager
+alertmanager_config_dir: /etc/alertmanager
+alertmanager_db_dir: /var/lib/alertmanager
+
+alertmanager_web_listen_address: '127.0.0.1:9093'
+alertmanager_resolve_timeout: 3m
+
+alertmanager_config_flags_extra: {}
+
+alertmanager_cluster_gossip_interval: "5s"
+alertmanager_cluster_settle_timeout: "3m"
+alertmanager_cluster_probe_timeout: "5s"
+alertmanager_cluster_probe_interval: "30s"
+alertmanager_cluster_pushpull_interval: "3m"
+alertmanager_cluster_reconnect_interval: "1m"
+alertmanager_cluster_listen_address: ""
+alertmanager_cluster_peers: []
+
+alertmanager_config: {}
