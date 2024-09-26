@@ -22,8 +22,9 @@
     {
         "fileMatch": [".*y[a]?ml$"],
         "matchStrings": [
-            "# renovate: datasource=(?<datasource>docker)( versioning=(?<versioning>.*?))?\\s.+_image: \"(?<depName>.*?):(?<currentValue>.*)\"",
-            "# renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_version: \"(?<currentValue>.*)\""
+            "#\\srenovate:\\sdatasource=(?<datasource>docker)( versioning=(?<versioning>.*?))?\\s.+_image: \"(?<depName>.*?):(?<currentValue>.*)\"",
+            "#\\srenovate:\\sdatasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.*?_version: \"(?<currentValue>.*)\"",
+            "#\\srenovate:\\sdatasource=(?<datasource>.*?)\\sdepName=(?<depName>.*?)(\\sversioning=(?<versioning>.*?))?\\s.*?_version:\\s*(?:(?<currentValue>.*?))"
         ]
     }
   ]
