@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/vault-pki-cli
-vault_pki_cli_version: v1.14.0
+vault_pki_cli_version: v1.15.1
 
 vault_pki_cli_issue_timer_delay: 6h
 vault_pki_cli_issue_timer_calendar: "*-*-* 04/6:00:00"
