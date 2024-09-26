@@ -34,7 +34,7 @@ table ip global {
             udp . 123 : accept
         }
 
-        ip saddr $LOCAL_PROMETHEUS_SERVER tcp dport { 9100, 9192 } accept
+        ip saddr { $LOCAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN, $LOCAL_DEVICE_SOEREN } tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
         ip saddr { 192.168.72.0/24, 192.168.74.0/24 } tcp dport { 445, 6600 } accept
         ip saddr $NET_PRIVATE tcp dport ssh accept
     }
@@ -51,6 +51,10 @@ table ip global {
             udp . 67 : accept,
             udp . 123 : accept
         }
+
+        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
+        ip saddr 192.168.0.0/16 tcp dport { 9094 } accept
+        ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
     chain inbound {
@@ -71,7 +75,6 @@ table ip global {
             "vlan75": jump inbound_private,
             "vlan76": jump inbound_private
         }
-
         # the rest is dropped by the above policy
     }
 

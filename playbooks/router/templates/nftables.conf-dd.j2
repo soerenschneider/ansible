@@ -20,7 +20,7 @@ table ip global {
         udp dport $WIREGUARD_PORT accept
 
         # allow SSH connections from some well-known internet host
-        ip saddr $WORLD_SSH_SOURCES tcp dport 42222 accept
+        ip saddr $WORLD_SSH_SOURCES tcp dport 22 accept
     }
 
     chain inbound_private {
@@ -37,9 +37,9 @@ table ip global {
         }
 
         # todo: add variable for devices to tighten this rule
-        ip saddr { 192.168.67.0/24, 192.168.64.0/24 } tcp dport { 80, 445, 6600 } accept
-        ip saddr { 192.168.64.0/24, $LOCAL_PROMETHEUS_SERVER } tcp dport { 8405, 9100, 9192 } accept
-        ip saddr $NET_PRIVATE tcp dport 42222 accept
+        ip saddr { 192.168.67.0/24, 192.168.64.0/24 } tcp dport { 80, 445, 6600, 9999 } accept
+        ip saddr { $LOCAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN, $LOCAL_DEVICE_SOEREN } tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
+        ip saddr $NET_PRIVATE tcp dport 22 accept
     }
 
     chain inbound_wg {
@@ -48,12 +48,16 @@ table ip global {
 
         # allow DHCP, DNS and SSH from the private network
         ip protocol . th dport vmap {
-        tcp . 42222 : accept,
-        udp . 53    : accept,
-        tcp . 53    : accept,
-        udp . 67    : accept,
-        udp . 123   : accept
-    }
+            tcp . 22    : accept,
+            udp . 53    : accept,
+            tcp . 53    : accept,
+            udp . 67    : accept,
+            udp . 123   : accept
+        }
+
+        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
+        ip saddr 192.168.0.0/16 tcp dport { 9094 } accept
+        ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
     chain inbound {

@@ -21,7 +21,7 @@ table ip global {
             udp . 123 : accept
         }
 
-        ip saddr $LOCAL_PROMETHEUS_SERVER tcp dport { 8405, 9100, 9192, 15283 } accept
+        ip saddr { $LOCAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN, $LOCAL_DEVICE_SOEREN } tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
         ip saddr $SSH_SOURCES tcp dport ssh accept
         ip saddr 192.168.2.0/24 tcp dport {80, 443, 445, 6600 } accept
         udp dport $WIREGUARD_PORT accept
@@ -38,6 +38,10 @@ table ip global {
             tcp . 53 : accept,
             udp . 123 : accept
         }
+
+        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
+        ip saddr 192.168.0.0/16 tcp dport { 9094 } accept
+        ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
     chain inbound {
