@@ -1,12 +1,17 @@
 {% for tag in fw_tags %}
-{% if vars['fw_tags_local_' + tag ] | length > 0 %}
-define LOCAL_{{ tag | upper }} = { {% for item in vars['fw_tags_local_' + tag ] %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
+{% set local_tags = vars['fw_tags_local_' + tag] %}
+{% set global_tags = vars['fw_tags_global_' + tag] %}
+{% set combined_tags = (local_tags + global_tags) | unique %}
+{% if local_tags | length > 0 %}
+define LOCAL_{{ tag | upper }} = { {% for item in local_tags %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
 {% endif %}
-{% if vars['fw_tags_global_' + tag ] | length > 0 %}
-define GLOBAL_{{ tag | upper }} = { {% for item in vars['fw_tags_global_' + tag ] %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
+{% if global_tags | length > 0 %}
+define GLOBAL_{{ tag | upper }} = { {% for item in global_tags %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
+{% endif %}
+{% if combined_tags | length > 0 %}
+define ALL_{{ tag | upper }} = { {% for item in combined_tags %}{{ item }}{% if not loop.last %}, {% endif %}{% endfor %} }
 {% endif %}
 {% endfor %}
-
 
 define DEV_PRIVATE = enp2s0
 define DEV_WORLD = {{ networks[location].uplink.device }}
