@@ -11,6 +11,10 @@
         "minor",
         "patch"
       ]
+    },
+    {
+      "automerge": true,
+      "matchUpdateTypes": ["minor", "patch"]
     }
   ],
   "regexManagers": [
