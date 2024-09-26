@@ -80,8 +80,20 @@
     vault_archive: vault_{{ vault_version[1:] }}_{{ ansible_system | lower }}_{{ vault_arch_name }}.zip
     vault_checksum: vault_{{ vault_version[1:] }}_SHA256SUMS
     vault_checksum_gpg: vault_{{ vault_version[1:] }}_SHA256SUMS.sig
-    vault_download_dir: /tmp/vault
   tags: [vault, vault-install, deps]
+
+- name: Generate temp dir
+  become: false
+  ansible.builtin.tempfile:
+    state: "directory"
+    suffix: "vault"
+  register: _download_dir
+  tags: [vault, vault-install, deps]
+
+- name: Set vars for generating download link
+  ansible.builtin.set_fact:
+    vault_download_dir: "{{ _download_dir.path }}"
+  changed_when: false
 
 - name: Run block
   when: not vault_binary.stat.exists or vault_version[1:] != vault_installed_version
@@ -97,10 +109,12 @@
     - name: Download archive
       become: false
       ansible.builtin.get_url:
-        url: https://releases.hashicorp.com/vault/{{ vault_version[1:] }}/{{ item.file }}
+        url: "https://releases.hashicorp.com/vault/{{ vault_version[1:] }}/{{ item.file }}"
         dest: "{{ item.dest }}"
         mode: "0640"
+        timeout: 60
       register: download_vault
+
       retries: 5
       delay: 2
       with_items:
