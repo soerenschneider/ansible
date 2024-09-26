@@ -7,7 +7,7 @@ node_exporter_group: "{{ node_exporter_user }}"
 # add users to the node_exporter group
 node_exporter_add_users: []
 # renovate: datasource=github-releases depName=prometheus/node_exporter
-node_exporter_version: v1.8.1
+node_exporter_version: v1.8.2
 
 node_exporter_traefik:
   disable_auth: false
