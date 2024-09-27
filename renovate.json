@@ -27,7 +27,7 @@
         "fileMatch": [".*y[a]?ml$"],
         "matchStrings": [
             "#\\srenovate:\\sdatasource=(?<datasource>docker)( versioning=(?<versioning>.*?))?\\s.+_image: \"(?<depName>.*?):(?<currentValue>.*)\"",
-            "#\\s+renovate:\\s+datasource=(?<datasource>.*?)\\s+depName=(?<depName>.*?)(\\s+versioning=(?<versioning>.*?))?\\s.*?_version:\\s*(?<currentValue>.*)"
+            "(?i)#\\s+renovate:\\s+datasource=(?<datasource>.*?) depName=(?<depName>.*?)(\\s+versioning=(?<versioning>.*?))?\\s+.*_version[=:]\\s*(?<currentValue>.*)"
         ]
     }
   ]
