@@ -21,7 +21,7 @@
           stats hide-version
 
       frontend https_front
-          bind *:443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify optional
+          bind *:443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
           mode http
           # only allow the following CNs
           # http-request deny if !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
@@ -50,7 +50,7 @@
           default_backend minio
 
       frontend directory_exporter
-          bind *:2443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
@@ -58,7 +58,7 @@
           default_backend directory_exporter
 
       frontend node_exporter
-          bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:9443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
