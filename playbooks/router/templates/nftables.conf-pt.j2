@@ -105,7 +105,7 @@ table ip global {
         ip saddr { 192.168.64.0/24, 192.168.64.5, 192.168.200.2, 192.168.200.3, 192.168.200.100/28 } iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport { 443, 445, 5000, 6600, 8080 } accept
         ip saddr { 192.168.200.2, 192.168.200.3, 192.168.200.100/28 } iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport { 443, 5000, 445, 6600 } accept
 
-        ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport 9999 accept
+        ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport {{ fetcharr_webhook_port }} accept
         ip saddr 192.168.200.0/24 iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_VAULT_SERVER      tcp dport 443  accept
         ip saddr 192.168.200.1    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_PROMETHEUS_SERVER tcp dport 443  accept
         ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan73" ip daddr $LOCAL_FILESERVER        tcp dport 9999 accept
