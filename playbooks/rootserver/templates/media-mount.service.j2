@@ -15,6 +15,7 @@ ExecStart=/usr/bin/rclone mount webdav: /mnt/media \
     --vfs-read-chunk-size 128M \
     --vfs-read-chunk-size-limit off \
     --vfs-write-back 5s \
+    --read-only \
     --buffer-size 64M \
     --attr-timeout 1s \
     --dir-cache-time 60m \
