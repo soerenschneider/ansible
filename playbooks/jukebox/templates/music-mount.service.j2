@@ -1,0 +1,43 @@
+[Unit]
+Description=Mount WebDAV remote using rclone
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User={{ rclone_mount_user | default('rclone') }}
+Group=nogroup
+ExecStart=/usr/bin/rclone mount webdav: /mnt/music \
+    --config=/etc/rclone-webdav.conf \
+    --vfs-cache-mode full \
+    --vfs-cache-max-size 196M \
+    --vfs-cache-max-age 24h \
+    --vfs-read-chunk-size 128M \
+    --vfs-read-chunk-size-limit off \
+    --vfs-write-back 5s \
+    --buffer-size 64M \
+    --attr-timeout 1s \
+    --dir-cache-time 60m \
+    --poll-interval 1m \
+    --read-only \
+    --transfers 8 \
+    --checkers 8 \
+    --low-level-retries 20 \
+    --vfs-cache-poll-interval 1m \
+    --cache-dir /var/rclone/music \
+    --allow-other
+
+ExecStop=/bin/fusermount -u /mnt/music
+#ProtectSystem=full
+#NoNewPrivileges=true
+#PrivateTmp=true
+#ProtectKernelModules=true
+#ProtectKernelTunables=true
+#ProtectControlGroups=true
+#PrivateDevices=true
+#ReadWritePaths=/mnt /etc/mtab
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

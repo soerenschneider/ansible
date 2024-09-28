@@ -14,6 +14,11 @@
         file: tasks/hifiberry.yml
       tags: [dac, hifiberry]
 
+    - name: Setup rclone mount
+      ansible.builtin.include_tasks:
+        file: tasks/rclone-mount.yaml
+      tags: always
+
     - name: Include role mpd
       ansible.builtin.include_role:
         name: mpd
@@ -23,3 +28,9 @@
     - name: Reboot load hifiberry driver
       ansible.builtin.reboot: {}
       tags: [hifiberry, dac]
+
+    - name: "Restart rclone mount"
+      ansible.builtin.systemd:
+        name: "mnt-music.service"
+        state: "restarted"
+        daemon-reload: true

@@ -1,0 +1,70 @@
+---
+- name: Install rclone
+  ansible.builtin.package:
+    name: rclone
+  tags: rclone
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ rclone_mount_user | default('rclone') }}"
+    system: true
+  tags: rclone
+
+- name: "Allow other users in fuse"
+  lineinfile:
+    path: "/etc/fuse.conf"
+    regexp: '^#user_allow_other'
+    line: 'user_allow_other'
+    state: present
+  tags: rclone
+
+- name: Create mountpoint
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ rclone_mount_user | default('rclone') }}"
+    group: "root"
+    mode: "0755"
+  with_items:
+    - "/mnt/music"
+    - "/var/rclone"
+  tags: rclone
+
+- name: "Mount tmpfs to cache rclone"
+  ansible.posix.mount:
+    path: /var/rclone
+    src: tmpfs
+    fstype: tmpfs
+    opts: defaults,noatime,nosuid,nodev,noexec,size=200m,mode=1777
+    state: present
+  tags: rclone
+
+- name: Add configuration block
+  ansible.builtin.copy:
+    dest: /etc/rclone-webdav.conf
+    owner: "{{ rclone_mount_user | default('rclone') }}"
+    group: root
+    mode: "0644"
+    content: |
+      [webdav]
+      type = webdav
+      url = http://nas-ha/media/music/
+      vendor = other
+  notify: "Restart rclone mount"
+  tags: rclone
+
+- name: Add configuration block
+  ansible.builtin.template:
+    src: "templates/music-mount.service.j2"
+    dest: "/etc/systemd/system/mnt-music.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: "Restart rclone mount"
+  tags: rclone
+
+- name: Enable mount
+  ansible.builtin.systemd:
+    name: "mnt-music.service"
+    enabled: true
+  tags: rclone
