@@ -19,7 +19,7 @@
     path: /var/log
     src: tmpfs
     fstype: tmpfs
-    opts: defaults,noatime,nosuid,nodev,noexec,mode=0755
+    opts: defaults,noatime,nosuid,nodev,noexec,size=48m,mode=0755
     state: present
-  when: raspberry.ramdisk_log
+  when: raspberry_ramdisk_log | default(true)
   tags: [raspberry, base]
