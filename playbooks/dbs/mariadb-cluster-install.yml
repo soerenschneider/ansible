@@ -48,15 +48,26 @@
         mode: "0700"
       tags: [mariadb, mysql, db]
 
-    - name: Copy letsencrypt sst.cnf
+    - name: Add my.cnf
       ansible.builtin.copy:
         content: |
+          [mariadb]
+          ssl_cert = /certs/tls.crt
+          ssl_key = /certs/tls.key
+          ssl_ca = /certs/ca.crt
+          require_secure_transport = ON
+          [galera]
+          wsrep_node_incoming_address={{ inventory_hostname }}
+          wsrep_node_address={{ inventory_hostname }}
+          wsrep-node-name={{ inventory_hostname }}
+          wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/wsrep-ca.crt;socket.ssl_cert=/certs/wsrep.crt;socket.ssl_key=/certs/wsrep.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568;
           [sst]
-          encrypt=4
-          tkey=/certs/wsrep.key
-          tcert=/certs/wsrep.crt
-          tca=/certs/wsrep-ca.crt
-        dest: "{{ mariadb_base_dir }}/sst.cnf"
+          tca=/certs/sst-ca.crt
+          tcert=/certs/sst.crt
+          encrypt=2
+          [mariabackup]
+          ssl-verify-server-cert = false
+        dest: "{{ mariadb_base_dir }}/my.cnf"
         owner: root
         group: root
         mode: "0444"

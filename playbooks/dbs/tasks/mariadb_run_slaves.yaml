@@ -11,19 +11,15 @@
     env:
       MARIADB_GALERA_CLUSTER_NAME: "{{ mariadb_galera_cluster_name }}"
       MARIADB_GALERA_CLUSTER_ADDRESS: "{{ mariadb_galera_cluster_address }}"
+      MARIADB_GALERA_NODE_NAME: "{{ inventory_hostname }}"
       MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_galera_backup_user }}"
       MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_galera_backup_pw }}"
       MARIADB_REPLICATION_USER: "{{ mariadb_replication_user }}"
       MARIADB_REPLICATION_PASSWORD: "{{ mariadb_replication_pass }}"
-      MARIADB_ENABLE_TLS: "yes"
-      MARIADB_TLS_CERT_FILE: /certs/tls.crt
-      MARIADB_TLS_KEY_FILE: /certs/tls.key
-      MARIADB_TLS_CA_FILE: /certs/ca.crt
       MARIADB_CHARACTER_SET: utf8mb4
       MARIADB_COLLATE: utf8mb4_unicode_520_ci
-      MARIADB_EXTRA_FLAGS: --require_secure_transport=1 --wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/node-ca.crt;socket.ssl_cert=/certs/node.crt;socket.ssl_key=/certs/node.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568; --wsrep_node_incoming_address={{ inventory_hostname }} --wsrep_node_address={{ inventory_hostname }}
       TZ: UTC
-    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/sst.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
+    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/my.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
   tags: [docker, mariadb, mysql]
 
 - name: Wait for node to be ready
