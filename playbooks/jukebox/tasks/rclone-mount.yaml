@@ -11,7 +11,7 @@
   tags: rclone
 
 - name: "Allow other users in fuse"
-  lineinfile:
+  ansible.builtin.lineinfile:
     path: "/etc/fuse.conf"
     regexp: '^#user_allow_other'
     line: 'user_allow_other'
