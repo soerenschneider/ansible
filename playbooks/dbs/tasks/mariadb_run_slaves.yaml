@@ -24,7 +24,7 @@
 
 - name: Wait for node to be ready
   ansible.builtin.command: >
-    docker exec {{ mariadb_container_name }} mysqladmin ping -u{{ mariadb_root_user | default('root') }} -p{{ mariadb_root_password }}
+    docker exec {{ mariadb_container_name }} mariadb-admin ping --ssl-verify-server-cert=false -u{{ mariadb_root_user | default('root') }} -p{{ mariadb_root_password }}
   register: _result
   until: _result.rc == 0
   retries: 100
