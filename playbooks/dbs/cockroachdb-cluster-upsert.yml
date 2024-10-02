@@ -26,19 +26,48 @@
       community.docker.docker_container:
         name: "{{ cockroachdb_container_name }}"
         image: cockroachdb/cockroach:{{ cockroachdb_version }}
-        # user: "{{ _cockroachdb_user_string }}"
+        user: "{{ _cockroachdb_user_string }}"
         restart_policy: always
         recreate: true
-        ansible.builtin.command: [start, --certs-dir=/certs, "--cert-principal-map=soeren-nb.ha.soeren.cloud:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}", --cluster-name=kakerlake, '--locality=zone={{ location }}', --listen-addr=0.0.0.0:26257, '--advertise-addr={{ inventory_hostname }}:26257', '--advertise-sql-addr={{ inventory_hostname }}:26258', --sql-addr=0.0.0.0:26258, --http-addr=0.0.0.0:8080, "--join={% for node in groups['dbs'] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}"]
+        command:
+          - start
+          - --certs-dir=/certs
+          - --cert-principal-map=user-soeren@soeren.cloud:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+            #- --cert-principal-map=user-soeren@soeren.cloud:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+          - --cluster-name=kakerlake
+          - --locality=zone={{ location }}
+          - --listen-addr=0.0.0.0:26257
+          - --advertise-addr={{ inventory_hostname }}:26257
+          - --advertise-sql-addr={{ inventory_hostname }}:26258
+          - --sql-addr=0.0.0.0:26258
+          - --http-addr=0.0.0.0:8080
+          - --join={% for node in groups['dbs'] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}
         ports: [0.0.0.0:8080:8080, 0.0.0.0:26257:26257, 0.0.0.0:26258:26258]
         env:
           TZ: UTC
-        volumes: [/etc/cockroachdb/certs:/certs:ro, /etc/cockroachdb/storage:/cockroach/cockroach-data/]
+        volumes: [/var/lib/cockroachdb/certs:/certs:ro, /var/lib/cockroachdb/storage:/cockroach/cockroach-data/]
       tags: [docker, cockroachdb]
 
-    - name: Init cluster
-      community.docker.docker_container_exec:
-        container: cockroachdb
-        ansible.builtin.command: cockroach init --certs-dir /certs/ --cert-principal-map={% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %} --host {{ inventory_hostname }}
-      # ansible.builtin.command: cockroach init --insecure --cluster-name=kakerlake
-      when: false and inventory_hostname == groups["dbs"][0]
+    - name: fuckblock
+      when: inventory_hostname == groups["dbs"][0]
+      block:
+        - name: Init cluster
+          community.docker.docker_container_exec:
+            container: cockroachdb
+            command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name=kakerlake --cert-principal-map=user-soeren@soeren.cloud:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+          async: 30
+          poll: 0
+          register: exec_result
+
+        - name: Wait for the command to finish
+          async_status:
+            jid: "{{ exec_result.ansible_job_id }}"
+          register: job_result
+          until: job_result.finished
+          retries: 30
+          delay: 1
+
+        - name: Fail if the command did not finish in 30s
+          fail:
+            msg: "The command did not complete in time."
+          when: not job_result.finished
