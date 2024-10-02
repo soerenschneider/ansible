@@ -1,43 +1,43 @@
 ---
-- name: Install rclone
+- name: "Install rclone"
   ansible.builtin.package:
-    name: rclone
-  tags: rclone
+    name: "rclone"
+  tags: "rclone"
 
-- name: Add user
+- name: "Add user"
   ansible.builtin.user:
     name: "{{ rclone_mount_user | default('rclone') }}"
     system: true
-  tags: rclone
+  tags: "rclone"
 
 - name: "Allow other users in fuse"
   ansible.builtin.lineinfile:
     path: "/etc/fuse.conf"
     regexp: '^#user_allow_other'
     line: 'user_allow_other'
-    state: present
-  tags: rclone
+    state: "present"
+  tags: "rclone"
 
-- name: Create mountpoint
+- name: "Create mountpoint"
   ansible.builtin.file:
     path: "{{ item }}"
-    state: directory
+    state: "directory"
     owner: "{{ rclone_mount_user | default('rclone') }}"
     group: "root"
     mode: "0755"
   with_items:
     - "/mnt/music"
     - "/var/rclone"
-  tags: rclone
+  tags: "rclone"
 
 - name: "Mount tmpfs to cache rclone"
   ansible.posix.mount:
-    path: /var/rclone
-    src: tmpfs
-    fstype: tmpfs
-    opts: defaults,noatime,nosuid,nodev,noexec,size=200m,mode=1777
-    state: present
-  tags: rclone
+    path: "/var/rclone"
+    src: "tmpfs"
+    fstype: "tmpfs"
+    opts: defaults,noatime,nosuid,nodev,noexec,size=8m,mode=1777
+    state: "present"
+  tags: "rclone"
 
 - name: Add configuration block
   ansible.builtin.copy:
