@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/sc-agent
-sc_agent_version: v1.3.0
+sc_agent_version: v1.4.0
 
 sc_agent_conf_dir: "/etc/sc-agent/conf.d"
 
