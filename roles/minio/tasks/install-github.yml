@@ -27,7 +27,9 @@
   tags: [minio, minio-install, deps]
   block:
     - name: Check installed version
-      ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | head -n1 | awk '{print $3}'
+      ansible.builtin.shell:
+        cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | head -n1 | awk '{print $3}'"
+        executable: /bin/bash
       register: installed_version
       changed_when: false
 
