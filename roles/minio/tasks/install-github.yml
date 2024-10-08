@@ -145,4 +145,5 @@
       ansible.builtin.systemd:
         name: "{{ service_name }}"
         state: restarted
+      failed_when: false
       when: stopped_service is defined and stopped_service is changed
