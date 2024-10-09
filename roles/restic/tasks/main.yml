@@ -46,8 +46,14 @@
     group: root
     mode: "0644"
   register: _restic_svcs
-  with_items: [restic-backup@.service, restic-init@.service, restic-prune@.service, restic-prune@.timer]
+  with_items: "{{ restic_systemd_unit_files }}"
   tags: [restic, backup]
+
+- name: Create systemd overrides
+  ansible.builtin.include_tasks: overrides.yaml
+  with_items: "{{ restic_backups | dict2items }}"
+  no_log: true
+  tags: [restic, restic-overrides, backup]
 
 - name: Create systemd timers
   ansible.builtin.template:
@@ -74,7 +80,6 @@
 - name: Systemd daemon reload
   ansible.builtin.systemd:
     daemon_reload: true
-  when: _restic_svcs is changed or _restic_timers is changed
   tags: [restic, backup]
 
 - name: Schedule backups

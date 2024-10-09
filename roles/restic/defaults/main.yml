@@ -1,3 +1,4 @@
 ---
 restic_backups: {}
 restic_command: python3 /opt/scripts/restic/restic_backup.py -i %I
+restic_systemd_unit_files: [restic-backup@.service, restic-init@.service, restic-prune@.service, restic-prune@.timer]

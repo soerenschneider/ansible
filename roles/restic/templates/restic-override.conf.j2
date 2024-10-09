@@ -1,0 +1,4 @@
+[Service]
+{% for f in item.value.extra_env_files %}
+EnvironmentFile=/etc/restic-{{ item.key }}-{{ f }}.conf
+{% endfor %}

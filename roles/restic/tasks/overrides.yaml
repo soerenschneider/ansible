@@ -1,0 +1,26 @@
+---
+- name: Create systemd override directory
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ (file | regex_replace('@.*', '@')) ~ item.key }}.service.d/"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  with_items: "{{ restic_systemd_unit_files | select('search', '\\.service$') | list }}"
+  loop_control:
+    loop_var: file
+  when: item.value.extra_env_files | default([]) | length > 0
+  tags: [restic, restic-overrides, backup]
+
+- name: Create systemd override
+  ansible.builtin.template:
+    src: "restic-override.conf.j2"
+    dest: "/etc/systemd/system/{{ (file | regex_replace('@.*', '@')) ~ item.key }}.service.d/override.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  with_items: "{{ restic_systemd_unit_files | select('search', '\\.service$') | list }}"
+  loop_control:
+    loop_var: file
+  when: item.value.extra_env_files | default([]) | length > 0
+  tags: [restic, restic-overrides, backup]
