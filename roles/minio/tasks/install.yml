@@ -13,8 +13,8 @@
 
 - name: Add minio certs dir
   ansible.builtin.file:
-    path: /home/{{ minio_user }}/.minio/certs
-    state: directory
+    path: "/home/{{ minio_user }}/.minio/certs"
+    state: "directory"
     owner: "{{ minio_user }}"
     group: "{{ minio_group }}"
     mode: "0750"
@@ -23,7 +23,7 @@
 - name: Add base dir
   ansible.builtin.file:
     path: "{{ minio_base_dir }}"
-    state: directory
+    state: "directory"
     owner: "{{ minio_user }}"
     group: "{{ minio_group }}"
     mode: "0700"
@@ -32,7 +32,7 @@
 - name: Add volume dirs
   ansible.builtin.file:
     path: "{{ item }}"
-    state: directory
+    state: "directory"
     owner: "{{ minio_user }}"
     group: "{{ minio_group }}"
     mode: "0700"
