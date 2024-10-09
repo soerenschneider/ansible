@@ -33,7 +33,6 @@
           - start
           - --certs-dir=/certs
           - --cert-principal-map=user-soeren@soeren.cloud:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
-            #- --cert-principal-map=user-soeren@soeren.cloud:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
           - --cluster-name=kakerlake
           - --locality=zone={{ location }}
           - --listen-addr=0.0.0.0:26257
@@ -60,7 +59,7 @@
           register: exec_result
 
         - name: Wait for the command to finish
-          async_status:
+          ansible.builtin.async_status:
             jid: "{{ exec_result.ansible_job_id }}"
           register: job_result
           until: job_result.finished
@@ -68,6 +67,6 @@
           delay: 1
 
         - name: Fail if the command did not finish in 30s
-          fail:
+          ansible.builtin.fail:
             msg: "The command did not complete in time."
           when: not job_result.finished
