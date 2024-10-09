@@ -48,7 +48,7 @@
         volumes: [/var/lib/cockroachdb/certs:/certs:ro, /var/lib/cockroachdb/storage:/cockroach/cockroach-data/]
       tags: [docker, cockroachdb]
 
-    - name: fuckblock
+    - name: "Conditionally init cluster"
       when: inventory_hostname == groups["dbs"][0]
       block:
         - name: Init cluster
