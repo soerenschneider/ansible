@@ -26,6 +26,10 @@
           # only allow the following CNs
           # http-request deny if !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
 
+          # ACL to detect Prometheus based on User-Agent
+          acl is_prometheus hdr_beg(User-Agent) "Blackbox Exporter/"
+          http-request return status 200 content-type "text/plain" lf-string "OK"  if is_prometheus
+
           http-request redirect code 301 prefix / drop-query append-slash if { path /media }
           http-request redirect code 301 prefix / drop-query append-slash if { path /pub }
           http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
