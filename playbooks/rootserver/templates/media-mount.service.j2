@@ -9,21 +9,22 @@ User={{ rclone_mount_user | default('rclone') }}
 Group=nogroup
 ExecStart=/usr/bin/rclone mount webdav: /mnt/media \
     --config=/etc/rclone-webdav.conf \
+    --buffer-size 128M \
     --vfs-cache-mode full \
     --vfs-cache-max-size 10G \
-    --vfs-cache-max-age 24h \
-    --vfs-read-chunk-size 128M \
-    --vfs-read-chunk-size-limit off \
+    --vfs-cache-max-age 48h \
+    --vfs-cache-poll-interval 1m \
+    --vfs-read-chunk-size 16M \
+    --vfs-read-chunk-size-limit 256M \
+    --vfs-read-ahead 1536M \
     --vfs-write-back 5s \
     --read-only \
-    --buffer-size 64M \
     --attr-timeout 1s \
     --dir-cache-time 60m \
     --poll-interval 1m \
-    --transfers 8 \
-    --checkers 8 \
+    --transfers 4 \
+    --checkers 4 \
     --low-level-retries 20 \
-    --vfs-cache-poll-interval 1m \
     --cache-dir /var/rclone/media \
     --allow-other
 
