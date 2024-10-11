@@ -11,5 +11,5 @@
       {% for nameserver in resolv_conf_nameservers %}
       nameserver {{ nameserver }}
       {% endfor %}
-    when: resolv_conf_nameservers | default([]) | length > 0
-    tags: [resolv, dns]
+  when: resolv_conf_nameservers | default([]) | length > 0
+  tags: [resolv, dns]
