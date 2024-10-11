@@ -31,12 +31,14 @@
         dest: "/etc/systemd/journald.conf"
         regexp: "^SystemMaxUse="
         line: "SystemMaxUse={{ baseline_systemd_journal_system_max_use }}"
+      notify: "Restart journald"
 
     - name: "Limit the size of each journald log file"
       ansible.builtin.lineinfile:
         dest: "/etc/systemd/journald.conf"
         regexp: "^SystemMaxFileSize="
         line: "SystemMaxFileSize={{ baseline_systemd_journal_system_max_file_size }}"
+      notify: "Restart journald"
 
 - name: "Add runtime limits for auto/volatile setting"
   when: baseline_systemd_journal_storage in ['volatile', 'auto']
@@ -47,9 +49,11 @@
         dest: "/etc/systemd/journald.conf"
         regexp: "^RuntimeMaxUse="
         line: "RuntimeMaxUse={{ baseline_systemd_journal_runtime_max_use }}"
+      notify: "Restart journald"
 
     - name: "Limit the size of each journald log file"
       ansible.builtin.lineinfile:
         dest: "/etc/systemd/journald.conf"
         regexp: "^RuntimeMaxFileSize="
         line: "RuntimeMaxFileSize={{ baseline_systemd_journal_runtime_max_file_size }}"
+      notify: "Restart journald"
