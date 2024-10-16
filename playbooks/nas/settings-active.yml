@@ -15,11 +15,6 @@ rclone_backup_hour: 3
 rclone_backup_minute: 0
 
 rclone_backup_definitions:
-  - name: scans-dropbox
-    user: "{{ nas_media_user }}"
-    src: "{{ disk.mountpoint }}/scans-crypt"
-    dst: dropbox:scans
-    excludes: gocryptfs.conf
   - name: documents-dropbox
     user: "{{ nas_media_user }}"
     src: "{{ disk.mountpoint }}/documents-crypt"
