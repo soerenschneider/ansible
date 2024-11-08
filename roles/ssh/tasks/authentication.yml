@@ -101,12 +101,12 @@
   tags: [ssh, base]
 
 - name: Run block
-  when: [ssh_user_ca_enabled | default(True), ssh_user_ca_key | default("") | length > 0]
+  when: [ssh_user_ca_enabled | default(True), ssh_user_ca_key_file | default("") | length > 0]
   tags: [ssh, base]
   block:
     - name: Add user CA key
-      ansible.builtin.copy:
-        content: "{{ ssh_user_ca_key }}"
+      ansible.builtin.get_url:
+        url: "{{ ssh_user_ca_key_url }}"
         dest: "{{ ssh_user_ca_key_file }}"
         owner: root
         group: root
