@@ -55,3 +55,31 @@
     enabled: true
     name: dhcpd
   tags: [dhcp, dhcpd]
+
+- name: Add workaround timer to restart dhcpd 2m after the system started
+  block:
+    - name: Add dhcpd-restart service
+      ansible.builtin.template:
+        src: templates/dhcpd-restart.service.j2
+        dest: "/etc/systemd/system//dhcpd-restart.service"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+
+    - name: Add dhcpd-restart timer
+      ansible.builtin.template:
+        src: templates/dhcpd-restart.timer.j2
+        dest: "/etc/systemd/system//dhcpd-restart.timer"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+
+    - name: Enable dhcpd-timer services
+      ansible.builtin.systemd:
+        enabled: true
+        daemon_reload: true
+        state: "started"
+        name: "{{ item }}"
+      with_items: ["dhcpd-restart.service", "dhcpd-restart.timer"]
+  notify: Restart dhcpd
+  tags: [dhcp, dhcpd, dhcpd-workaround]

@@ -1,0 +1,9 @@
+[Unit]
+Description=Timer to restart DHCPD service 1 minute after boot
+
+[Timer]
+OnBootSec=2min
+Unit=dhcpd-restart.service
+
+[Install]
+WantedBy=timers.target

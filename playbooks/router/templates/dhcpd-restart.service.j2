@@ -1,0 +1,6 @@
+[Unit]
+Description=Restart DHCPD service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl restart dhcpd.service
