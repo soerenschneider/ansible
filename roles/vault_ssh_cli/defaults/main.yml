@@ -1,5 +1,5 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/ssh-key-signer
-vault_ssh_cli_version: v1.8.3
+vault_ssh_cli_version: v1.9.2
 vault_ssh_cli_timer_delay: 5m
 vault_ssh_cli_timer_calendar: "*-*-* 00/4:00:00"
