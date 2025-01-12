@@ -57,6 +57,8 @@
   tags: [dhcp, dhcpd]
 
 - name: Add workaround timer to restart dhcpd 2m after the system started
+  notify: Restart dhcpd
+  tags: [dhcp, dhcpd, dhcpd-workaround]
   block:
     - name: Add dhcpd-restart service
       ansible.builtin.template:
@@ -81,5 +83,3 @@
         state: "started"
         name: "{{ item }}"
       with_items: ["dhcpd-restart.service", "dhcpd-restart.timer"]
-  notify: Restart dhcpd
-  tags: [dhcp, dhcpd, dhcpd-workaround]
