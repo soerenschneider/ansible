@@ -11,7 +11,7 @@
     acmevault_client_config: "{{ acmevault_default_client_config }}"
 
     # renovate: datasource=github-releases depName=rfjakob/gocryptfs versioning=semver-coerced
-    gocryptfs_version: v2.4.0
+    gocryptfs_version: v2.5.0
 
   tasks:
     - name: Read specific settings file
