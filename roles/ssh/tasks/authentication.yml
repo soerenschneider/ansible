@@ -118,27 +118,3 @@
         regexp: ^#?TrustedUserCAKeys
         line: TrustedUserCAKeys {{ ssh_user_ca_key_file }}
       notify: Restart_sshd
-
-    - name: Add script to update ca cert
-      ansible.builtin.template:
-        src: fetch-ssh-user-ca.sh.j2
-        dest: /usr/local/sbin/fetch-ssh-user-ca.sh
-        owner: root
-        group: root
-        mode: "0750"
-
-    - name: Schedule fetching cert
-      ansible.builtin.template:
-        src: "{{ item }}.j2"
-        dest: /etc/systemd/system/{{ item }}
-        owner: root
-        group: root
-        mode: "0644"
-      with_items: [fetch-ssh-user-ca.service, fetch-ssh-user-ca.timer]
-
-    - name: Start and enable service
-      ansible.builtin.systemd:
-        name: "{{ item }}"
-        enabled: true
-        state: started
-      with_items: [fetch-ssh-user-ca.service, fetch-ssh-user-ca.timer]

@@ -1,9 +1,0 @@
-[Unit]
-Description=Fetch SSH User CA
-
-[Service]
-Type=simple
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/etc/ssh /var/lib/node_exporter
-ExecStart=/usr/local/sbin/fetch-ssh-user-ca.sh
