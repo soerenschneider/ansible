@@ -94,14 +94,9 @@
         occult_run_on_boot: "{{ fileserver_mode == 'active' }}"
       tags: always
 
-    - name: Include role mpd
+    - name: Include role syncthing
       ansible.builtin.include_role:
         name: syncthing
-      vars:
-        syncthing_user: "{{ nas_media_user }}"
-        syncthing_dirs_metrics_config:
-          - identifier: "{{ nas_media_user }}"
-            config_file: /home/"{{ nas_media_user }}"/.config/syncthing/config.xml
       tags: always
 
     - name: Including tasks
