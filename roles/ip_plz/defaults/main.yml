@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/ip-plz
-ip_plz_version: v1.3.2
+ip_plz_version: v1.4.0
 
 ip_plz_user: ip-plz
 ip_plz_group: ip-plz
