@@ -24,12 +24,12 @@
 
     - name: Load vault-approles config...
       ansible.builtin.include_vars:
-        file: ../../inventory/prod/group_vars/desktop/vault-approles.yaml
+        file: ../../../ansible-inventory-prod/group_vars/desktop/vault-approles.yaml
       tags: always
 
     - name: Load vault-pki-cli config...
       ansible.builtin.include_vars:
-        file: ../../inventory/prod/group_vars/desktop/vault-pki-cli.yaml
+        file: ../../../ansible-inventory-prod/group_vars/desktop/vault-pki-cli.yaml
       tags: always
 
     - name: Load host-based settings
@@ -50,7 +50,7 @@
 
     - name: Load syncthing config...
       ansible.builtin.include_vars:
-        file: ../../inventory/prod/group_vars/desktop/syncthing.yaml
+        file: ../../../ansible-inventory-prod/group_vars/desktop/syncthing.yaml
       ignore_errors: false
       tags: syncthing
 

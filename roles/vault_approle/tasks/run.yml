@@ -81,9 +81,3 @@
         VAULT_TOKEN: "{{ vault_wrapped_token }}"
       changed_when: true
       when: item.config.unwrap_before_save | default(False)
-
-    - name: Restart sc-agent
-      ansible.builtin.systemd:
-        name: sc-agent
-        state: restarted
-      failed_when: false
