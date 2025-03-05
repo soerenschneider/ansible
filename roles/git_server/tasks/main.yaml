@@ -1,0 +1,73 @@
+---
+- name: "Install git"
+  ansible.builtin.package:
+    name: "git"
+  tags: [git-server]
+
+- name: "Ensure git-shell is available"
+  ansible.builtin.command: "which git-shell"
+  register: "_git_shell"
+  changed_when: false
+  tags: [git-server]
+
+- name: "Ensure group 'git' exists"
+  group:
+    name: "git"
+    state: "present"
+  tags: [git-server]
+
+- name: "Create a restricted 'git' user"
+  ansible.builtin.user:
+    name: "{{ git_server_user }}"
+    shell: "{{ git_shell.stdout | default('/usr/bin/git-shell') }}"
+    home: "{{ git_server_home }}"
+    groups:
+      - git
+      - "{{ ssh_users_group }}"
+    create_home: yes
+    system: yes
+  tags: [git-server]
+
+- name: "Create .ssh directory"
+  ansible.builtin.file:
+    path: "{{ git_server_home }}/.ssh"
+    state: "directory"
+    owner: "{{ git_server_user }}"
+    mode: "0700"
+  tags: [git-server]
+
+- name: "Fetch GitHub SSH keys for user"
+  ansible.builtin.get_url:
+    url: "https://github.com/{{ git_server_github_username }}.keys"
+    dest: "{{ git_server_home }}/.ssh/authorized_keys"
+    owner: "{{ git_server_user }}"
+    mode: '0600'
+  when: git_server_github_username != ""
+  tags: [git-server]
+
+- name: "Setup chroot"
+  when: git_server_chroot_dir != ""
+  tags: [git-server]
+  block:
+    - name: "Create script to create chroot"
+      ansible.builtin.template:
+        src: "git-create-chroot.sh.j2"
+        dest: "/usr/local/bin/git-create-chroot.sh"
+        owner: "root"
+        group: "root"
+        mode: "0750"
+
+    - name: "Build chroot"
+      ansible.builtin.command: "/usr/local/bin/git-create-chroot.sh"
+
+    - name: "Add chroot block to sshd"
+      ansible.builtin.blockinfile:
+        path: "/etc/ssh/sshd_config"
+        insertafter: "EOF"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK chroot git"
+        block: |
+          Match User {{ git_server_user }}
+              ChrootDirectory {{ git_server_chroot_dir }}
+              #ForceCommand /usr/bin/git-shell
+              DisableForwarding yes
+      notify: Restart_sshd

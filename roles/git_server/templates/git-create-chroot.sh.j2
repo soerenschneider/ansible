@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+CHROOT="{{ git_server_chroot_dir }}"
+
+mkdir -p "${CHROOT}/usr/bin"
+mkdir -p "${CHROOT}/usr/lib"
+[ ! -L "${CHROOT}/lib" ] && ln -rs "${CHROOT}/usr/lib" "${CHROOT}/lib"
+[ ! -L "${CHROOT}/lib64" ] && ln -rs "${CHROOT}/usr/lib" "${CHROOT}/lib64"
+
+for bin in /usr/bin/git /usr/bin/git-shell; do
+  cp $bin "${CHROOT}/usr/bin/"
+  ldd $bin | awk '{print $3}' | grep -v '^$' | xargs -I{} cp {} "${CHROOT}/usr/lib/"
+done
+
+cp /lib64/ld-linux-x86-64.so.2 "${CHROOT}/usr/lib/"
+
+mkdir -p "${CHROOT}/dev"
+[ ! -e "${CHROOT}/dev/null" ] && mknod "${CHROOT}/dev/null" c 1 3
+[ ! -e "${CHROOT}/dev/zero" ] && mknod "${CHROOT}/dev/zero" c 1 5
+[ ! -e "${CHROOT}/dev/tty" ] && mknod "${CHROOT}/dev/tty" c 5 0
+[ ! -e "${CHROOT}/dev/random" ] && mknod "${CHROOT}/dev/random" c 1 8
+[ ! -e "${CHROOT}/dev/urandom" ] && mknod "${CHROOT}/dev/urandom" c 1 9
+chmod 0666 "${CHROOT}"/dev/{null,tty,zero}
+chown root:tty "${CHROOT}/dev/tty"

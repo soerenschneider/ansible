@@ -1,0 +1,21 @@
+---
+- name: "Install git"
+  ansible.builtin.package:
+    name: "git"
+  tags: [git-sync]
+
+- name: "Fetch git-sync script"
+  ansible.builtin.git:
+    repo: "https://github.com/simonthum/git-sync.git"
+    dest: "/opt/git-sync"
+    version: "master"
+    update: true
+  tags: [git-sync]
+
+- name: "Create symlink for git-sync in /usr/local/bin"
+  ansible.builtin.file:
+    src: "/opt/git-sync/git-sync"
+    dest: "/usr/local/bin/git-sync"
+    state: "link"
+    force: true
+  tags: [git-sync]

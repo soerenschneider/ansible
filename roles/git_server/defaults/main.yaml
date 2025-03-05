@@ -1,0 +1,6 @@
+---
+git_server_github_username: "soerenschneider"
+git_server_user: "git"
+git_server_home: "/home/git"
+
+git_server_chroot_dir: "/srv/git"
