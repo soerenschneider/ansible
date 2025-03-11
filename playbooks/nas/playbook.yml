@@ -75,12 +75,6 @@
       when: restic_backups | default([]) | length > 0
       tags: always
 
-    - name: Include role acxi
-      ansible.builtin.include_role:
-        name: acxi
-      when: fileserver_mode == "active"
-      tags: always
-
     - name: Include role magnetotactic
       ansible.builtin.include_role:
         name: magnetotactic
