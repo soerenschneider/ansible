@@ -1,0 +1,10 @@
+[Unit]
+Description=Run wiki-git-sync every {{ wiki_git_sync_interval_min | default('30') }} minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ wiki_git_sync_interval_min | default('30') }}min
+Unit=wiki-git-sync.service
+
+[Install]
+WantedBy=timers.target

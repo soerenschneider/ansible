@@ -93,6 +93,10 @@
         name: syncthing
       tags: always
 
+    - name: Include tasks 'wiki'
+      ansible.builtin.include_tasks: tasks/wiki.yaml
+      tags: always
+
     - name: Including tasks
       ansible.builtin.include_tasks: tasks/disk.yml
       tags: always
@@ -101,6 +105,16 @@
       ansible.builtin.include_role:
         name: fetcharr
       when: fileserver_mode == "active"
+      tags: always
+
+    - name: "Install git-sync"
+      ansible.builtin.include_role:
+        name: "git_sync"
+      tags: always
+
+    - name: "Install git-server"
+      ansible.builtin.include_role:
+        name: "git_server"
       tags: always
 
     - name: Add template file

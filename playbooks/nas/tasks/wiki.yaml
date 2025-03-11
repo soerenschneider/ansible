@@ -1,0 +1,32 @@
+---
+- name: Add script to sync wiki with git
+  ansible.builtin.template:
+    src: templates/scripts/wiki-git-sync.sh
+    dest: /usr/local/bin/wiki-git-sync.sh
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [wiki]
+
+- name: Create systemd unit and timer for wiki git sync
+  ansible.builtin.template:
+    src: "templates/{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: root
+    group: root
+    mode: "0644"
+  with_items:
+    - wiki-git-sync.service
+    - wiki-git-sync.timer
+  tags: [wiki]
+
+- name: Reload systemd and start unit and timer
+  ansible.builtin.systemd:
+    daemon_reload: true
+    enabled: true
+    state: "started"
+    name: "{{ item }}"
+  with_items:
+    - wiki-git-sync.service
+    - wiki-git-sync.timer
+  tags: [wiki]

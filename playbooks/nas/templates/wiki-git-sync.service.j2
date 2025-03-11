@@ -1,0 +1,7 @@
+[Unit]
+Description=Run wiki-git-sync
+
+[Service]
+Type=oneshot
+User={{ wiki_git_sync_service_user | default('root') }}
+ExecStart=/usr/local/bin/wiki-git-sync.sh
