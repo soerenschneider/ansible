@@ -1,0 +1,81 @@
+---
+- name: Create keycloak user
+  ansible.builtin.user:
+    name: "{{ keycloak_user }}"
+    system: true
+  tags: [keycloak]
+
+- name: Create keycloak dir
+  ansible.builtin.file:
+    path: "{{ keycloak_base_dir | default('/var/lib/keycloak') }}"
+    state: "directory"
+    owner: "{{ keycloak_user }}"
+    group: "root"
+    mode: "0750"
+  tags: [keycloak]
+
+- name: Create keycloak dir storage
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ keycloak_user }}"
+    group: root
+    mode: "0700"
+  with_items:
+    - "{{ keycloak_storage_dir | default('/var/lib/keycloak/storage') }}"
+    - "{{ keycloak_certs_dir | default('/var/lib/keycloak/certs') }}"
+  tags: [docker, keycloak]
+
+- name: Get UID for generated user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ keycloak_user }}"
+  tags: always
+
+- name: Build user string
+  ansible.builtin.set_fact:
+    # _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}:{{ getent_passwd['keycloak'][2] }}"
+    _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}"
+  tags: always
+
+- name: Create keycloak docker network
+  community.docker.docker_network:
+    name: "{{ keycloak_docker_network }}"
+  tags: [docker, keycloak]
+
+- name: Run keycloak
+  community.docker.docker_container:
+    name: "{{ keycloak_container_name }}"
+    #image: "quay.io/keycloak/keycloak:{{ keycloak_version }}"
+    image: "quay.io/phasetwo/keycloak-crdb:{{ keycloak_version }}"
+    user: "{{ _keycloak_user_string }}"
+    networks:
+      - name: "{{ keycloak_docker_network }}"
+        aliases:
+          - "{{ inventory_hostname }}"
+    restart_policy: "always"
+    recreate: true
+    published_ports:
+      - "127.0.0.1:8080:8080"
+      - "127.0.0.1:9000:9000"
+    env:
+      KC_DB_SCHEMA: "public"
+      KC_DB_URL_PROPERTIES: "useCockroachMetadata=true"
+      KC_DB: "{{ {{ keycloak_db_name | default('cockroach') }}"
+      KC_TRANSACTION_XA_ENABLED: "false"
+      KC_TRANSACTION_JTA_ENABLED: "false"
+      KC_DB_URL: "jdbc:cockroachdb://{{ keycloak_db_host }}:{{ keycloak_db_port }}/{{ keycloak_db_database }}"
+      KC_DB_USERNAME: "{{ keycloak_db_user }}"
+      KC_DB_PASSWORD: "{{ keycloak_db_password }}"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: "xforwarded"
+      #KC_PROXY_PROTOCOL_ENABLED: "true"
+      #KC_HTTPS_CERTIFICATE_FILE: /certs/cert.crt
+      #KC_HTTPS_CERTIFICATE_KEY_FILE: /certs/cert.key
+      KC_HOSTNAME: "https://{{ inventory_hostname }}"
+      TZ: UTC
+    command:
+      - start
+    volumes:
+      - /var/lib/keycloak/certs:/certs:ro
+  tags: [docker, keycloak]
