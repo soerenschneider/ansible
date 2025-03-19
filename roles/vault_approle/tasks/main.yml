@@ -29,20 +29,20 @@
     mode: "0700"
   tags: [vault-approle, vault-approle-install]
 
-- name: Restart sc-agent
+- name: "Stop sc-agent"
   ansible.builtin.systemd:
-    name: sc-agent
-    state: stop
+    name: "sc-agent"
+    state: "stopped"
   failed_when: false
 
-- name: Rotate secret
+- name: "Rotate secret"
   ansible.builtin.include_tasks: run.yml
   with_items: "{{ vault_approles }}"
   when: lookup('env', 'VAULT_TOKEN') | length > 0
   tags: [vault-approle, vault-approle-install, vault-approle-rotate]
 
-- name: Restart sc-agent
+- name: "Restart sc-agent"
   ansible.builtin.systemd:
-    name: sc-agent
-    state: stopped
+    name: "sc-agent"
+    state: "restarted"
   failed_when: false
