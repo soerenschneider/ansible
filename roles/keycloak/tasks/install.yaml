@@ -61,7 +61,7 @@
     env:
       KC_DB_SCHEMA: "public"
       KC_DB_URL_PROPERTIES: "useCockroachMetadata=true"
-      KC_DB: "{{ {{ keycloak_db_name | default('cockroach') }}"
+      KC_DB: "{{ keycloak_db_name | default('cockroach') }}"
       KC_TRANSACTION_XA_ENABLED: "false"
       KC_TRANSACTION_JTA_ENABLED: "false"
       KC_DB_URL: "jdbc:cockroachdb://{{ keycloak_db_host }}:{{ keycloak_db_port }}/{{ keycloak_db_database }}"
