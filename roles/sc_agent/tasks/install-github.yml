@@ -3,7 +3,7 @@
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
-    desired_version: "{{ sc_agent_version | default('') }}"
+    sc_agent_desired_version: "{{ sc_agent_version | default('') }}"
     download_archive: ""
     download_signature: ""
     stopped_service: ""
