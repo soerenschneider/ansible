@@ -1,6 +1,6 @@
 ---
 - name: Upsert cockroachdb cluster
-  hosts: dbs
+  hosts: "{{ cockroachdb_ansible_group | default('dbs') }}"
   become: true
   gather_facts: true
   any_errors_fatal: true
@@ -19,41 +19,54 @@
 
     - name: Create cockroachdb docker network
       community.docker.docker_network:
-        name: cockroachdb-cluster
+        name: "{{ cockroachdb_docker_network }}"
       tags: [docker, cockroachdb]
 
     - name: Run cockroachdb
       community.docker.docker_container:
         name: "{{ cockroachdb_container_name }}"
-        image: cockroachdb/cockroach:{{ cockroachdb_version }}
+        image: "cockroachdb/cockroach:{{ cockroachdb_version }}"
         user: "{{ _cockroachdb_user_string }}"
-        restart_policy: always
+        restart_policy: "always"
+        networks:
+          - name: "{{ cockroachdb_docker_network }}"
+            aliases:
+              - "{{ inventory_hostname }}"
         recreate: true
         command:
           - start
           - --certs-dir=/certs
-          - --cert-principal-map=user-soeren@soeren.cloud:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
-          - --cluster-name=kakerlake
+          - --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,{% for node in groups[cockroachdb_ansible_group] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+          - --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }}
           - --locality=zone={{ location }}
           - --listen-addr=0.0.0.0:26257
           - --advertise-addr={{ inventory_hostname }}:26257
           - --advertise-sql-addr={{ inventory_hostname }}:26258
           - --sql-addr=0.0.0.0:26258
           - --http-addr=0.0.0.0:8080
-          - --join={% for node in groups['dbs'] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}
-        ports: [0.0.0.0:8080:8080, 0.0.0.0:26257:26257, 0.0.0.0:26258:26258]
+          - --join={% for node in groups[cockroachdb_ansible_group] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}
+        exposed_ports:
+          - "26257"
+          - "26258"
+        published_ports:
+          - "26257:26257"
+          - "26258:26258"
         env:
           TZ: UTC
         volumes: [/var/lib/cockroachdb/certs:/certs:ro, /var/lib/cockroachdb/storage:/cockroach/cockroach-data/]
       tags: [docker, cockroachdb]
 
     - name: "Conditionally init cluster"
-      when: inventory_hostname == groups["dbs"][0]
+      when: inventory_hostname == groups[cockroachdb_ansible_group][0]
       block:
+        - debug:
+            msg: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+
         - name: Init cluster
           community.docker.docker_container_exec:
             container: cockroachdb
-            command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name=kakerlake --cert-principal-map=user-soeren@soeren.cloud:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+            command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
+            #command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
           async: 30
           poll: 0
           register: exec_result

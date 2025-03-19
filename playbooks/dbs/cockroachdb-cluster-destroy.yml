@@ -1,6 +1,6 @@
 ---
 - name: Destroy cockroachdb cluster
-  hosts: dbs
+  hosts: "{{ cockroach_ansible_group | default('dbs') }}"
   become: true
   gather_facts: true
   tasks:
