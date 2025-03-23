@@ -1,0 +1,38 @@
+---
+- name: Run block
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: ssh-aegis
+    github_repo: soerenschneider/ssh-aegis
+    service_name: ssh-aegis
+  tags: [ssh-aegis, ssh-aegis-configure]
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: ssh-aegis.service.j2
+    dest: /etc/systemd/system/ssh-aegis.service
+    owner: root
+    group: root
+    mode: "0640"
+  notify: "Restart ssh-aegis"
+  tags: [ssh-aegis, ssh-aegis-configure]
+
+- name: Run block
+  when: ssh_aegis_config is defined
+  tags: [ssh-aegis, ssh-aegis-configure]
+  block:
+    - name: Create config
+      ansible.builtin.copy:
+        content: "{{ ssh_aegis_config | to_nice_json(indent=2) }}"
+        dest: "{{ ssh_aegis_config_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      notify: "Restart ssh-aegis"
+
+    - name: Enable and start units
+      ansible.builtin.systemd:
+        name: ssh-aegis.service
+        daemon_reload: true
+        enabled: true
+        state: started

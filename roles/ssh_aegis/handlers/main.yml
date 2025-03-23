@@ -1,0 +1,5 @@
+---
+- name: Restart ssh-aegis
+  ansible.builtin.systemd:
+    name: "ssh-aegis"
+    state: restarted
