@@ -1,9 +1,0 @@
-[Unit]
-Description=Update SSH Listener based on Wireguard availability
-
-[Service]
-Type=simple
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/etc/ssh /var/lib/node_exporter
-ExecStart=/usr/local/sbin/ssh-update-listener
