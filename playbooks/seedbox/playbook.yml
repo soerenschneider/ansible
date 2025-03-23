@@ -55,9 +55,14 @@
         direction: in
       tags: firewall
 
-    - name: Including tasks
+    - name: Including ip_plz
       ansible.builtin.include_role:
         name: ip_plz
+      tags: always
+
+    - name: Including ssh_aegis
+      ansible.builtin.include_role:
+        name: ssh_aegis
       tags: always
 
     - name: Including tasks
