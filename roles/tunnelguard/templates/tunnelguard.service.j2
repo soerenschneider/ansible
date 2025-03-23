@@ -1,0 +1,18 @@
+[Unit]
+Description=tunnelguard
+After=network-online.target
+Wants=network-online.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/tunnelguard -config={{ tunnelguard_config_file }}
+
+# restart forerver
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
