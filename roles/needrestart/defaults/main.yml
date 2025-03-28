@@ -1,6 +1,6 @@
 ---
 needrestart_install_distro: false
 # renovate: datasource=github-releases depName=liske/needrestart versioning=semver-coerced
-needrestart_version: v3.8
+needrestart_version: v3.9
 
 needrestart_force_restart_services: [NetworkManager, network-manager, networking, wpa_supplicant]
