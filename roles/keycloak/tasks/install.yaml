@@ -69,6 +69,9 @@
       KC_DB_PASSWORD: "{{ keycloak_db_password }}"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: "xforwarded"
+      DB_POOL_INITIAL_SIZE: "1"
+      DB_POOL_MAX_SIZE: "2"
+      DB_POOL_MIN_SIZE: "1"
       #KC_PROXY_PROTOCOL_ENABLED: "true"
       #KC_HTTPS_CERTIFICATE_FILE: /certs/cert.crt
       #KC_HTTPS_CERTIFICATE_KEY_FILE: /certs/cert.key

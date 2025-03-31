@@ -2,4 +2,6 @@
 keycloak_user: keycloak
 keycloak_certs_dir: /var/lib/keycloak/certs
 keycloak_container_name: keycloak
+
+# renovate: datasource=docker depName=quay.io/phasetwo/keycloak-crdb
 keycloak_version: 26.1.2
