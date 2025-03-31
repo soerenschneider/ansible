@@ -13,6 +13,11 @@ RUN ansible-galaxy install -r /requirements.yml
 COPY ./playbooks /data/playbooks
 COPY ./roles /data/roles
 
-RUN addgroup -S ansible && adduser -S ansible -G ansible
+RUN addgroup -S ansible && \
+    adduser -S ansible -G ansible && \
+    mkdir /data/inventory && \
+    chown ansible:ansible /data/inventory
+
+ENV ANSIBLE_INVENTORY=/data/inventory/inventory.yml
 USER ansible
 WORKDIR /data/playbooks
