@@ -24,8 +24,8 @@
     groups:
       - git
       - "{{ ssh_users_group }}"
-    create_home: yes
-    system: yes
+    create_home: true
+    system: true
   tags: [git-server]
 
 - name: "Create .ssh directory"

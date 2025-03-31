@@ -43,12 +43,14 @@
           - --advertise-addr={{ inventory_hostname }}:26257
           - --advertise-sql-addr={{ inventory_hostname }}:26258
           - --sql-addr=0.0.0.0:26258
-          - --http-addr=0.0.0.0:8080
+          - --http-addr=0.0.0.0:8888
           - --join={% for node in groups[cockroachdb_ansible_group] %}{{ node }}:26257{% if not loop.last %},{% endif %}{% endfor %}
         exposed_ports:
+          - "8888"
           - "26257"
           - "26258"
         published_ports:
+          - "8888:8888"
           - "26257:26257"
           - "26258:26258"
         env:
@@ -59,14 +61,10 @@
     - name: "Conditionally init cluster"
       when: inventory_hostname == groups[cockroachdb_ansible_group][0]
       block:
-        - debug:
-            msg: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
-
         - name: Init cluster
           community.docker.docker_container_exec:
             container: cockroachdb
             command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
-            #command: cockroach init --host {{ inventory_hostname }} --certs-dir=/certs --cluster-name={{ cockroachdb_cluster_name | default('kakerlake') }} --cert-principal-map={{ cockroachdb_cert_principal_root_cn | default('user-soeren@soeren.cloud') }}:root,dbs.ha.soeren.cloud:node,{% for node in groups['dbs'] %}{{ node }}:node{% if not loop.last %},{% endif %}{% endfor %}
           async: 30
           poll: 0
           register: exec_result
