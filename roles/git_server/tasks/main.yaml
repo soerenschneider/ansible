@@ -59,6 +59,7 @@
 
     - name: "Build chroot"
       ansible.builtin.command: "/usr/local/bin/git-create-chroot.sh"
+      changed_when: false
 
     - name: "Add chroot block to sshd"
       ansible.builtin.blockinfile:
