@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/soerenschneider/ansible/compare/v1.0.0...v1.0.1) (2025-04-09)
+
+
+### Bug Fixes
+
+* **deps:** update python docker tag to v3.13.3 ([#84](https://github.com/soerenschneider/ansible/issues/84)) ([261ff9d](https://github.com/soerenschneider/ansible/commit/261ff9d6db6c3744fcfe7ee24adc5cca0c1d4f5b))
+
 ## 1.0.0 (2025-03-31)
 
 
