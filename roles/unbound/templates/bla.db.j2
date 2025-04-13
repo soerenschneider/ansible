@@ -12,7 +12,7 @@
     local-data: "{{ service.name }}.{{ loc.key }}.{{network_domain}}.          IN SRV 0 10 {{ service.port }} {{ host.host }}.{{ loc.key }}.{{network_domain }}"
 {% endfor %}
 {% for record in host.ha_srv_records | default([]) %}
-    local-data: "{{ record.name }}.{{network_domain}}.          IN SRV 0 10 {{ record.port }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
+    local-data: "{{ record.name }}.{{network_domain}}.          IN SRV 0 10 {{ record.port }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
 {% endfor %}
 {% for record in host.ha_records | default([]) %}
     local-data: "{{ record }}.{{network_domain}}.          IN A {{ host.logical }}"
