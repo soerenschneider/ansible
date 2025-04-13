@@ -1,0 +1,6 @@
+---
+- name: "Restart k0s"
+  ansible.builtin.systemd:
+    name: "k0s"
+    daemon_reload: true
+    state: "restarted"

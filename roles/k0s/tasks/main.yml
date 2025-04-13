@@ -1,0 +1,69 @@
+---
+- name: Run block
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: k0s
+    github_repo: k0sproject/k0s
+    service_name: k0s
+  tags: [k0s, k0s-configure]
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: k0s.service.j2
+    dest: /etc/systemd/system/k0s.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: "Restart k0s"
+  tags: [k0s, k0s-configure]
+
+- name: Run block
+  when: sc_agent_config is defined
+  tags: [k0s, k0s-configure]
+  block:
+    - name: Create config directory
+      ansible.builtin.file:
+        path: "{{ sc_agent_conf_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0700"
+
+    - name: Create conf.d entries
+      ansible.builtin.copy:
+        content: "{{ item.value | to_nice_yaml(indent=2) }}"
+        dest: "{{ sc_agent_conf_dir }}/{{ item.key }}"
+        owner: root
+        group: root
+        mode: "0600"
+      notify: "Restart k0s"
+      with_dict: "{{ sc_agent_conf_d }}"
+
+    - name: "List all files in the conf.d directory"
+      ansible.builtin.find:
+        paths: "{{ sc_agent_conf_dir }}"
+        file_type: "file"
+      register: "_found_files"
+
+    - name: "Remove files not in the dictionary"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: "absent"
+      loop: "{{ _found_files.files }}"
+      when: item.path | basename not in sc_agent_conf_d.keys() | map('string') | list
+
+    - name: Create config
+      ansible.builtin.copy:
+        content: "{{ sc_agent_config | to_nice_yaml(indent=2) }}"
+        dest: /etc/k0s.yaml
+        owner: root
+        group: root
+        mode: "0600"
+      notify: "Restart k0s"
+
+    - name: Enable and start units
+      ansible.builtin.systemd:
+        name: k0s.service
+        daemon_reload: true
+        enabled: true
+        state: started

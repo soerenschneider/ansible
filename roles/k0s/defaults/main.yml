@@ -1,0 +1,8 @@
+---
+# renovate: datasource=github-releases depName=k0sproject/k0s
+k0s_version: v1.32.3+k0s.0
+
+k0s_labels: []
+
+k0s_kubelet_args:
+  - --max-pods=150
