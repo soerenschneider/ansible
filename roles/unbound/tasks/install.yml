@@ -24,11 +24,11 @@
       ansible.builtin.copy:
         content: |
           [Unit]
-                    # restart forever
+          # restart forever
           StartLimitIntervalSec=0
 
           [Service]
-                    # restart forever
+          # restart forever
           Restart=always
           RestartSec={{ unbound_restart_delay_s }}
         dest: /etc/systemd/system/unbound.service.d/override.conf
@@ -64,7 +64,7 @@
 
 - name: Create unbound database
   ansible.builtin.template:
-    src: bla.db.j2
+    src: "local.db.j2"
     dest: "{{ unbound_config_conf_d_dir }}/local.db"
     owner: root
     group: "{{ unbound_config_group }}"
