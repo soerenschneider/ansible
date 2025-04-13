@@ -11,6 +11,11 @@
       tags: always
 
     - name: Including tasks
+      ansible.builtin.include_role:
+        name: k0s
+      tags: always
+
+    - name: Including tasks
       ansible.builtin.include_tasks: tasks/limits.yaml
       tags: always
 
