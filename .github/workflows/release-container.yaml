@@ -22,7 +22,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: GoogleCloudPlatform/release-please-action@v4.2.0
+      - uses: "googleapis/release-please-action@v4"
         name: release
         id: release
         with:
