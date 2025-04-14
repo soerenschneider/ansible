@@ -18,7 +18,7 @@
   tags: [base, sudo]
 
 - name: Run block
-  when: [ansible_system != "OpenBSD", not inventory_hostname | ipaddr('bool')]
+  when: [ansible_system != "OpenBSD", not inventory_hostname | ansible.utils.ipaddr('bool')]
   tags: [base, hostname]
   block:
     - name: Set full hostname
