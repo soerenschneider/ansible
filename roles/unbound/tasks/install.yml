@@ -62,14 +62,24 @@
   changed_when: true
   tags: [unbound, unbound-install]
 
-- name: Create unbound database
+- name: Create unbound database local.db
   ansible.builtin.template:
     src: "local.db.j2"
     dest: "{{ unbound_config_conf_d_dir }}/local.db"
     owner: root
     group: "{{ unbound_config_group }}"
     mode: "0644"
-  notify: Restart unbound
+  notify: "Restart unbound"
+  tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
+
+- name: Create unbound database virtual-ips.db
+  ansible.builtin.template:
+    src: "virtual-ips.db.j2"
+    dest: "{{ unbound_config_conf_d_dir }}/virtual-ips.db"
+    owner: root
+    group: "{{ unbound_config_group }}"
+    mode: "0644"
+  notify: "Restart unbound"
   tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
 
 - name: Create unbound config
