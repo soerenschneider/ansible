@@ -1,0 +1,6 @@
+---
+- name: "Restart keepalived"
+  ansible.builtin.systemd:
+    name: "keepalived"
+    daemon_reload: true
+    state: "restarted"

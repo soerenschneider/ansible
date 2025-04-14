@@ -1,0 +1,24 @@
+---
+- name: Install keepalived
+  ansible.builtin.package:
+    name:
+      - keepalived
+  tags: [keepalived]
+
+- name: Update keepalived config
+  ansible.builtin.template:
+    src: "keepalived.conf.j2"
+    dest: "/etc/keepalived/keepalived.conf"
+    owner: "root"
+    mode: "0640"
+  notify: "Restart keepalived"
+  tags: [keepalived]
+
+- name: Allow VRRP (protocol 112) in UFW before.rules
+  ansible.builtin.lineinfile:
+    path: /etc/ufw/before.rules
+    insertafter: '^\*filter'
+    line: '-A ufw-before-input -p 112 -j ACCEPT'
+    state: present
+  notify: "Restart keepalived"
+  tags: [keepalived]

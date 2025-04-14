@@ -1,0 +1,3 @@
+---
+keepalived_sync_groups: []
+keepalived_vrrp_instances: []
