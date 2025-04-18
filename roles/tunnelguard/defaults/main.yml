@@ -1,5 +1,5 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/tunnelguard
-tunnelguard_version: v1.0.1
+tunnelguard_version: v1.1.0
 
 tunnelguard_config_file: "/etc/tunnelguard.json"
