@@ -1,5 +1,5 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/ssh-aegis
-ssh_aegis_version: v1.0.2
+ssh_aegis_version: v1.1.0
 
 ssh_aegis_config_file: "/etc/ssh-aegis.json"
