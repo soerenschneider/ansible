@@ -31,6 +31,12 @@
         dufs_serve_path: "/srv/files/media"
       tags: always
 
+    - name: "Manage fileserver mode file"
+      ansible.builtin.file:
+        path: "{{ nas_fileserver_mode_active_file }}"
+        state: "{{ 'touch' if fileserver_mode == 'active' else 'absent' }}"
+      tags: media
+
     - name: Include role platform
       ansible.builtin.include_role:
         name: platform
@@ -41,9 +47,9 @@
         name: minio
       tags: always
 
-    - name: Include role conditional_reboot
+    - name: Include role flac_converter
       ansible.builtin.include_role:
-        name: conditional_reboot
+        name: flac_converter
       tags: always
 
     - name: Include role mpd

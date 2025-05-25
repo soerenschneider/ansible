@@ -1,0 +1,9 @@
+[Unit]
+Description=Periodically run flac-converter
+
+[Timer]
+OnCalendar={{ flac_converter_calendar_expression }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

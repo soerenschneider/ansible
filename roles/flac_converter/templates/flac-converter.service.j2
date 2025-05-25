@@ -1,0 +1,13 @@
+[Unit]
+Description=flac-converter
+{% if flac_converter_condition_path_exists | default("") | length > 0 %}
+ConditionPathExists={{ flac_converter_condition_path_exists }}
+{% endif %}
+
+[Service]
+ExecStart=/usr/local/bin/flac-converter.sh {{ flac_converter_src }} {{ flac_converter_dest }} {{ flac_converter_codec }} {{ flac_converter_bitrate }} {{ flac_converter_quality_mode }}
+Type=oneshot
+User={{ flac_converter_user }}
+
+[Install]
+WantedBy=multi-user.target
