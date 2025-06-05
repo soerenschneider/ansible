@@ -1,0 +1,82 @@
+sources:
+  journald_logs:
+    type: "journald"
+    exclude_units:
+      - "vector.service"
+    since_now: false
+    # Batch size for performance
+    batch_size: 16
+
+# Transforms
+transforms:
+  filter_journald_units:
+    type: filter
+    inputs:
+      - journald_logs
+    condition: >-
+      ends_with(to_string!(._SYSTEMD_UNIT), ".service") || ends_with(to_string!(._SYSTEMD_UNIT), ".timer")
+
+  # Parse and enrich journald logs
+  journald_parser:
+    type: "remap"
+    inputs: ["filter_journald_units"]
+    source: |
+      .dc = get_env_var("DC") ?? ""
+      
+      # Clean up and structure fields
+      .unit_name = ._SYSTEMD_UNIT
+
+      .app_name = replace!(to_string!(.unit_name) || "unknown", r'\.(service|timer|socket)', "")
+
+      if exists(.message) {
+        message_str = string(.message) ?? ""
+
+        # Try JSON first
+        json_result = parse_json(message_str) ?? {}
+        if exists(json_result.level) && is_string(json_result.level) {
+          .log_level = downcase!(json_result.level)
+        } else {
+          # Comprehensive regex for common log level patterns
+          level_match = parse_regex(message_str, r'(?i)(?:\[|<|\(|^|\s|level[=:]\s*|severity[=:]\s*|\|)(?P<level>info|error|warn|warning|debug|trace|fatal|critical)(?:\]|>|\)|[:\s]|\||$)') ?? {}
+
+          if exists(level_match.level) {
+            found_level = downcase!(level_match.level)
+
+            # Normalize variations
+            .log_level = found_level
+          }
+        }
+      }
+
+      .pid = to_int(.systemd_pid) ?? null
+      .uid = to_int(.systemd_uid) ?? null
+      .gid = to_int(.systemd_gid) ?? null
+      .boot_id = .systemd_boot_id
+
+      # Create structured log entry
+      .log_type = "journald"
+
+      # Remove raw journald fields we don't need in Elasticsearch
+      del(.priority)
+      del(.facility)
+      del(.systemd_unit)
+      del(.systemd_pid)
+      del(.systemd_uid)
+      del(.systemd_gid)
+      del(.systemd_boot_id)
+
+sinks:
+  vlogs:
+    inputs:
+      - journald_parser
+    type: elasticsearch
+    endpoints:
+      - https://logs.rs.soeren.cloud/insert/elasticsearch/
+    api_version: v8
+    compression: gzip
+    healthcheck:
+      enabled: false
+    query:
+      _msg_field: message
+      _time_field: timestamp
+      _stream_fields: host,app_name,log_type,dc

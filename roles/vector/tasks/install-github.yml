@@ -85,7 +85,7 @@
     - name: Set filenames
       ansible.builtin.set_fact:
         checksum_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256"
-        full_filename: "{{ binary_name }}-{{ desired_version[1:] }}-{{ go_arch }}-unknown-linux-gnu.tar.gz"
+        full_filename: "{{ binary_name }}-{{ desired_version[1:] }}-{{ go_arch }}-unknown-linux-gnu{% if go_arch in ['arm', 'armv7'] %}eabihf{% endif %}.tar.gz"
       changed_when: false
 
     - name: Get checksum for archive

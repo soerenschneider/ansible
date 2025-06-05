@@ -1,7 +1,17 @@
 ---
+- name: Add environment file
+  ansible.builtin.template:
+    src: "templates/environment.j2"
+    dest: "/etc/default/vector"
+    owner: "root"
+    group: "vector"
+    mode: "0640"
+  notify: Restart vector
+  tags: [vector, vector-configure]
+
 - name: Add config
   ansible.builtin.copy:
-    content: "{{ vector_config | to_nice_yaml }}"
+    src: "files/vector.yaml"
     dest: "{{ vector_config_file }}"
     owner: "{{ vector_user }}"
     group: root

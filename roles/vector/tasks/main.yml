@@ -37,4 +37,4 @@
 
 - name: Including tasks
   ansible.builtin.include_tasks: configure.yml
-  tags: [vector, vector-install, deps]
+  tags: [vector, vector-configure, deps]

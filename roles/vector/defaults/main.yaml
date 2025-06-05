@@ -4,28 +4,3 @@ vector_version: v0.46.1
 vector_config_file: /etc/vector/vector.yaml
 vector_user: vector
 vector_group: vector
-
-vector_config:
-  sources:
-    journald:
-      type: journald
-
-  transforms:
-    journald_trans:
-      type: remap
-      inputs: [journald]
-      source: .type = "journald"
-
-  sinks:
-    loki:
-      type: loki
-      tenant_id: default
-      out_of_order_action: accept
-      endpoint: "https://loki.svc.{{ location }}.{{ primary_network_domain }}"
-      encoding:
-        codec: json
-      inputs: [journald_trans]
-      labels:
-        role: "{{ group_names[0] }}"
-        host: "{{ inventory_hostname }}"
-        datacenter: "{{ location }}"
