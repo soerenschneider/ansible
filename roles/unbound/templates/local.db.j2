@@ -6,8 +6,8 @@
 # {{ network_domain }}
 # hosts
 {% for host in loc.value %}
-    local-data: "{{ host.host }}{% if not host.omit_datacenter | default(false) and loc.key != location %}.{{ loc.key }}{% endif %}.{{ network_domain }}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
-    local-data-ptr: "{{ host.logical }} {{ host.host }}{% if not host.omit_datacenter | default(false) and loc.key != location %}.{{ loc.key }}{% endif %}.{{ network_domain }}"
+    local-data: "{{ host.host }}.{{ loc.key }}.{{ network_domain }}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
+    local-data-ptr: "{{ host.logical }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
 {% for service in host.services | default([]) %}
     local-data: "{{ service.name }}.{{ loc.key }}.{{network_domain}}. {{ host.ttl | default(3600) }} IN SRV 0 10 {{ service.port }} {{ host.host }}.{{ loc.key }}.{{network_domain }}"
 {% endfor %}
