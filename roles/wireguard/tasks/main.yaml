@@ -87,28 +87,6 @@
   when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
   tags: [tunnelguard, wireguard, vpn]
   block:
-    - name: Add tunnelguard script
-      ansible.builtin.template:
-        src: tunnelguard.j2
-        dest: /usr/local/bin/tunnelguard
-        owner: root
-        group: root
-        mode: "0755"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
-      register: _tunnelguard_service_script
-
-    - name: Add tunnelguard service
-      ansible.builtin.template:
-        src: tunnelguard.service.j2
-        dest: /etc/systemd/system/tunnelguard.service
-        owner: root
-        group: root
-        mode: "0644"
-      register: _tunnelguard_service_systemd
-
-    - name: Start and enable tunnelguard
-      ansible.builtin.systemd:
+    - name: Including tunnelguard
+      ansible.builtin.include_role:
         name: tunnelguard
-        enabled: true
-        daemon_reload: "{% if _tunnelguard_service_systemd is changed %}true{% else %}false{% endif %}"
-        state: "{% if _tunnelguard_service_script is changed %}restarted{% else %}started{% endif %}"
