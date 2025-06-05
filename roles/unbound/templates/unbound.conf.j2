@@ -37,6 +37,9 @@ server:
     infra-cache-slabs: 1
     key-cache-slabs: 1
 
+    # TODO: maybe look at this to enhance security
+    chroot: ""
+
 {% if ansible_os_family | lower != 'redhat' %}
     auto-trust-anchor-file: "{{ unbound_root_key_file }}"
 {% endif %}
