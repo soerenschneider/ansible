@@ -15,6 +15,11 @@
 
     - name: Including tasks
       ansible.builtin.include_role:
+        name: ssh_aegis
+      tags: always
+
+    - name: Including tasks
+      ansible.builtin.include_role:
         name: wireguard
       tags: always
 
@@ -44,10 +49,6 @@
 
     - name: Including tasks
       ansible.builtin.include_tasks: tasks/ip-plz.yaml
-      tags: always
-
-    - name: Including tasks
-      ansible.builtin.include_tasks: tasks/rclone-mount.yaml
       tags: always
 
     - name: Allow incoming wireguard
@@ -95,9 +96,3 @@
     - name: Run ip-plz renewal hook
       ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
       changed_when: true
-
-    - name: "Restart rclone mount"
-      ansible.builtin.systemd:
-        name: "mnt-media.service"
-        state: "restarted"
-        daemon-reload: true
