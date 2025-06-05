@@ -11,3 +11,5 @@ baseline_systemd_journal_runtime_max_file_size: "4M"
 
 baseline_wol_enable: false
 baseline_wol_device: "{{ ansible_default_ipv4.interface }}"
+
+baseline_enable_firewall: true

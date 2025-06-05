@@ -5,7 +5,7 @@
   tags: [firewall]
 
 - name: Run block
-  when: firewall_rules | length > 1
+  when: firewall_rules | length > 1 and baseline_enable_firewall | default(true)
   tags: [firewall]
   block:
     - name: Collect TCP rules

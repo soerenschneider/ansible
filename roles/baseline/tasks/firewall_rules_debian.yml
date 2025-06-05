@@ -16,33 +16,33 @@
   loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'udp') | list }}"
   tags: [firewall, always]
 
-- name: Reset firewall
-  community.general.ufw:
-    state: reset
+- name: Configure UFW firewall
   tags: [firewall, always]
+  when: baseline_enable_firewall | default(true)
+  block:
+    - name: Reset firewall
+      community.general.ufw:
+        state: reset
 
-- name: Allow TCP rules
-  community.general.ufw:
-    rule: allow
-    port: "{{ item.0 }}"
-    src: "{{ item.1 }}"
-    proto: tcp
-  loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
-  tags: [firewall, always]
+    - name: Allow TCP rules
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.0 }}"
+        src: "{{ item.1 }}"
+        proto: tcp
+      loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
 
-- name: Allow UDP rules
-  community.general.ufw:
-    rule: allow
-    port: "{{ item.0 }}"
-    src: "{{ item.1 }}"
-    proto: udp
-  loop: "{{ fw_udp_rules | default([]) | flatten(levels=1) }}"
-  tags: [firewall, always]
+    - name: Allow UDP rules
+      community.general.ufw:
+        rule: allow
+        port: "{{ item.0 }}"
+        src: "{{ item.1 }}"
+        proto: udp
+      loop: "{{ fw_udp_rules | default([]) | flatten(levels=1) }}"
 
-- name: Set default ingress policy to reject
-  community.general.ufw:
-    state: enabled
-    default: reject
-    direction: incoming
-    logging: low
-  tags: [firewall, always]
+    - name: Set default ingress policy to reject
+      community.general.ufw:
+        state: enabled
+        default: reject
+        direction: incoming
+        logging: low
