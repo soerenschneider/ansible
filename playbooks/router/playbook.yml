@@ -30,12 +30,12 @@
 
     - name: Including role
       ansible.builtin.include_role:
-        name: tunnelguard
+        name: device_stalker
       tags: always
 
-    - name: Including role
+    - name: Including tasks
       ansible.builtin.include_role:
-        name: device_stalker
+        name: ssh_aegis
       tags: always
 
     - name: Including role
