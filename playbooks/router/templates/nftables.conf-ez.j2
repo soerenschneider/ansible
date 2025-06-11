@@ -40,7 +40,7 @@ table ip global {
         }
 
         ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
-        ip saddr 192.168.0.0/16 tcp dport { 9094 } accept
+        ip saddr 192.168.0.0/16 tcp dport { 9094, 9093 } accept
         ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
@@ -76,15 +76,12 @@ table ip global {
         # allow routers to have a HA nas backend
         ip saddr { 192.168.200.3, 192.168.200.4 } ip daddr 192.168.2.216 tcp dport { 443, 445, 6600 } accept
 
-        ip saddr 192.168.0.0/16 iifname $WG_IF ip daddr { $LOCAL_VAULT_SERVER, $LOCAL_PROMETHEUS_SERVER }   tcp dport 443 accept
+        ip saddr 192.168.0.0/16 iifname $WG_IF ip daddr { $LOCAL_VAULT_SERVER, $LOCAL_PROMETHEUS_SERVER }   tcp dport { 443, 8200 } accept
         ip saddr $GLOBAL_DEVICE_SOEREN_WORK iifname $WG_IF ip daddr { 192.168.2.229 }                       tcp dport { 80, 443 } accept
         ip saddr $GLOBAL_DEVICE_SOEREN_WORK iifname $WG_IF ip daddr { 192.168.2.0/24 }                      tcp dport 22 accept
         ip saddr $GLOBAL_DEVICE_SOEREN_WORK iifname $WG_IF ip daddr $LOCAL_K8S_MASTER                       tcp dport 6443 accept
 
         #iifname wg0 ip daddr 192.168.2.0/24 accept
-
-        # the rest is dropped by the above policy
-        log prefix "Dropped:  " flags all drop
     }
 
     chain postrouting {
