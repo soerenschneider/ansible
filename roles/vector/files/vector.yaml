@@ -22,7 +22,7 @@ transforms:
     inputs: ["filter_journald_units"]
     source: |
       .dc = get_env_var("DC") ?? ""
-      
+
       # Clean up and structure fields
       .unit_name = ._SYSTEMD_UNIT
 

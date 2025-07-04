@@ -5,6 +5,6 @@ flac_converter_codec: "opus"
 flac_converter_bitrate: "128k"
 flac_converter_quality_mode: "vbr"
 
-flac-converter_condition_path_exists: ""
+flac_converter_condition_path_exists: ""
 flac_converter_calendar_expression: "*-*-* 06:00:00"
 flac_converter_user: "root"
