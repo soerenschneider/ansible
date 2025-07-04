@@ -1,5 +1,0 @@
----
-- name: Restart conditional-reboot
-  ansible.builtin.systemd:
-    name: conditional-reboot
-    state: restarted

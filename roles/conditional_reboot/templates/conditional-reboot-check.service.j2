@@ -1,9 +1,0 @@
-[Unit]
-Description=conditional-reboot check
-
-[Service]
-ExecStart=/usr/local/bin/conditional-reboot -dry-run
-Type=idle
-
-[Install]
-WantedBy=multi-user.target

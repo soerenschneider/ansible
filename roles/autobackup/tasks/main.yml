@@ -1,8 +1,0 @@
----
-- name: Including tasks
-  ansible.builtin.include_tasks: install.yml
-  tags: [autobackup, autobackup-install]
-
-- name: Including tasks
-  ansible.builtin.include_tasks: configure.yml
-  tags: [autobackup, autobackup-configure]
