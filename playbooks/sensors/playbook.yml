@@ -3,7 +3,7 @@
   hosts: sensors
   become: true
   tasks:
-    - name: Run command
+    - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
@@ -41,24 +41,19 @@
             name: logrotate
             state: restarted
 
-    - name: Run command
-      ansible.builtin.include_role:
-        name: vault_pki_cli
-      tags: always
-
-    - name: Run command
+    - name: "Run role gobot_pir"
       ansible.builtin.include_role:
         name: gobot_pir
       when: install_gobot_pir | default(true)
       tags: always
 
-    - name: Run command
+    - name: "Run role gobot_bme280"
       ansible.builtin.include_role:
         name: gobot_bme280
       when: install_gobot_bme280 | default(true)
       tags: always
 
-    - name: Run command
+    - name: "Run role gobot_lux"
       ansible.builtin.include_role:
         name: gobot_lux
       when: install_gobot_lux | default(true)

@@ -76,12 +76,6 @@
         name: vault_approle
       tags: always
 
-    - name: Load syncthing config...
-      ansible.builtin.include_vars:
-        file: ../../inventory/prod/group_vars/desktop/vault-ssh-cli.yaml
-      ignore_errors: false
-      tags: vault-ssh-cli
-
     - name: "Configure wireguard"
       when: use_wireguard | default(False)
       tags: always

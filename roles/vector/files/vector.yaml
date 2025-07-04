@@ -1,3 +1,4 @@
+---
 sources:
   journald_logs:
     type: "journald"

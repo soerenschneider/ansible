@@ -35,6 +35,9 @@
       ansible.builtin.file:
         path: "{{ nas_fileserver_mode_active_file }}"
         state: "{{ 'touch' if fileserver_mode == 'active' else 'absent' }}"
+        owner: "root"
+        group: "root"
+        mode: "0644"
       tags: media
 
     - name: "Run role platform"
