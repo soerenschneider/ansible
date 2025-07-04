@@ -4,36 +4,36 @@
   become: true
   gather_facts: true
   tasks:
-    - name: Including tasks
+    - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
 
-    - name: Including tasks
+    - name: "Run role keepalived"
       ansible.builtin.include_role:
         name: keepalived
       tags: always
 
-    - name: Including tasks
+    - name: "Install docker support"
+      ansible.builtin.package:
+        name: python3-docker
+      tags: docker
+
+    - name: "Run role docker"
       ansible.builtin.include_role:
         name: docker
       tags: always
 
-    - name: Including tasks
+    - name: "Run role restic"
       ansible.builtin.include_role:
         name: restic
       tags: always
       when: restic_backups | length > 0
 
-    - name: Including tasks
+    - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
       tags: always
 
-    - name: Install docker support
-      ansible.builtin.package:
-        name: python3-docker
-      tags: docker
-
-    - name: Including tasks
+    - name: "Run role tasks/mounts.yml"
       ansible.builtin.include_tasks: tasks/mounts.yml
       tags: always

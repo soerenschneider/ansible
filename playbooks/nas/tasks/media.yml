@@ -62,5 +62,6 @@
     state: present
   with_items: "{{ ssh_known_hosts | selectattr('name', 'in', [fetcharr_remote_host]) | list }}"
   when: fileserver_mode == 'active'
-  become_user: "soeren"
+  become_user: "{{ nas_media_user }}"
+  become: false
   tags: [media, remote_move]

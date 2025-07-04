@@ -1,22 +1,22 @@
 ---
-- name: Including tasks
+- name: "Run tasks authentication.yml"
   ansible.builtin.include_tasks: authentication.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks hostkeys.yml"
   ansible.builtin.include_tasks: hostkeys.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks hardening.yml"
   ansible.builtin.include_tasks: hardening.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks match_blocks.yml"
   ansible.builtin.include_tasks: match_blocks.yml
   when: match_blocks is defined
   tags: always
 
-- name: Including tasks
+- name: "Run tasks 2fa"
   ansible.builtin.include_tasks: 2fa-{{ ansible_system | lower }}.yml
   when: ssh_2fa_enabled | bool
   tags: always

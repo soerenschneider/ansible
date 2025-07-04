@@ -1,32 +1,45 @@
 ---
-- name: Install smartctl
+- name: "Install smartctl"
   ansible.builtin.package:
     name: smartmontools
+  tags: [smartctl-exporter, smartmon]
 
-- name: Including tasks
-  ansible.builtin.include_tasks: install-github.yml
-  vars:
-    binary_name: smartctl-exporter
-    github_repo: soerenschneider/smartctl-exporter
-    service_name: smartctl-exporter
-  # todo
-  when: false
-  tags: [smartctl-exporter, smartctl-exporter-install]
+- name: "Copy script"
+  ansible.builtin.copy:
+    src: "files/smartmon.sh"
+    dest: "/usr/local/sbin/smartmon.sh"
+    owner: "root"
+    group: "root"
+    mode: "0750"
+  tags: [smartctl-exporter, smartmon]
 
-- name: Add systemd service
+- name: "Add systemd service"
   ansible.builtin.template:
-    src: smartctl-exporter.service.j2
-    dest: /etc/systemd/system/smartctl-exporter.service
-    owner: root
-    group: root
+    src: "smartctl-exporter.service.j2"
+    dest: "/etc/systemd/system/smartctl-exporter.service"
+    owner: "root"
+    group: "root"
     mode: "0644"
-  notify: Restart smartctl-exporter
+  notify: "Restart smartctl-exporter"
   register: _smartctl_exporter_service
-  tags: [smartctl-exporter, smartctl-exporter-configure]
+  tags: [smartctl-exporter, smartmon]
+
+- name: "Add systemd timer"
+  ansible.builtin.template:
+    src: "smartctl-exporter.timer.j2"
+    dest: "/etc/systemd/system/smartctl-exporter.timer"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  tags: [smartctl-exporter, smartmon]
 
 - name: Enable/disable smartctl-exporter
   ansible.builtin.service:
-    name: "{{ smartctl_exporter_service_name }}"
+    name: "{{ item }}"
     daemon_reload: "{% if _smartctl_exporter_service is changed %}true{% else %}false{% endif %}"
-    enabled: true
-  tags: [smartctl-exporter, smartctl-exporter-configure]
+    enabled: "{{ smartctl_exporter_enabled }}"
+    state: "{% if smartctl_exporter_enabled %}started{% else %}stopped{% endif %}"
+  with_items:
+    - "{{ smartctl_exporter_service_name }}.service"
+    - "{{ smartctl_exporter_service_name }}.timer"
+  tags: [smartctl-exporter, smartmon]

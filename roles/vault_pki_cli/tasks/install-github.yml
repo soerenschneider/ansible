@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Set variables"
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
@@ -63,7 +63,7 @@
         msg: "Latest GitHub version: {{ vault_pki_cli_desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not vault_pki_cli_local_binary.stat.exists or vault_pki_cli_desired_version != vault_pki_cli_installed_version
   tags: [vault-pki-cli, vault-pki-cli-install, deps]
   block:

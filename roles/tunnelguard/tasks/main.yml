@@ -8,7 +8,7 @@
   tags: [tunnelguard, tunnelguard-configure]
   with_items: [ssh-key-signer.service, ssh-key-signer.timer]
 
-- name: Run block
+- name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: tunnelguard
@@ -26,7 +26,7 @@
   notify: "Restart tunnelguard"
   tags: [tunnelguard, tunnelguard-configure]
 
-- name: "Run block"
+- name: "Configure tunnelguard"
   when: tunnelguard_config is defined
   tags: [tunnelguard, tunnelguard-configure]
   block:

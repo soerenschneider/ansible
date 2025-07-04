@@ -1,66 +1,66 @@
 ---
-- name: Including tasks
+- name: "Run tasks system_basics.yaml"
   ansible.builtin.include_tasks: system_basics.yml
   tags: [base]
 
-- name: Including tasks
+- name: "Run tasks resilience.yml"
   ansible.builtin.include_tasks: resilience.yml
   tags: [base, base-resilience]
 
-- name: Including tasks
+- name: "Run tasks firewall_data.yml"
   ansible.builtin.include_tasks: firewall_data.yml
   tags: [base, firewall, always]
 
-- name: Including tasks
+- name: "Run tasks packages.yml"
   ansible.builtin.include_tasks: packages.yml
   when: ansible_system == "Linux"
   tags: [base, base-packages]
 
-- name: Including tasks
+- name: "Run tasks journald.yaml"
   ansible.builtin.include_tasks: journald.yaml
   when: ansible_system == "Linux"
   tags: [base, logs, logging, journald, systemd]
 
-- name: Including tasks
+- name: "Run tasks firewall_rules"
   ansible.builtin.include_tasks: firewall_rules_{{ ansible_os_family | lower }}.yml
   when: [ansible_system != "OpenBSD", not inventory_hostname.startswith("k8s-"), ufw_enabled | default(true)]
   ignore_errors: true
   register: ignore_errors_register
   tags: [base, firewall]
 
-- name: Including tasks
+- name: "Include role raspberry"
   ansible.builtin.include_role:
     name: raspberry
   when: [ansible_system == "Linux", ansible_lsb.id is defined, ansible_lsb.id == "Raspbian" or "raspi" in ansible_kernel | lower]
   tags: always
 
-- name: Including tasks
+- name: "Run tasks default_users.yml"
   ansible.builtin.include_tasks: default_users.yml
   when: [default_users_enabled | default(false), default_users_name is defined, ansible_user != default_users_name]
   tags: always
 
-- name: Including tasks
+- name: "Run tasks authorized_keys.yml"
   ansible.builtin.include_tasks: authorized_keys.yml
   tags: [base, authorized_keys, ssh]
 
-- name: Including tasks
+- name: "Run tasks mounts.yml"
   ansible.builtin.include_tasks: mounts.yml
   when: ansible_system == "Linux"
   tags: [base, base-mounts, base-fs]
 
-- name: Including tasks
+- name: "Run tasks signify.yaml"
   ansible.builtin.include_tasks: signify.yml
   tags: [base, base-signify, signify]
 
-- name: Including tasks
+- name: "Run tasks pki.yml"
   ansible.builtin.include_tasks: pki.yml
   tags: [base, pki]
 
-- name: Including tasks
+- name: "Run tasks wake_on_lan.yaml"
   ansible.builtin.include_tasks: wake_on_lan.yaml
   when: baseline_wol_enable
   tags: [base, wol, wake-on-lan]
 
-- name: Including tasks
+- name: "Run tasks dns.yaml"
   ansible.builtin.include_tasks: dns.yaml
   tags: [base, dns, resolv]

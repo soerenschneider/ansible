@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Set variables"
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
@@ -65,7 +65,7 @@
         msg: "Latest GitHub version: {{ k0s_desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not k0s_local_binary.stat.exists or k0s_desired_version != k0s_installed_version
   tags: [k0s, k0s-install]
   block:

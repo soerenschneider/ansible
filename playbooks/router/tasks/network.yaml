@@ -27,7 +27,7 @@
   when: item.vlantag is defined
   tags: [network, vlan]
 
-- name: Run block
+- name: "Configure DHCP"
   when: networks[location].uplink.type | default("") | lower == "dhcp"
   tags: [network, isp, vlan]
   block:

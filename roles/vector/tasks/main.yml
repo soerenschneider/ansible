@@ -1,12 +1,12 @@
 ---
-- name: Create group for vector
+- name: "Create group for vector"
   ansible.builtin.group:
     name: "{{ vector_group }}"
     system: true
     state: present
   tags: [vector, vector-install, deps]
 
-- name: Create user for vector
+- name: "Create user for vector"
   ansible.builtin.user:
     name: "{{ vector_user }}"
     system: true
@@ -17,7 +17,7 @@
     createhome: false
   tags: [vector, vector-install]
 
-- name: Create dirs
+- name: "Create dirs"
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -27,7 +27,7 @@
   with_items: [/etc/vector, /var/lib/vector]
   tags: [vector, vector-install]
 
-- name: Including tasks
+- name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: vector
@@ -35,6 +35,6 @@
     service_name: vector
   tags: [vector, vector-install, deps]
 
-- name: Including tasks
+- name: "Run tasks configure.yml"
   ansible.builtin.include_tasks: configure.yml
   tags: [vector, vector-configure, deps]

@@ -2,29 +2,35 @@
 - name: Setup seedbox
   hosts: seedbox
   become: true
+  vars:
+    baseline_enable_firewall: false
   tasks:
-    - name: Including tasks
+    - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: [always]
 
-    - name: Including tasks
+    - name: "Run tasks geo-firewall.yaml"
+      ansible.builtin.include_tasks: tasks/geo-firewall.yaml
+      tags: always
+
+    - name: "Run role certbot"
       ansible.builtin.include_role:
         name: certbot
       tags: always
 
-    - name: Including tasks
+    - name: "Run role lootorganizer"
       ansible.builtin.include_role:
         name: lootorganizer
       tags: always
 
-    - name: Add group loot
+    - name: "Add group loot"
       ansible.builtin.group:
         name: loot
         state: present
       tags: [transmission, torrent, script]
 
-    - name: Add scripts for transmission
+    - name: "Add scripts for transmission"
       ansible.builtin.template:
         src: "{{ item }}.j2"
         dest: /usr/local/bin/{{ item }}
@@ -34,48 +40,52 @@
       with_items: [transmission-script-torrent-added.sh, transmission-script-torrent-done.sh]
       tags: [transmission, torrent, script]
 
-    - name: Including tasks
+    - name: "Run role transmission"
       ansible.builtin.include_role:
         name: transmission
       tags: always
 
-    - name: Including tasks
+    - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
       tags: always
 
-    - name: Including tasks
+    - name: "Run role wireguard"
       ansible.builtin.include_role:
         name: wireguard
       tags: always
 
-    - name: Allow incoming wireguard
-      community.general.ufw:
-        rule: allow
-        interface: wg0
-        direction: in
-      tags: firewall
+#    - name: Allow incoming wireguard
+#      community.general.ufw:
+#        rule: allow
+#        interface: wg0
+#        direction: in
+#      tags: firewall
 
-    - name: Including ip_plz
+    - name: "Run role ip_plz"
       ansible.builtin.include_role:
         name: ip_plz
       tags: always
 
-    - name: Including ssh_aegis
+    - name: "Run role ssh_aegis"
       ansible.builtin.include_role:
         name: ssh_aegis
       tags: always
 
-    - name: Including tasks
+    - name: "Run tasks ip-plz.yaml"
       ansible.builtin.include_tasks: tasks/ip-plz.yaml
       tags: always
 
   handlers:
-    - name: Restart haproxy
+    - name: "Restart haproxy"
       ansible.builtin.systemd:
         state: restarted
         name: haproxy
       failed_when: false
 
-    - name: Run ip-plz renewal hook
+    - name: "Run ip-plz renewal hook"
       ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/ip-plz.sh
+      changed_when: true
+
+    - name: "Run firewall"
+      ansible.builtin.command: /etc/firewall.sh
       changed_when: true

@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: ssh-aegis
@@ -17,7 +17,7 @@
   notify: "Restart ssh-aegis"
   tags: [ssh-aegis, ssh-aegis-configure]
 
-- name: Run block
+- name: "Configure ssh_aegis"
   when: ssh_aegis_config is defined
   tags: [ssh-aegis, ssh-aegis-configure]
   block:

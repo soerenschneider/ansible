@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Install needrestart (RHEL)"
   when: ['ansible_distribution not in [ "Debian", "Ubuntu", "Fedora" ]']
   tags: [automatic-sysupdates, needrestart]
   block:
@@ -34,7 +34,7 @@
         chdir: /opt/needrestart
       changed_when: true
 
-- name: Install needrestart
+- name: "Install needrestart (Debian)"
   ansible.builtin.package:
     name: needrestart
   when: ansible_distribution in [ "Debian", "Ubuntu", "Fedora" ]
@@ -57,7 +57,7 @@
   with_items: "{{ needrestart_force_restart_services }}"
   tags: [automatic-sysupdates, needrestart]
 
-- name: Run block
+- name: "Install dnf plugin"
   when: ansible_os_family == "RedHat"
   tags: [automatic-sysupdates, needrestart]
   block:

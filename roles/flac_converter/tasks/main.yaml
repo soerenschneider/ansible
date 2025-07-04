@@ -7,7 +7,7 @@
     owner: root
     group: root
     mode: "0755"
-  tags: [flac-converter]
+  tags: [flac, flac-converter]
 
 - name: Add systemd unit
   ansible.builtin.template:
@@ -20,7 +20,7 @@
     - flac-converter.service
     - flac-converter.timer
   register: _flac_converter_systemd
-  tags: [flac-converter]
+  tags: [flac, flac-converter]
 
 - name: Enable systemd unit
   ansible.builtin.systemd:
@@ -30,4 +30,4 @@
   with_items:
     - flac-converter.service
     - flac-converter.timer
-  tags: [flac-converter]
+  tags: [flac, flac-converter]

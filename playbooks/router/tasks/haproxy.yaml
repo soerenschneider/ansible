@@ -8,6 +8,7 @@
   ansible.builtin.systemd:
     name: haproxy
     enabled: true
+  tags: haproxy
 
 - name: Allow haproxy to bind to any port
   ansible.posix.seboolean:

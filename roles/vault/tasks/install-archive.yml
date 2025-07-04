@@ -9,7 +9,7 @@
     var: vault_version
   tags: [vault, vault-install, deps]
 
-- name: Run block
+- name: "Check version"
   when: vault_binary.stat.exists
   tags: [vault, vault-install, deps]
   block:
@@ -39,7 +39,7 @@
       ansible.builtin.set_fact:
         vault_version: "{{ github_release.json.tag_name | regex_replace('^v?(.*)$', '\\1') }}"
 
-- name: Run block
+- name: "Print version"
   ansible.builtin.debug:
     msg: "Installed version: {{ vault_installed_version }}, available version: {{ vault_version }}"
   tags: [vault, vault-install, deps]
@@ -95,7 +95,7 @@
     vault_download_dir: "{{ _download_dir.path }}"
   changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not vault_binary.stat.exists or vault_version[1:] != vault_installed_version
   tags: [vault, vault-install, deps]
   block:

@@ -69,11 +69,11 @@
       ansible.builtin.debug:
         var: extracted_number
 
-    - name: Including tasks
+    - name: "Map and set data for extracted position"
       ansible.builtin.set_fact:
         _data: "{{ groups.dbs | map('extract', hostvars) | list | json_query('[].{host: inventory_hostname, pos: extracted_number }') }}"
 
-    - name: Including tasks
+    - name: "Sort data"
       ansible.builtin.command: "python3 -c 'import sys, json; data = json.load(sys.stdin); sorted_data = sorted(data, key=lambda x: int(x[\"pos\"]), reverse=True); print(sorted_data[0][\"host\"])'"
       args:
         stdin: "{{ _data | to_json }}"

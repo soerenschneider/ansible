@@ -1,4 +1,4 @@
 ---
-- name: Including tasks
+- name: "Including tasks transmission.yml"
   ansible.builtin.include_tasks: transmission.yml
   tags: [always]

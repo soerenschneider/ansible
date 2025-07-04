@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Set variables"
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
@@ -64,7 +64,7 @@
         msg: "Latest GitHub version: {{ desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not local_binary.stat.exists or desired_version != installed_version
   tags: [fetcharr, fetcharr-install, deps]
   block:

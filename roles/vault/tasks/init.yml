@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Init vault"
   when: vault_storage_files.matched == 0
   tags: [vault, vault-configure]
   block:
@@ -14,7 +14,7 @@
       run_once: true
       with_items: "{{ vault_gpg_keys }}"
 
-    - name: Init vault
+    - name: "Run vault operator init"
       ansible.builtin.command: vault operator init -n=1 -t=1 {% if vault_gpg_keys | default([]) | length > 0 %}-pgp-keys /etc/vault.d/gpg -root-token-pgp-key /etc/vault.d/gpg{% endif %}
       become: true
       become_user: vault

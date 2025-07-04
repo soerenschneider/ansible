@@ -4,12 +4,12 @@
   become: true
   serial: 1
   tasks:
-    - name: Run block
+    - name: "Run role vault"
       ansible.builtin.include_role:
         name: vault
       tags: always
 
-    - name: Run block
+    - name: "Wait for node health to recover"
       tags: [always, health]
       block:
         - name: Perform Health Check

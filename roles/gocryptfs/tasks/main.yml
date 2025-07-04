@@ -1,17 +1,17 @@
 ---
-- name: Including tasks
+- name: "Run tasks gpg.yml"
   ansible.builtin.include_tasks: gpg.yml
   tags: [gocryptfs, gocryptfs-install, deps]
 
-- name: Including tasks
+- name: "Run tasks deps.yml"
   ansible.builtin.include_tasks: deps.yml
   tags: [gocryptfs, gocryptfs-install, deps]
 
-- name: Including tasks
+- name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: [gocryptfs, gocryptfs-install, deps]
 
-- name: Allow fuse mounts for others
+- name: "Allow fuse mounts for others"
   ansible.builtin.lineinfile:
     line: user_allow_other
     regexp: ^user_allow_other

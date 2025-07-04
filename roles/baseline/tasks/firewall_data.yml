@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Collect and transform firewall rules"
   when: datacenter | default('') | length > 0
   tags: [firewall, base]
   block:

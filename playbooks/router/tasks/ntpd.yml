@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Install ntp client (Linux)"
   when: ansible_system | lower == "linux"
   tags: [ntp, ntpd, chrony]
   block:
@@ -48,7 +48,7 @@
         state: "{% if _chronyd_override is changed or _chronyd_conf is changed %}restarted{% else %}started{% endif %}"
         enabled: true
 
-- name: Run block
+- name: "Configure ntp (OpenBSD)"
   when: ansible_system | lower == "openbsd"
   tags: [ntpd, ntp]
   block:

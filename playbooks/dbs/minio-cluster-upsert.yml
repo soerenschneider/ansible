@@ -33,14 +33,12 @@
       register: _container_result
       tags: [docker, minio]
 
-    - name: Run block
+    - name: Stop replicas
+      community.docker.docker_container:
+        name: "{{ minio_container_name | default('minio') }}"
+        state: absent
       when: _container_result.exists
       tags: [docker, minio]
-      block:
-        - name: Stop replicas
-          community.docker.docker_container:
-            name: "{{ minio_container_name | default('minio') }}"
-            state: absent
 
     - name: Run minio
       community.docker.docker_network:

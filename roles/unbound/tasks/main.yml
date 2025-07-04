@@ -1,12 +1,12 @@
 ---
-- name: Including tasks
+- name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks adblocker.yml"
   ansible.builtin.include_tasks: adblocker.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks blackhole.yml"
   ansible.builtin.include_tasks: blackhole.yml
   tags: always

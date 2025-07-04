@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Install vault"
   when: ansible_pkg_mgr == 'apt'
   tags: [vault, vault-install]
   block:

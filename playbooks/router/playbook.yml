@@ -9,61 +9,61 @@
     nftables_variables_file: /etc/nftables/nftables-variables.nft
 
   tasks:
-    - name: Including role
+    - name: "Run tasks network.yaml"
       ansible.builtin.include_tasks: tasks/network.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
 
-    - name: Including role
+    - name: "Run role unbound"
       ansible.builtin.include_role:
         name: unbound
       tags: always
 
-    - name: Including role
+    - name: "Run role alertmanager"
       ansible.builtin.include_role:
         name: alertmanager
       tags: always
 
-    - name: Including role
+    - name: "Run role device_stalker"
       ansible.builtin.include_role:
         name: device_stalker
       tags: always
 
-    - name: Including tasks
+    - name: "Run role ssh_aegis"
       ansible.builtin.include_role:
         name: ssh_aegis
       tags: always
 
-    - name: Including role
+    - name: "Run tasks haproxy.yaml"
       ansible.builtin.include_tasks: tasks/haproxy.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run role wireguard"
       ansible.builtin.include_role:
         name: wireguard
       tags: always
 
-    - name: Including role
+    - name: "Run tasks firewall.yaml"
       ansible.builtin.include_tasks: tasks/firewall.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks sysctl.yaml"
       ansible.builtin.include_tasks: tasks/sysctl.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks dhcpd.yml"
       ansible.builtin.include_tasks: tasks/dhcpd.yml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks ntpd.yml"
       ansible.builtin.include_tasks: tasks/ntpd.yml
       tags: always
 
-    - name: Including role
+    - name: "Run role dyndns"
       ansible.builtin.include_role:
         name: dyndns
       tags: always

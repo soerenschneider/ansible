@@ -24,22 +24,10 @@
     name: automatic_sysupdates
   tags: always
 
-- name: Including role 'vault_ssh_cli'
-  ansible.builtin.include_role:
-    name: vault_ssh_cli
-  when: vault_ssh_cli_config is defined
-  tags: always
-
-- name: Including role 'vault_pki_cli'
-  ansible.builtin.include_role:
-    name: vault_pki_cli
-  when: vault_pki_cli_issue_config is defined or vault_pki_cli_acme_config is defined
-  tags: always
-
 - name: Including role 'vault_approle'
   ansible.builtin.include_role:
     name: vault_approle
-  when: vault_approles | default([]) | length > 0
+  when: false and vault_approles | default([]) | length > 0
   tags: always
 
 - name: Including role 'vector'

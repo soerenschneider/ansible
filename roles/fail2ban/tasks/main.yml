@@ -1,12 +1,12 @@
 ---
-- name: Including tasks
+- name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks configure.yml"
   ansible.builtin.include_tasks: configure.yml
   tags: always
 
-- name: Including tasks
+- name: "Run tasks exporter.yml"
   ansible.builtin.include_tasks: exporter.yml
   tags: always

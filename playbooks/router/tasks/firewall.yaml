@@ -17,7 +17,7 @@
   notify: Reload nftables
   tags: [firewall]
 
-- name: Run block
+- name: "Set and apply nft firewall rules"
   tags: [firewall]
   block:
     - name: Set nft firewall files

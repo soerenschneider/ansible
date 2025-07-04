@@ -1,17 +1,17 @@
 ---
-- name: Including tasks
+- name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: [mosquitto, mosquitto-install]
 
-- name: Including tasks
+- name: "Run tasks configure.yml"
   ansible.builtin.include_tasks: configure.yml
   tags: [mosquitto, mosquitto-configure]
 
-- name: Including tasks
+- name: "Run tasks certbot.yaml"
   ansible.builtin.include_tasks: certbot.yaml
   tags: [mosquitto, mosquitto-configure, mosquitto-certbot]
 
-- name: Including tasks
+- name: "Run tasks exporter.yml"
   ansible.builtin.include_tasks: exporter.yml
   when: mosquitto_exporter_install
   tags: [mosquitto, mosquitto_exporter]

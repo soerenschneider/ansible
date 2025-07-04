@@ -47,7 +47,7 @@
         msg: "Latest GitHub version: {{ desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not local_binary.stat.exists or desired_version != installed_version
   tags: [gobot-lux, gobot-lux-install, gobot, deps]
   block:

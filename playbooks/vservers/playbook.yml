@@ -4,44 +4,44 @@
   become: true
   gather_facts: true
   tasks:
-    - name: Including role
+    - name: "Run tasks hw.yaml"
       ansible.builtin.include_tasks: tasks/hw.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks serial.yaml"
       ansible.builtin.include_tasks: tasks/serial.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks network.yaml"
       ansible.builtin.include_tasks: tasks/network.yaml
       tags: always
       when: ansible_os_family | lower == "redhat"
 
-    - name: Including role
+    - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
 
-    - name: Including role
+    - name: "Run role libvirt"
       ansible.builtin.include_role:
         name: libvirt
       tags: always
 
-    - name: Including role
+    - name: "Run role smartctl_exporter"
       ansible.builtin.include_role:
         name: smartctl_exporter
       tags: always
 
-    - name: Including role
+    - name: "Run tasks packages.yaml"
       ansible.builtin.include_tasks: tasks/packages.yaml
       tags: always
 
-    - name: Including role
+    - name: "Run role occult"
       ansible.builtin.include_role:
         name: occult
       tags: always
 
-    - name: Copy virsh autostart
+    - name: "Copy virsh autostart script"
       ansible.builtin.copy:
         src: files/virsh-autostart
         dest: "{{ virsh_autostart_file }}"

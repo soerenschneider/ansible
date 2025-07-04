@@ -20,7 +20,7 @@
     mode: "0700"
   tags: [syncthing, syncthing-configure]
 
-- name: Including tasks
+- name: "Set syncthing_local_devices variable"
   ansible.builtin.set_fact:
     syncthing_local_devices: "{{ syncthing_local_devices | default([]) + item.devices }} "
   with_items: "{{ syncthing_folders | default([]) }}"
@@ -50,7 +50,7 @@
   become: true
   tags: [syncthing, syncthing-configure]
 
-- name: Including tasks
+- name: "Run tasks metrics.yml"
   ansible.builtin.include_tasks: metrics.yml
   when: syncthing_collect_metrics | default(true)
   tags: [syncthing, syncthing-metrics]

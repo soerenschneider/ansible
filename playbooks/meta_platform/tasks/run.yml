@@ -58,9 +58,8 @@
   become: false
   delegate_to: localhost
 
-- name: Run block
+- name: "Unwrap token and rotate secret_id"
   when: _login.skipped is defined or _login.rc != 0
-
   block:
     - name: "{{ item.config.role_name }} - Unwrap token"
       ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output unwrap-secret-id }}

@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Install wireguard"
   when: [ansible_system == "Linux"]
   tags: [wireguard, vpn]
   block:
@@ -26,25 +26,7 @@
         daemon_reload: true
       when: _wg_timer is changed  # noqa: no-handler
 
-- name: Run block
-  when: [ansible_system == "OpenBSD", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
-  tags: [wireguard, vpn]
-  block:
-    - name: Write wg config
-      ansible.builtin.template:
-        src: wg-{{ ansible_system | lower }}.j2
-        dest: /etc/hostname.{{ item.device }}
-        owner: root
-        group: wheel
-        mode: "0640"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
-      register: _wg_config_changed
-    - name: Run command
-      ansible.builtin.command: sh /etc/netstart
-      changed_when: false
-      when: [_wg_config_changed is defined, _wg_config_changed is changed]
-
-- name: Run block
+- name: "Configure wireguard"
   when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
   tags: [wireguard, vpn]
   block:
@@ -83,10 +65,10 @@
         enabled: "{% if wg_enable_default | default(True) %}true{% else %}false{% endif %}"
       with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
 
-- name: Run block
+- name: "Install tunnelguard"
   when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
   tags: [tunnelguard, wireguard, vpn]
   block:
-    - name: Including tunnelguard
+    - name: "Run role tunnelguard"
       ansible.builtin.include_role:
         name: tunnelguard

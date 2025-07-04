@@ -1,4 +1,4 @@
 ---
-- name: Including tasks
+- name: "Run tasks install.yaml"
   ansible.builtin.include_tasks: install.yaml
   tags: [keycloak]

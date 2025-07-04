@@ -29,7 +29,7 @@
   when: _ssh_key['content'] | length == 0
   tags: [base, default_users]
 
-- name: Run block
+- name: "Create group and add user to group"
   when: default_users_groups is not defined or default_users_groups | length == 0
   tags: [base, default_users]
   block:
@@ -78,7 +78,7 @@
   when: user_created is changed  # noqa: no-handler
   tags: [base, default_users]
 
-- name: Run block
+- name: "Delete old user and group"
   when: [old_user != "root", default_users_name is defined, default_users_name | length > 0]
   tags: [base, default_users]
   block:

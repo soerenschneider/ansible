@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Set variables"
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
@@ -63,7 +63,7 @@
         msg: "Latest GitHub version: {{ vault_ssh_cli_desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not vault_ssh_cli_local_binary.stat.exists or vault_ssh_cli_desired_version != vault_ssh_cli_installed_version
   tags: [vault-ssh-cli, vault-ssh-cli-install]
   block:

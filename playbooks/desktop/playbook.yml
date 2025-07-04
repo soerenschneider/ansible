@@ -12,24 +12,15 @@
       changed_when: false
       tags: always
 
-    - name: Run block
+    - name: "Set hostname and inventory_hostname"
       ansible.builtin.set_fact:
         hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
         inventory_hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
       tags: always
-    - name: Run block
+
+    - name: "Print hostname"
       ansible.builtin.debug:
         msg: "{{ inventory_hostname }}"
-      tags: always
-
-    - name: Load vault-approles config...
-      ansible.builtin.include_vars:
-        file: ../../../ansible-inventory-prod/group_vars/desktop/vault-approles.yaml
-      tags: always
-
-    - name: Load vault-pki-cli config...
-      ansible.builtin.include_vars:
-        file: ../../../ansible-inventory-prod/group_vars/desktop/vault-pki-cli.yaml
       tags: always
 
     - name: Load host-based settings
@@ -65,33 +56,24 @@
       with_items: "{{ syncthing_folders }}"
       tags: syncthing
 
-    - name: Run block
+    - name: "Run role syncthing"
       ansible.builtin.include_role:
         name: syncthing
       vars:
         syncthing_collect_metrics: false
       tags: always
 
-    - name: Run block
+    - name: "Run tasks ssh-ca.yaml"
       ansible.builtin.include_tasks: tasks/ssh-ca.yaml
       tags: always
 
-    - name: Run block
+    - name: "Run tasks signify.yml"
       ansible.builtin.include_tasks: tasks/signify.yml
       tags: always
 
-    - name: Run block
+    - name: "Run role vault_approle"
       ansible.builtin.include_role:
         name: vault_approle
-      tags: always
-
-    - name: Run block
-      ansible.builtin.include_role:
-        name: vault_pki_cli
-      tags: always
-
-    - name: Run block
-      ansible.builtin.include_tasks: tasks/vault-pki-cli.yaml
       tags: always
 
     - name: Load syncthing config...
@@ -100,25 +82,16 @@
       ignore_errors: false
       tags: vault-ssh-cli
 
-    - name: Run block
-      ansible.builtin.include_role:
-        name: vault_ssh_cli
-      tags: always
-
-    - name: Run block
-      ansible.builtin.include_tasks: tasks/vault-ssh-cli.yaml
-      tags: always
-
-    - name: Run block
+    - name: "Configure wireguard"
       when: use_wireguard | default(False)
       tags: always
       block:
-        - name: Load wireguard pubkeys...
+        - name: Load wireguard pubkeys
           ansible.builtin.include_vars:
             file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-pubkeys.yaml
           ignore_errors: false
 
-        - name: Load wireguard networks...
+        - name: Load wireguard networks
           ansible.builtin.include_vars:
             file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-nets.yaml
           ignore_errors: false
@@ -127,10 +100,10 @@
           community.sops.load_vars:
             file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-psks.sops.yaml
 
-        - name: Load wireguard private key...
+        - name: Load wireguard private key
           community.sops.load_vars:
             file: wg-{{ hostname }}.sops.yaml
 
-        - name: Include role
+        - name: "Run role wireguard"
           ansible.builtin.include_role:
             name: wireguard

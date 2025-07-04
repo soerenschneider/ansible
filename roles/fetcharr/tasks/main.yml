@@ -1,5 +1,5 @@
 ---
-- name: Including tasks
+- name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: fetcharr

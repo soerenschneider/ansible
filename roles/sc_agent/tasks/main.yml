@@ -8,7 +8,7 @@
   tags: [sc-agent, sc-agent-configure]
   with_items: [ssh-key-signer.service, ssh-key-signer.timer]
 
-- name: Run block
+- name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: sc-agent
@@ -26,7 +26,7 @@
   notify: "Restart sc-agent"
   tags: [sc-agent, sc-agent-configure]
 
-- name: Run block
+- name: "Configure sc_agent"
   when: sc_agent_config is defined
   tags: [sc-agent, sc-agent-configure]
   block:

@@ -1,5 +1,5 @@
 ---
-- name: Run block
+- name: "Set variables"
   ansible.builtin.set_fact:
     local_binary: ""
     installed_version: ""
@@ -65,7 +65,7 @@
         msg: "Latest GitHub version: {{ sc_agent_desired_version }}"
       changed_when: false
 
-- name: Run block
+- name: "Download artifacts"
   when: not sc_agent_local_binary.stat.exists or sc_agent_desired_version != sc_agent_installed_version
   tags: [sc-agent, sc-agent-install]
   block:

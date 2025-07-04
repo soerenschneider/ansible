@@ -3,10 +3,10 @@
   hosts: vault
   become: true
   tasks:
-    - name: Including role
+    - name: "Run role platform"
       ansible.builtin.debug:
         msg: "User is: {{ ansible_user }}"
-    - name: Including role
+    - name: "Run role "
       ansible.builtin.include_role:
         name: platform
       tags: always
@@ -30,20 +30,20 @@
             group: root
             mode: "0600"
 
-    - name: Including role
+    - name: "Run role certbot"
       ansible.builtin.include_role:
         name: certbot
       tags: always
 
-    - name: Including role
+    - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
       tags: always
 
-    - name: Including role
+    - name: "Run tasks certificate.yml"
       ansible.builtin.include_tasks: tasks/certificate.yml
       tags: always
 
-    - name: Including role
+    - name: "Run role vault"
       ansible.builtin.include_role:
         name: vault
       tags: always

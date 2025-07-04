@@ -1,3 +1,4 @@
 ---
-smartctl_exporter_interval: 8h
-smartctl_exporter_service_name: smartctl-exporter
+smartctl_exporter_interval: "0/4:00"
+smartctl_exporter_service_name: "smartctl-exporter"
+smartctl_exporter_enabled: true

@@ -5,7 +5,7 @@
   register: gocryptfs_binary
   tags: [gocryptfs, gocryptfs-install, deps]
 
-- name: Run block
+- name: "Check versions"
   when: gocryptfs_binary.stat.exists
   tags: [gocryptfs, gocryptfs-install, deps]
   block:
@@ -22,7 +22,7 @@
       ansible.builtin.debug:
         msg: "Installed version: {{ gocryptfs_installed_version }}"
 
-- name: Run block
+- name: "Fetch version info"
   when: gocryptfs_version is not defined or gocryptfs_version | length == 0
   tags: [gocryptfs, gocryptfs-install, deps]
   block:
@@ -45,7 +45,7 @@
     go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' }}"
   tags: [gocryptfs, gocryptfs-install, deps]
 
-- name: Run block
+- name: "Download artifacts"
   when: not gocryptfs_binary.stat.exists or gocryptfs_version != gocryptfs_installed_version
   tags: [gocryptfs, gocryptfs-install, deps]
   block:

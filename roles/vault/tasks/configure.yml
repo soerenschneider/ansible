@@ -114,7 +114,7 @@
     enabled: true
   tags: [vault, vault-configure]
 
-- name: Run block
+- name: "Configure vault audit log"
   when: vault_audit_log | default("") | length > 0
   tags: [vault, vault-configure]
   block:

@@ -8,7 +8,7 @@
       prompt: Do you want to destroy MariaDB (yes/no)?
       private: false
   tasks:
-    - name: Run block
+    - name: "Delete mariadb container and trash data folder"
       when: destroy_mariadb | bool
       block:
         - name: Delete docker container

@@ -14,11 +14,11 @@
         _needrestart_ksta: "{{ _needrestart_output.stdout | regex_search('NEEDRESTART-KSTA: ([0-9]+)', '\\1') | default(['0']) }}"
         _needrestart_svc: "{{ 'NEEDRESTART-SVC:' in _needrestart_output.stdout }}"
 
-    - name: Check if we are running an outdated kernel/svc
+    - name: "Set variable"
       ansible.builtin.set_fact:
         _needrestart_kernel: "{{ _needrestart_ksta[0] | int > 1 }}"
 
-    - name: Run block
+    - name: "Print needrestart debug information"
       ansible.builtin.debug:
         msg: "Outdated kernel: {{ _needrestart_kernel }} ({{ _needrestart_ksta }}), outdated svc(s): {{ _needrestart_svc }}"
 
@@ -37,7 +37,7 @@
       environment:
         VAULT_ADDR: https://{{ inventory_hostname }}:8200
 
-    - name: Run block
+    - name: "Reboot node and setup vault"
       when: _vault_unseal_status.stdout == "true" or _needrestart_kernel is true or _needrestart_svc is true
       block:
         - name: Reboot machine

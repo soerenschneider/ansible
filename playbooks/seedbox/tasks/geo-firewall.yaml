@@ -1,0 +1,39 @@
+---
+- name: "Disable existing firewalls"
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: false
+    state: "stopped"
+    masked: true
+  failed_when: false
+  with_items:
+    - ufw
+    - nftables
+  tags: ["firewall", "iptables"]
+
+- name: Write firewall script
+  ansible.builtin.template:
+    src: "templates/iptables-firewall.sh.j2"
+    dest: "/etc/firewall.sh"
+    owner: "root"
+    group: "root"
+    mode: "0750"
+  notify: "Run firewall"
+  tags: ["firewall", "iptables"]
+
+- name: Template firewall.service file
+  ansible.builtin.template:
+    src: templates/iptables-firewall.service.j2
+    dest: /etc/systemd/system/iptables-firewall.service
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  tags: ["firewall", "iptables"]
+
+- name: Enable script at boot and start
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "iptables-firewall.service"
+    enabled: true
+    state: "started"
+  tags: ["firewall", "iptables"]

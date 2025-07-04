@@ -8,7 +8,7 @@
   tags: [vault-ssh-cli, vault-ssh-cli-configure]
   with_items: [ssh-key-signer.service, ssh-key-signer.timer]
 
-- name: Run block
+- name: "Install vault_ssh_cli"
   ansible.builtin.include_tasks: install-github.yml
   vars:
     binary_name: vault-ssh-cli
@@ -16,7 +16,7 @@
     service_name: vault-ssh-cli
   tags: [vault-ssh-cli, vault-ssh-cli-configure]
 
-- name: Run block
+- name: "Configure vault_ssh_cli"
   when: vault_ssh_cli_config is defined
   tags: [vault-ssh-cli, vault-ssh-cli-configure]
   block:
