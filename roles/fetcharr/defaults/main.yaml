@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=soerenschneider/fetcharr
-fetcharr_version: v1.2.0
+fetcharr_version: v1.3.0
 fetcharr_config_file: /etc/fetcharr.yaml
 fetcharr_user: fetcharr
 fetcharr_wanted_services: []
