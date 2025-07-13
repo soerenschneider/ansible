@@ -5,6 +5,22 @@
   when: [ansible_os_family == "Debian"]
   tags: [docker]
 
+- name: Create or update Docker daemon config for log rotation
+  ansible.builtin.copy:
+    dest: /etc/docker/daemon.json
+    content: |
+      {
+        "log-driver": "json-file",
+        "log-opts": {
+          "max-size": "3m",
+          "max-file": "3"
+        }
+      }
+    owner: root
+    group: root
+    mode: '0644'
+  tags: [docker]
+
 - name: Add cleanup systemd units
   ansible.builtin.template:
     src: "{{ item }}.j2"
