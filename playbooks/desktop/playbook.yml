@@ -63,7 +63,7 @@
 
     - name: Load syncthing config...
       ansible.builtin.include_vars:
-        file: ../../../ansible-inventory-prod/group_vars/desktop/syncthing.yaml
+        file: "{{ inventory_path }}/group_vars/desktop/syncthing.yaml"
       ignore_errors: false
       tags: syncthing
 
@@ -103,17 +103,17 @@
       block:
         - name: Load wireguard pubkeys
           ansible.builtin.include_vars:
-            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-pubkeys.yaml
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-pubkeys.yaml"
           ignore_errors: false
 
         - name: Load wireguard networks
           ansible.builtin.include_vars:
-            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-nets.yaml
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-nets.yaml"
           ignore_errors: false
 
         - name: Load wireguard psk keys
           community.sops.load_vars:
-            file: ../../inventory/prod/group_vars/wireguard_mesh/wireguard-psks.sops.yaml
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-psks.sops.yaml"
 
         - name: Load wireguard private key
           community.sops.load_vars:
