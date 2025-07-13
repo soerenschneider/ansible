@@ -32,10 +32,11 @@
   with_items: [docker-prune.service, docker-prune.timer]
   tags: [docker]
 
-- name: Enable prune timer
+- name: Enable prune timer and service
   ansible.builtin.systemd:
-    name: docker-prune.timer
+    src: "{{ item }}"
     daemon_reload: true
     enabled: true
     state: started
+  with_items: [docker-prune.service, docker-prune.timer]
   tags: [docker]
