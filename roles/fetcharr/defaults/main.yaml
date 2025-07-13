@@ -6,6 +6,9 @@ fetcharr_user: fetcharr
 fetcharr_wanted_services: []
 fetcharr_required_services: []
 
+# sets the ConditionPathExists in the systemd service unit file
+fetcharr_systemd_condition_path_exists: ""
+
 fetcharr_conf:
   syncer_impl: rsync
 

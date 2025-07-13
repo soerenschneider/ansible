@@ -2,6 +2,9 @@
 Description=fetcharr
 # restart forever
 StartLimitIntervalSec=0
+{% if fetcharr_systemd_condition_path_exists | length > 0 %}
+ConditionPathExists={{ fetcharr_systemd_condition_path_exists }}
+{% endif %}
 {% if fetcharr_required_services | default([]) | length > 0 %}
 Requires={{ fetcharr_required_services | join(' ') }}
 {% endif %}
