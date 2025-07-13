@@ -1,0 +1,18 @@
+---
+- name: Install MariaDB cluster
+  hosts: auth
+  become: true
+  gather_facts: true
+  any_errors_fatal: true
+  vars:
+    sc_agent_version: v1.8.0
+  tasks:
+    - name: Include role platform
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: Include role platform
+      ansible.builtin.include_role:
+        name: keycloak
+      tags: always

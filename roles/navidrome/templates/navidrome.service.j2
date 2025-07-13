@@ -1,0 +1,32 @@
+# {{ ansible_managed }}
+[Unit]
+Description=navidrome
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/navidrome
+ReadOnlyPaths={{ navidrome_music_dir }}
+ReadWritePaths={{ navidrome_data_dir }}
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=true
+NoNewPrivileges=true
+User={{navidrome_user }}
+Group={{ navidrome_group }}
+LimitCPU=50%
+LimitMEMLOCK=2G
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FSETID CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SETPCAP
+
+SyslogIdentifier=navidrome
+
+# restart forever
+Restart=always
+RestartSec=60
+
+
+[Install]
+WantedBy=multi-user.target

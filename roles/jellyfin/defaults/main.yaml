@@ -1,0 +1,10 @@
+---
+jellyfin_user: jellyfin
+jellyfin_container_name: jellyfin
+
+# renovate: datasource=docker depName=jellyfin/jellyfin
+jellyfin_version: "10.10.7"
+
+jellyfin_base_dir: "/var/lib/jellyfin"
+jellyfin_config_dir: "{{ jellyfin_base_dir }}/config"
+jellyfin_cache_dir: "{{ jellyfin_base_dir }}/cache"

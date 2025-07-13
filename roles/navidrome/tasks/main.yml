@@ -1,0 +1,67 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ navidrome_group }}"
+    system: true
+  tags: [navidrome, navidrome-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ navidrome_user }}"
+    shell: "/bin/false"
+    system: true
+    groups: "{{ navidrome_group }}"
+  tags: [navidrome, navidrome-install]
+
+- name: Create navidrome data directory
+  ansible.builtin.file:
+    path: "{{ navidrome_data_dir }}"
+    state: "directory"
+    owner: "{{ navidrome_user }}"
+    group: "{{ navidrome_group }}"
+    mode: "0750"
+  tags: [navidrome, navidrome-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: "navidrome"
+    github_repo: "navidrome/navidrome"
+    service_name: "navidrome"
+    version_wanted: "{{ navidrome_version }}"
+  tags: [navidrome, navidrome-install, deps]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: "navidrome.service.j2"
+    dest: "/etc/systemd/system/navidrome.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: Restart navidrome
+  tags: [navidrome, navidrome-install, navidrome-configure]
+
+- name: Create systemd override directory for navidrome
+  ansible.builtin.file:
+    path: "/etc/systemd/system/navidrome.service.d"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  tags: [navidrome, navidrome-install]
+
+- name: Create override.conf for navidrome with environment variables
+  ansible.builtin.template:
+    src: "navidrome-override.conf.j2"
+    dest: "/etc/systemd/system/navidrome.service.d/override.conf"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: Restart navidrome
+  tags: [navidrome, navidrome-install]
+
+- name: Enable/disable navidrome
+  ansible.builtin.service:
+    name: "{{ navidrome_service_name }}"
+    enabled: true
+  tags: [navidrome, navidrome-install, navidrome-configure]

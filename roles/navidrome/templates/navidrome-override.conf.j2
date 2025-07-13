@@ -1,0 +1,4 @@
+[Service]
+{% for key, value in navidrome_env.items() %}
+    Environment="{{ key }}={{ value }}"
+{% endfor %}

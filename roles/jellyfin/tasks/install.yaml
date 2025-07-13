@@ -1,0 +1,60 @@
+---
+- name: Create jellyfin user
+  ansible.builtin.user:
+    name: "{{ jellyfin_user }}"
+    system: true
+  tags: [jellyfin]
+
+- name: Create jellyfin dirs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ jellyfin_user }}"
+    group: "root"
+    mode: "0700"
+  with_items:
+    - "{{ jellyfin_base_dir }}"
+    - "{{ jellyfin_config_dir }}"
+    - "{{ jellyfin_cache_dir }}"
+  tags: [docker, jellyfin]
+
+- name: Get UID for generated user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ jellyfin_user }}"
+  tags: always
+
+- name: Build user string
+  ansible.builtin.set_fact:
+    _jellyfin_user_string: "{{ getent_passwd['jellyfin'][1] }}"
+  tags: always
+
+- name: Create jellyfin docker network
+  community.docker.docker_network:
+    name: "{{ jellyfin_docker_network | default('jellyfin') }}"
+  tags: [docker, jellyfin]
+
+- name: Run jellyfin
+  community.docker.docker_container:
+    name: "{{ jellyfin_container_name }}"
+    image: "jellyfin/jellyfin:{{ jellyfin_version }}"
+    user: "{{ _jellyfin_user_string }}"
+    networks:
+      - name: "{{ jellyfin_docker_network | default('jellyfin') }}"
+    restart_policy: "always"
+    recreate: true
+    published_ports:
+      - "127.0.0.1:8096:8096"
+    groups:
+      - 44
+    devices:
+      - /dev/dri/card0
+    env:
+      TZ: UTC
+    command:
+      - start
+    volumes:
+      - "{{ jellyfin_config_dir }}:/config"
+      - "{{ jellyfin_cache_dir }}:/cache"
+      - "/srv/files/media:/media:ro"
+  tags: [docker, jellyfin]
