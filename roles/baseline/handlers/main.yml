@@ -8,3 +8,10 @@
   ansible.builtin.systemd:
     name: "systemd-journald"
     state: "restarted"
+
+- name: "remount filesystems"
+  ansible.posix.mount:
+    path: "{{ item }}"
+    state: remounted
+  with_items: "{{ ansible_mounts | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$') | map(attribute='mount') | list }}"
+  listen: "remount filesystems"
