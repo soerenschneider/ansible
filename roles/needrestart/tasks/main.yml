@@ -1,5 +1,5 @@
 ---
-- name: Install packages
+- name: Install needrestart (RHEL)
   when: [ansible_os_family | lower == "redhat", ansible_distribution | lower != "fedora"]
   tags: [automatic-sysupdates, needrestart]
   block:
@@ -7,11 +7,11 @@
       ansible.builtin.command: dnf config-manager --set-enabled crb
       changed_when: true
 
-    - name: Install epel release
-      ansible.builtin.dnf:
-        name: epel-release
+    - name: "Run tasks install-github.yml"
+      ansible.builtin.include_tasks: install-github.yaml
 
-- name: Install needrestart
+- name: Install needrestart (Debian)
+  when: ansible_os_family | lower == "debian"
   ansible.builtin.package:
     name: needrestart
   tags: [automatic-sysupdates, needrestart]
