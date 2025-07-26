@@ -46,7 +46,7 @@
 - name: "Run tasks mounts.yml"
   ansible.builtin.include_tasks: mounts.yml
   when: ansible_system == "Linux"
-  tags: [base, base-mounts, base-fs]
+  tags: always
 
 - name: "Run tasks signify.yaml"
   ansible.builtin.include_tasks: signify.yml

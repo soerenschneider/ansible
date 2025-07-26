@@ -6,22 +6,13 @@
   failed_when: false
   tags: [base, fs]
 
-- name: Make sure mountpoints use 'noatime'
-  ansible.posix.mount:
-    name: "{{ item.mount }}"
-    src: "{{ item.device }}"
-    fstype: "{{ item.fstype }}"
-    opts: "{{ item.options }},noatime"
-    state: present
-  with_items: "{{ ansible_mounts }}"
-  when:
-    # disable for now
-    - false
-    - baseline_mount_set_noatime
-    - item.options.find(",") >= 0
-    - item.options.find("noatime") == -1
-    - item.fstype not in ["vfat", "fuse.gocryptfs", "fuse"]
-  #    -item.fstype.find("vfat") == -1
-  #    - item.fstype.find("gocryptfs") == -1
-  #    - item.fstype.find("fuse") == -1
-  tags: [base, mounts]
+- name: Add noatime option to appropriate filesystem entries in fstab
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#\s]+)\s+{{ item.mount | regex_escape }}\s+({{ item.fstype }})\s+([^\s]*?)(\s+\d+\s+\d+)(.*)$'
+    line: '\1 {{ item.mount }} \2 \3,noatime\4\5'
+    backrefs: yes
+  when: item.fstype in ['ext2', 'ext3', 'ext4', 'xfs', 'btrfs'] and 'noatime' not in (item.options | default(''))
+  with_items: "{{ ansible_mounts | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$') | list }}"
+  notify: remount filesystems
+  tags: [base, fs]
