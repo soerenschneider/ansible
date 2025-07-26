@@ -22,20 +22,45 @@
         group: "systemd-journal"
       when: not _systemd_journal_dir.stat.exists
 
+- name: Find journald.conf location
+  tags: [base, systemd, journald, logs, logging]
+  block:
+    - name: Check if journald.conf exists in /usr/lib/systemd
+      ansible.builtin.stat:
+        path: /usr/lib/systemd/journald.conf
+      register: journald_conf_lib
+
+    - name: Check if journald.conf exists in /etc/systemd
+      ansible.builtin.stat:
+        path: /etc/systemd/journald.conf
+      register: journald_conf_etc
+
+    - name: Set journald_conf_path variable
+      ansible.builtin.set_fact:
+        journald_conf_path: >-
+          {{
+            '/usr/lib/systemd/journald.conf' if journald_conf_lib.stat.exists
+            else (
+              '/etc/systemd/journald.conf' if journald_conf_etc.stat.exists
+              else ''
+            )
+          }}
+
+
 - name: "Add system limits for auto/persistent setting"
   when: baseline_systemd_journal_storage in ['persistent', 'auto']
   tags: [base, systemd, journald, logs, logging]
   block:
     - name: "Limit the total size of journald logs"
       ansible.builtin.lineinfile:
-        dest: "/etc/systemd/journald.conf"
+        dest: "{{ journald_conf_path }}"
         regexp: "^SystemMaxUse="
         line: "SystemMaxUse={{ baseline_systemd_journal_system_max_use }}"
       notify: "Restart journald"
 
     - name: "Limit the size of each journald log file"
       ansible.builtin.lineinfile:
-        dest: "/etc/systemd/journald.conf"
+        dest: "{{ journald_conf_path }}"
         regexp: "^SystemMaxFileSize="
         line: "SystemMaxFileSize={{ baseline_systemd_journal_system_max_file_size }}"
       notify: "Restart journald"
@@ -46,14 +71,14 @@
   block:
     - name: "Limit the total size of journald logs"
       ansible.builtin.lineinfile:
-        dest: "/etc/systemd/journald.conf"
+        dest: "{{ journald_conf_path }}"
         regexp: "^RuntimeMaxUse="
         line: "RuntimeMaxUse={{ baseline_systemd_journal_runtime_max_use }}"
       notify: "Restart journald"
 
     - name: "Limit the size of each journald log file"
       ansible.builtin.lineinfile:
-        dest: "/etc/systemd/journald.conf"
+        dest: "{{ journald_conf_path }}"
         regexp: "^RuntimeMaxFileSize="
         line: "RuntimeMaxFileSize={{ baseline_systemd_journal_runtime_max_file_size }}"
       notify: "Restart journald"
