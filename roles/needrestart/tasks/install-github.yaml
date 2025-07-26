@@ -1,0 +1,35 @@
+---
+- name: Install perl requirements
+  ansible.builtin.dnf:
+    name: [make, gettext, perl-ExtUtils-MakeMaker, perl-Module-Find, perl-Proc-ProcessTable, perl-Sort-Naturally, perl-libintl-perl]
+  tags: [automatic-sysupdates, needrestart]
+
+- name: Get version
+  tags: [automatic-sysupdates, needrestart]
+  when: needrestart_version is not defined or not needrestart_version
+  block:
+    - name: Check for latest version
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/liske/needrestart/releases/latest
+        return_content: true
+      register: needrestart_latest
+
+    - name: Extract version information from json
+      ansible.builtin.set_fact:
+        needrestart_version: "{{ needrestart_latest.json.tag_name }}"
+
+- name: "Clone respository version: {{ needrestart_version }}"
+  ansible.builtin.git:
+    repo: https://github.com/liske/needrestart.git
+    dest: /opt/needrestart
+    version: "{{ needrestart_version }}"
+  register: needrestart_clone
+  tags: [automatic-sysupdates, needrestart]
+
+- name: Install needrestart
+  ansible.builtin.command: make install
+  when: needrestart_clone is changed  # noqa: no-handler
+  args:
+    chdir: /opt/needrestart
+  changed_when: true
+  tags: [automatic-sysupdates, needrestart]
