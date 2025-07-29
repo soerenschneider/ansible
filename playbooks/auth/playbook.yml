@@ -5,14 +5,23 @@
   gather_facts: true
   any_errors_fatal: true
   vars:
-    sc_agent_version: v1.8.0
+    postgres_network: "{{ keycloak_docker_network }}"
   tasks:
     - name: Include role platform
       ansible.builtin.include_role:
         name: platform
       tags: always
 
-    - name: Include role platform
+    - name: "Run tasks haproxy.yml"
+      ansible.builtin.include_tasks: tasks/haproxy.yml
+      tags: always
+
+    - name: Include role 'postgres'
+      ansible.builtin.include_role:
+        name: postgres
+      tags: always
+
+    - name: Include role 'keycloak'
       ansible.builtin.include_role:
         name: keycloak
       tags: always

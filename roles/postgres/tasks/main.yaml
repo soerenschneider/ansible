@@ -1,0 +1,55 @@
+---
+- name: Create postgres group
+  ansible.builtin.user:
+    name: "{{ postgres_group }}"
+    system: true
+  when: postgres_group != "root"
+  tags: [postgres]
+
+- name: Create postgres user
+  ansible.builtin.user:
+    name: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    system: true
+  when: postgres_user != "root"
+  tags: [postgres]
+
+- name: Get UID for generated user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ postgres_user }}"
+  tags: always
+
+- name: Set UID and GID facts for use in container
+  ansible.builtin.set_fact:
+    postgres_uid: "{{ getent_passwd[postgres_user][1] }}"
+    postgres_gid: "{{ getent_passwd[postgres_user][2] }}"
+  tags: always
+
+- name: Create directory for PostgreSQL data
+  ansible.builtin.file:
+    path: "{{ postgres_data_directory }}"
+    state: directory
+    owner: "{{ postgres_user }}"
+    group: "{{ postgres_group }}"
+    mode: "0755"
+  tags: [postgres]
+
+- name: Run PostgreSQL
+  community.docker.docker_container:
+    name: "postgres"
+    image: "postgres:{{ postgres_version }}"
+    state: "started"
+    user: "{{ postgres_uid }}:{{ postgres_gid }}"
+    restart_policy: "always"
+    networks:
+      - name: "{{ postgres_network }}"
+    env:
+      POSTGRES_USER: "{{ postgres_db_user }}"
+      POSTGRES_PASSWORD: "{{ postgres_db_password }}"
+      POSTGRES_DB: "{{ postgres_db_name }}"
+    exposed_ports:
+      - 5432
+    volumes:
+      - "{{ postgres_data_directory }}:/var/lib/postgresql/data"
+  tags: [postgres, deps]

@@ -1,0 +1,11 @@
+---
+# renovate: datasource=docker depName=postgres
+postgres_version: "17.5"
+postgres_data_directory: "/var/lib/postgres"
+postgres_user: "postgres"
+postgres_group: "postgres"
+postgres_network: "pgnet"
+
+postgres_db_user: "postgres"
+#postgres_db_password: ""
+postgres_db_name: "postgres"
