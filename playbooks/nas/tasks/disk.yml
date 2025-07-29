@@ -2,9 +2,9 @@
 - name: Create mountpoint target path
   ansible.builtin.file:
     path: "{{ disk.mountpoint }}"
-    state: directory
-    owner: root
-    group: root
+    state: "directory"
+    owner: "root"
+    group: "root"
     mode: "0755"
   notify: [Mount_all_disks]
   tags: [disk]
@@ -14,8 +14,8 @@
     path: "{{ disk.mountpoint }}"
     src: "{{ disk.partition }}"
     fstype: "{{ disk.fs }}"
-    opts: auto,nofail,noatime
-    state: present
+    opts: "auto,nofail,noatime"
+    state: "present"
   notify: [Mount_all_disks]
   tags: [disk]
 
