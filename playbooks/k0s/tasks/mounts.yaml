@@ -1,0 +1,22 @@
+---
+- name: "Create mountpoint target path"
+  ansible.builtin.file:
+    path: "{{ item.mountpoint }}"
+    state: "directory"
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  notify: "Mount all disks"
+  with_items: "{{ mounts | default([]) }}"
+  tags: [disk, mounts]
+
+- name: "Add fstab entry for disk"
+  ansible.posix.mount:
+    path: "{{ item.mountpoint }}"
+    src: "{{ item.src }}"
+    fstype: "{{ item.fs }}"
+    opts: "{{ item.opts | default('auto,nofail,noatime') }}"
+    state: "present"
+  notify: "Mount all disks"
+  with_items: "{{ mounts | default([]) }}"
+  tags: [disk, mounts]

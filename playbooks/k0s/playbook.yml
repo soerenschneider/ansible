@@ -10,16 +10,25 @@
         name: platform
       tags: always
 
+    - name: "Run tasks limits.yaml"
+      ansible.builtin.include_tasks: tasks/limits.yaml
+      tags: always
+
     - name: "Run role k0s"
       ansible.builtin.include_role:
         name: k0s
       tags: always
 
-    - name: "Run tasks limits.yaml"
-      ansible.builtin.include_tasks: tasks/limits.yaml
+    - name: "Run tasks mounts.yaml"
+      ansible.builtin.include_tasks: "tasks/mounts.yaml"
       tags: always
 
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
       when: false and 'master' in inventory_hostname
       tags: always
+
+  handlers:
+    - name: "Mount all disks"
+      ansible.builtin.command: mount -a  # noqa: command-instead-of-module
+      changed_when: true
