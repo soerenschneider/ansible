@@ -8,6 +8,11 @@
     networks:
       - name: mariadb-cluster
     env:
-      DATA_SOURCE_NAME: exporter:{{ mysqld_exporter_password }}@({{ mariadb_container_name }}:3306)/?tls=skip-verify
+      MYSQLD_EXPORTER_PASSWORD: "{{ mysqld_exporter_password }}"
+    command: |
+      --mysqld.address={{ mariadb_container_name }}:3306
+      --mysqld.username=exporter
+      --tls.insecure-skip-verify
+      --log.level=debug
     ports: [0.0.0.0:9104:9104]
   tags: [mariadb, exporter, mysql]
