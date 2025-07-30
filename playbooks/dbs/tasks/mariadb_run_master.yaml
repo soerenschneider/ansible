@@ -20,7 +20,7 @@
       MARIADB_CHARACTER_SET: "utf8mb4"
       MARIADB_COLLATE: "utf8mb4_unicode_520_ci"
       TZ: UTC
-    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/my.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf, /etc/mariadb/01-exporter.sql:/docker-entrypoint-startdb.d/01-exporter.sql:ro]
+    volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/my.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf, "{{ mariadb_base_dir }}/01-exporter.sql:/docker-entrypoint-startdb.d/01-exporter.sql:ro"]
   tags: [docker, mariadb, mysql]
 
 - name: Wait for 30s
