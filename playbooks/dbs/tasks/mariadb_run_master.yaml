@@ -17,8 +17,8 @@
       MARIADB_REPLICATION_USER: "{{ mariadb_replication_user }}"
       MARIADB_REPLICATION_PASSWORD: "{{ mariadb_replication_pass }}"
       MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
-      MARIADB_CHARACTER_SET: utf8mb4
-      MARIADB_COLLATE: utf8mb4_unicode_520_ci
+      MARIADB_CHARACTER_SET: "utf8mb4"
+      MARIADB_COLLATE: "utf8mb4_unicode_520_ci"
       TZ: UTC
     volumes: ["{{ mariadb_certs_dir }}:/certs:ro", "{{ mariadb_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/my.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf, /etc/mariadb/01-exporter.sql:/docker-entrypoint-startdb.d/01-exporter.sql:ro]
   tags: [docker, mariadb, mysql]
@@ -45,8 +45,8 @@
       MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_galera_backup_pw }}"
       MARIADB_GALERA_CLUSTER_NAME: "{{ mariadb_galera_cluster_name }}"
       MARIADB_ROOT_PASSWORD: "{{ mariadb_root_password }}"
-      MARIADB_CHARACTER_SET: utf8mb4
-      MARIADB_COLLATE: utf8mb4_unicode_520_ci
+      MARIADB_CHARACTER_SET: "utf8mb4"
+      MARIADB_COLLATE: "utf8mb4_unicode_520_ci"
       MARIADB_REPLICATION_USER: "{{ mariadb_replication_user }}"
       MARIADB_REPLICATION_PASSWORD: "{{ mariadb_replication_pass }}"
       TZ: UTC
