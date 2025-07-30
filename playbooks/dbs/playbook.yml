@@ -28,7 +28,7 @@
       ansible.builtin.include_role:
         name: restic
       tags: always
-      when: restic_backups | length > 0
+      when: restic_backups | default([]) | length > 0
 
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
