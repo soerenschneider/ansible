@@ -34,7 +34,7 @@
 
 - name: Enable prune timer and service
   ansible.builtin.systemd:
-    src: "{{ item }}"
+    name: "{{ item }}"
     daemon_reload: true
     enabled: true
     state: started
