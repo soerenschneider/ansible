@@ -213,10 +213,13 @@
       register: _container_result
       tags: [docker, mariadb, mysql]
 
+    - name: Conditional fail if container already exists
+      ansible.builtin.fail:
+        msg: "mariadb container already exists"
+      when: _container_result.exists
+
     - name: Including tasks
       tags: [mariadb, mysql]
-      when: not _container_result.exists
-
       block:
         - name: Init cluster, run master
           ansible.builtin.include_tasks: tasks/mariadb_run_master.yaml
@@ -229,6 +232,7 @@
         - name: Run initial master as slave
           ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
           when: inventory_hostname == mariadb_cluster_master
+
     - name: Run exporter
       ansible.builtin.include_tasks: tasks/mariadb_run_exporter.yaml
       tags: [mariadb, exporter, mysql]
