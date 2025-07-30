@@ -11,6 +11,7 @@
     dest: "/etc/keepalived/keepalived.conf"
     owner: "root"
     mode: "0640"
+  when: keepalived_vrrp_instances | default([]) | length > 0
   notify: "Restart keepalived"
   tags: [keepalived]
 
@@ -20,5 +21,13 @@
     insertafter: '^\*filter'
     line: '-A ufw-before-input -p 112 -j ACCEPT'
     state: present
+  when: keepalived_vrrp_instances | default([]) | length > 0
   notify: "Restart keepalived"
+  tags: [keepalived]
+
+- name: "Enable/disable keepalived"
+  ansible.builtin.systemd:
+    name: "keepalived"
+    enabled: "{% if keepalived_vrrp_instances | default([]) | length > 0 %}true{% else %}false{% endif %}"
+    state: "{% if keepalived_vrrp_instances | default([]) | length > 0 %}started{% else %}stopped{% endif %}"
   tags: [keepalived]
