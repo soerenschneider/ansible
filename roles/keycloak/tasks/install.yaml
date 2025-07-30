@@ -37,11 +37,6 @@
     _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}"
   tags: always
 
-- name: Create keycloak docker network
-  community.docker.docker_network:
-    name: "{{ keycloak_docker_network }}"
-  tags: [docker, keycloak]
-
 - name: Run keycloak
   community.docker.docker_container:
     name: "{{ keycloak_container_name }}"
