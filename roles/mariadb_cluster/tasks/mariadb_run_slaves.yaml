@@ -1,0 +1,35 @@
+---
+- name: Run slaves
+  community.docker.docker_container:
+    name: "{{ mariadb_cluster_container_name }}"
+    image: "{{ mariadb_cluster_image }}"
+    user: "{{ _mariadb_cluster_user_string }}"
+    restart_policy: always
+    networks:
+      - name: mariadb-cluster
+    log_driver: journald
+    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+    env:
+      MARIADB_GALERA_CLUSTER_NAME: "{{ mariadb_cluster_galera_cluster_name }}"
+      MARIADB_GALERA_CLUSTER_ADDRESS: "{{ mariadb_cluster_galera_cluster_address }}"
+      MARIADB_GALERA_NODE_NAME: "{{ inventory_hostname }}"
+      MARIADB_GALERA_MARIABACKUP_USER: "{{ mariadb_cluster_galera_backup_user }}"
+      MARIADB_GALERA_MARIABACKUP_PASSWORD: "{{ mariadb_cluster_galera_backup_password }}"
+      MARIADB_REPLICATION_USER: "{{ mariadb_cluster_replication_user }}"
+      MARIADB_REPLICATION_PASSWORD: "{{ mariadb_cluster_replication_password }}"
+      MARIADB_CHARACTER_SET: utf8mb4
+      MARIADB_COLLATE: utf8mb4_unicode_520_ci
+      TZ: UTC
+    volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/my.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
+  tags: [docker, mariadb, mysql]
+
+- name: Wait for node to be ready
+  ansible.builtin.command: >
+    docker exec {{ mariadb_cluster_container_name }} mariadb-admin ping --ssl-verify-server-cert=false -u{{ mariadb_cluster_root_user | default('root') }} -p{{ mariadb_cluster_root_password }}
+  register: _result
+  until: _result.rc == 0
+  retries: 100
+  delay: 5
+  no_log: true
+  changed_when: false
+  tags: [docker, mariadb, mysql]
