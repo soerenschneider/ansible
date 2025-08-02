@@ -6,7 +6,7 @@
     user: "{{ _mariadb_cluster_user_string }}"
     restart_policy: always
     networks:
-      - name: mariadb-cluster
+      - name: "{{ mariadb_cluster_docker_network }}"
     log_driver: journald
     ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
     env:

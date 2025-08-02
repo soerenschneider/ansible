@@ -1,45 +1,76 @@
 ---
+- name: Create mariadb group
+  ansible.builtin.group:
+    name: "{{ mariadb_cluster_group }}"
+    system: true
+  tags: [mariadb, exporter, db]
+
 - name: Create mariadb user
   ansible.builtin.user:
     name: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
     system: true
-  tags: [mariadb, exporter, mysql, db]
+  tags: [mariadb, exporter, db]
 
 - name: Create mariadb dir
   ansible.builtin.file:
     path: "{{ mariadb_cluster_base_dir }}"
     state: directory
     owner: "{{ mariadb_cluster_user }}"
-    group: root
-    mode: "0700"
-  tags: [mariadb, mysql, db]
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0770"
+  tags: [mariadb, db]
 
 - name: Create mariadb storage dir
   ansible.builtin.file:
     path: "{{ mariadb_cluster_storage_dir }}"
     state: directory
     owner: "{{ mariadb_cluster_user }}"
-    group: root
-    mode: "0700"
-  tags: [mariadb, mysql, db]
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0770"
+  tags: [mariadb, db]
 
 - name: Create mariadb certs dir
   ansible.builtin.file:
     path: "{{ mariadb_cluster_certs_dir }}"
     state: directory
     owner: "{{ mariadb_cluster_user }}"
-    group: root
-    mode: "0700"
-  tags: [mariadb, mysql, db]
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0770"
+  tags: [mariadb, db]
 
-- name: Create mariadb dir storage
+- name: Create mariadb initdb dir
+  ansible.builtin.file:
+    path: "{{ mariadb_cluster_initdb_dir }}"
+    state: directory
+    owner: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0770"
+  tags: [mariadb, db]
+
+- name: Create mariadb initdb scripts
   ansible.builtin.template:
-    src: templates/01-exporter.sql.j2
-    dest: "{{ mariadb_cluster_base_dir }}/01-exporter.sql"
+    src: "{{ item }}"
+    dest: "{{ mariadb_cluster_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_user }}"
     mode: "0700"
-  tags: [mariadb, mysql, db]
+  with_fileglob:
+    - "templates/mariadb-initdb/*.j2"
+  tags: [mariadb, db]
+
+- name: Create env file
+  ansible.builtin.copy:
+    content: |
+      MARIADB_ROOT_PASSWORD={{ mariadb_cluster_root_password }}
+      MARIADB_CHARACTER_SET=utf8mb4
+      MARIADB_COLLATE=utf8mb4_unicode_520_ci
+      TZ=UTC
+    dest: "{{ mariadb_cluster_base_dir }}/env"
+    owner: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0400"
+  tags: [mariadb, db]
 
 - name: Add my.cnf
   ansible.builtin.copy:
@@ -48,7 +79,15 @@
       ssl_cert = /certs/tls.crt
       ssl_key = /certs/tls.key
       require_secure_transport = ON
+      binlog_format = ROW
+      default_storage_engine=InnoDB
+      innodb_autoinc_lock_mode=2
       [galera]
+      wsrep_on = ON
+      wsrep_cluster_name = {{ mariadb_cluster_galera_cluster_name }}
+      wsrep_provider = /usr/lib/galera/libgalera_smm.so
+      wsrep_sst_method=mariabackup
+      wsrep_sst_auth=sst_user:{{ mariadb_cluster_replication_password }}
       wsrep_node_incoming_address={{ inventory_hostname }}
       wsrep_node_address={{ inventory_hostname }}
       wsrep-node-name={{ inventory_hostname }}
@@ -56,7 +95,7 @@
       # NOTE: the comma at the end is not a typo, see https://fromdual.com/define-preferred-sst-donor-for-galera-cluster
       wsrep_sst_donor={{ mariadb_cluster_preferred_donors | join(',') }},
       {% endif %}
-      wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/wsrep-ca.crt;socket.ssl_cert=/certs/wsrep.crt;socket.ssl_key=/certs/wsrep.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568;
+      wsrep_provider_options=gcache.size=512M;socket.ssl=yes;socket.ssl_ca=/certs/wsrep-ca.crt;socket.ssl_cert=/certs/wsrep.crt;socket.ssl_key=/certs/wsrep.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568;
       [sst]
       tca=/certs/sst-ca.crt
       tcert=/certs/sst.crt
@@ -64,11 +103,11 @@
       [mariabackup]
       ssl-verify-server-cert = false
     dest: "{{ mariadb_cluster_base_dir }}/my.cnf"
-    owner: root
-    group: root
-    mode: "0444"
+    owner: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0440"
   register: _mariadb_set_config
-  tags: [mariadb, mysql, db]
+  tags: [mariadb, db]
 
 - name: "Check connectivity"
   tags: [mariadb, connectivity]
@@ -166,7 +205,7 @@
       when: _cert_expired | selectattr('expired', 'equalto', true) | list | length > 0
 
 - name: Get container information
-  tags: [mariadb, docker]
+  tags: [mariadb]
   block:
     - name: Get container information
       docker_container_info:
@@ -204,7 +243,7 @@
           ansible.builtin.set_fact:
             uptime_seconds: "{{ uptime_seconds.stdout }}"
             uptime_minutes: "{{ uptime_seconds.stdout | int / 60 }}"
-            running_and_stabilized: "{{ uptime_seconds.stdout | int / 60 >= 2 }}"
+            running_and_stabilized: "{{ uptime_seconds.stdout | int / 60 >= 2 }}" # at least running for 2 minutes
             running: "{{ uptime_seconds.stdout | int >= 0 }}"
           when: container_info.container.State.Running
 
@@ -237,21 +276,21 @@
 - name: Create mariadb docker network
   community.docker.docker_network:
     name: "{{ mariadb_cluster_docker_network }}"
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb]
 
 - name: Stop mariadb container as config has been updated
   community.docker.docker_container:
     name: "{{ mariadb_cluster_container_name }}"
     state: stopped
-  when: _mariadb_set_config is changed and groups[mariadb_cluster_ansible_group] | length == running_and_stabilized_instances | length
-  tags: [docker, mariadb, mysql]
+  when: _mariadb_set_config is changed and groups[mariadb_cluster_ansible_group] | length == running_and_stabilized_instances | default([]) | length
+  tags: [mariadb]
 
 - name: Check if it's safe to bootstrap existing cluster
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb]
   block:
     - name: "Check if 'safe_to_bootstrap: 1' is in grastate.dat"
       ansible.builtin.shell: |
-        grep -Fxq "safe_to_bootstrap: 1" /var/lib/mariadb/data/data/grastate.dat
+        grep -Fxq "safe_to_bootstrap: 1" {{ mariadb_cluster_storage_dir }}/grastate.dat
       register: bootstrap_check
       ignore_errors: true
 
@@ -273,7 +312,7 @@
         host_with_highest_number: "{{ bootstrap_candidates[0] }}"
       run_once: true
       when: bootstrap_candidates | length > 0
-      tags: [docker, mariadb, mysql]
+      tags: [mariadb, mysql]
 
     - name: "Print host_with_highest_number"
       ansible.builtin.debug:
@@ -281,7 +320,7 @@
 
 - name: Run wsrep-recover
   when: bootstrap_candidates | length == 0 and container_info.exists
-  tags: [docker, mariadb]
+  tags: [mariadb]
   block:
     - name: Figure out most recent commit
       community.docker.docker_container:
@@ -291,11 +330,13 @@
         user: "{{ _mariadb_cluster_user_string }}"
         networks:
           - name: mariadb-cluster
+        command: |
+          --wsrep-recover
+          --wsrep-cluster-address={{ mariadb_cluster_galera_cluster_address }}
         env:
-          MARIADB_EXTRA_FLAGS: --wsrep_recover
-          ALLOW_EMPTY_PASSWORD: "yes"
+          MARIADB_ALLOW_EMPTY_ROOT_PASSWORD: "yes"
           TZ: UTC
-        volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/bitnami/mariadb", /var/lib/mariadb/sst.cnf:/opt/bitnami/mariadb/conf/bitnami/my_custom.cnf]
+        volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", "/var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf"]
 
     - name: Pause to Allow Container to Generate Logs
       ansible.builtin.pause:
@@ -305,10 +346,13 @@
       ansible.builtin.command: "docker logs --since=1m {{ mariadb_cluster_container_name }}"
       changed_when: false
       register: container_logs
+    - name: debug
+      debug:
+        var: container_logs
 
     - name: Find correct logline
       ansible.builtin.set_fact:
-        relevant_log_line: "{{ container_logs.stdout_lines | select('search', 'Recovered position') | last }}"
+        relevant_log_line: "{{ container_logs.stderr_lines | select('search', 'Recovered position') | last }}"
 
     - name: Extract recovered position
       ansible.builtin.set_fact:
@@ -341,7 +385,7 @@
 
     - name: Set bootstrap variable
       ansible.builtin.lineinfile:
-        path: "{{ mariadb_cluster_storage_dir }}/data/grastate.dat"
+        path: "{{ mariadb_cluster_storage_dir }}/grastate.dat"
         regexp: "^safe_to_bootstrap:"
         line: "safe_to_bootstrap: 1"
       when: inventory_hostname == host_with_highest_number
@@ -349,22 +393,22 @@
     - name: No prior container exists
       ansible.builtin.set_fact:
         host_with_highest_number: "{{ groups[mariadb_cluster_ansible_group][0] }}"
-      tags: [docker, mariadb, mysql]
+      tags: [mariadb, mysql]
 
 - name: Run master with startdb sql
-  ansible.builtin.include_tasks: tasks/mariadb_run_master.yaml
+  ansible.builtin.include_tasks: tasks/run_master.yaml
   when: inventory_hostname == host_with_highest_number | default(groups[mariadb_cluster_ansible_group][0])
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb, mysql]
 
 - name: Run slaves
-  ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+  ansible.builtin.include_tasks: tasks/run_slaves.yaml
   when: inventory_hostname != host_with_highest_number | default(groups[mariadb_cluster_ansible_group][0])
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb, mysql]
 
 - name: Run initial master as slave
-  ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
+  ansible.builtin.include_tasks: tasks/run_slaves.yaml
   when: inventory_hostname == host_with_highest_number | default(groups[mariadb_cluster_ansible_group][0])
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb, mysql]
 
 - name: Run mysqld exporter
   community.docker.docker_container:
@@ -381,6 +425,6 @@
       --mysqld.username=exporter
       --tls.insecure-skip-verify
       --log.level=debug
-    exposed_ports:
-      - 9104
+    ports:
+      - "127.0.0.1:9104:9104"
   tags: [mariadb, exporter, mysql]

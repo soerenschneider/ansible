@@ -1,2 +1,0 @@
-CREATE USER 'exporter'@'172.%.%.%' IDENTIFIED BY '{{ mysqld_exporter_password }}' WITH MAX_USER_CONNECTIONS 3;
-GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'172.%.%.%';

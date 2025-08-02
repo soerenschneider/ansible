@@ -1,0 +1,77 @@
+---
+- name: Run master with startdb sql
+  community.docker.docker_container:
+    name: "{{ mariadb_cluster_container_name }}"
+    image: "{{ mariadb_cluster_image }}"
+    user: "{{ _mariadb_cluster_user_string }}"
+    restart_policy: always
+    networks:
+      - name: "{{ mariadb_cluster_docker_network }}"
+    log_driver: journald
+    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+    command: |
+      --wsrep-new-cluster
+      --wsrep-cluster-address=gcomm://
+    env_file: "{{ mariadb_cluster_base_dir }}/env"
+    volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", "/var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf", "{{ mariadb_cluster_initdb_dir }}/:/docker-entrypoint-initdb.d:ro"]
+  tags: [mariadb]
+
+- name: Wait for 5s
+  ansible.builtin.pause:
+    seconds: 5
+  tags: [mariadb]
+#
+#- name: Run master
+#  community.docker.docker_container:
+#    name: "{{ mariadb_cluster_container_name }}"
+#    image: "{{ mariadb_cluster_image }}"
+#    restart_policy: always
+#    recreate: true
+#    user: "{{ _mariadb_cluster_user_string }}"
+#    networks:
+#      - name: mariadb-cluster
+#    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+#    command: |
+#      --wsrep-new-cluster
+#      --wsrep-cluster-name={{ mariadb_cluster_galera_cluster_name }}
+#      --wsrep-cluster-address=gcomm://
+#      --wsrep-on=ON
+#      --wsrep-provider=/usr/lib/galera/libgalera_smm.so
+#      --binlog-format=row
+#      --default-storage-engine=InnoDB
+#      --innodb-autoinc-lock-mode=2
+#      --bind-address=0.0.0.0
+#    env:
+#      MARIADB_ROOT_PASSWORD: "{{ mariadb_cluster_root_password }}"
+#      MARIADB_CHARACTER_SET: "utf8mb4"
+#      MARIADB_COLLATE: "utf8mb4_unicode_520_ci"
+#      TZ: UTC
+#    volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", /var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf]
+#  tags: [docker, mariadb, mysql]
+
+- name: Wait for master to be ready (2 consecutive pings)
+  ansible.builtin.shell: |
+    success_count=0
+    max_attempts=600
+    attempt=0
+    while [ $attempt -lt $max_attempts ]; do
+      if docker exec {{ mariadb_cluster_container_name }} mariadb-admin ping --ssl-verify-server-cert=false -u{{ mariadb_cluster_root_user | default('root') }} -p{{ mariadb_cluster_root_password }} >/dev/null 2>&1; then
+        success_count=$((success_count + 1))
+        echo "Ping successful ($success_count/2)"
+        if [ $success_count -ge 2 ]; then
+          echo "Two consecutive pings successful!"
+          exit 0
+        fi
+      else
+        success_count=0
+        echo "Ping failed, resetting counter"
+      fi
+      attempt=$((attempt + 1))
+      sleep 1
+    done
+    echo "Max attempts reached without 2 consecutive successes"
+    exit 1
+  register: _result
+  changed_when: false
+  no_log: true
+  tags: [mariadb]
