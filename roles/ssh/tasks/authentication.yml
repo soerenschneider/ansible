@@ -103,6 +103,7 @@
 - name: "Add SSH user CA"
   when: [ssh_user_ca_enabled | default(True), ssh_user_ca_key_file | default("") | length > 0]
   tags: [ssh, base]
+  notify: Restart_sshd
   block:
     - name: Add user CA key
       ansible.builtin.get_url:
@@ -118,3 +119,12 @@
         regexp: ^#?TrustedUserCAKeys
         line: TrustedUserCAKeys {{ ssh_user_ca_key_file }}
       notify: Restart_sshd
+
+- name: Add host certificate
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    line: HostCertificate {{ ssh_host_certificate_file }}
+    regexp: "^HostCertificate "
+    insertafter: ^#?HostKey
+  notify: Restart_sshd
+  tags: [ssh, base]
