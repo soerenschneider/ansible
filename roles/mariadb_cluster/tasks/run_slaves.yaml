@@ -15,17 +15,6 @@
     volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", "/var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf"]
   tags: [docker, mariadb, mysql]
 
-#- name: Wait for node to be ready
-#  ansible.builtin.command: >
-#    docker exec {{ mariadb_cluster_container_name }} mariadb-admin ping --ssl-verify-server-cert=false -u{{ mariadb_cluster_root_user | default('root') }} -p{{ mariadb_cluster_root_password }}
-#  register: _result
-#  until: _result.rc == 0
-#  retries: 100
-#  delay: 5
-#  no_log: true
-#  changed_when: false
-#  tags: [mariadb]
-
 - name: Wait for slaves to be ready (2 consecutive pings)
   ansible.builtin.shell: |
     success_count=0

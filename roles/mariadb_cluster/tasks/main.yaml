@@ -1,113 +1,15 @@
 ---
-- name: Create mariadb group
-  ansible.builtin.group:
-    name: "{{ mariadb_cluster_group }}"
-    system: true
-  tags: [mariadb, exporter, db]
+- name: Install mariadb
+  ansible.builtin.include_tasks: install.yaml
+  tags: always
 
-- name: Create mariadb user
-  ansible.builtin.user:
-    name: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    system: true
-  tags: [mariadb, exporter, db]
+- name: Configure mariadb
+  ansible.builtin.include_tasks: configure.yaml
+  tags: always
 
-- name: Create mariadb dir
-  ansible.builtin.file:
-    path: "{{ mariadb_cluster_base_dir }}"
-    state: directory
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0770"
-  tags: [mariadb, db]
-
-- name: Create mariadb storage dir
-  ansible.builtin.file:
-    path: "{{ mariadb_cluster_storage_dir }}"
-    state: directory
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0770"
-  tags: [mariadb, db]
-
-- name: Create mariadb certs dir
-  ansible.builtin.file:
-    path: "{{ mariadb_cluster_certs_dir }}"
-    state: directory
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0770"
-  tags: [mariadb, db]
-
-- name: Create mariadb initdb dir
-  ansible.builtin.file:
-    path: "{{ mariadb_cluster_initdb_dir }}"
-    state: directory
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0770"
-  tags: [mariadb, db]
-
-- name: Create mariadb initdb scripts
-  ansible.builtin.template:
-    src: "{{ item }}"
-    dest: "{{ mariadb_cluster_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_user }}"
-    mode: "0700"
-  with_fileglob:
-    - "templates/mariadb-initdb/*.j2"
-  tags: [mariadb, db]
-
-- name: Create env file
-  ansible.builtin.copy:
-    content: |
-      MARIADB_ROOT_PASSWORD={{ mariadb_cluster_root_password }}
-      MARIADB_CHARACTER_SET=utf8mb4
-      MARIADB_COLLATE=utf8mb4_unicode_520_ci
-      TZ=UTC
-    dest: "{{ mariadb_cluster_base_dir }}/env"
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0400"
-  tags: [mariadb, db]
-
-- name: Add my.cnf
-  ansible.builtin.copy:
-    content: |
-      [mariadb]
-      ssl_cert = /certs/tls.crt
-      ssl_key = /certs/tls.key
-      require_secure_transport = ON
-      binlog_format = ROW
-      default_storage_engine=InnoDB
-      innodb_autoinc_lock_mode=2
-      [galera]
-      wsrep_on = ON
-      wsrep_cluster_name = {{ mariadb_cluster_galera_cluster_name }}
-      wsrep_provider = /usr/lib/galera/libgalera_smm.so
-      wsrep_sst_method=mariabackup
-      wsrep_sst_auth=sst_user:{{ mariadb_cluster_replication_password }}
-      wsrep_node_incoming_address={{ inventory_hostname }}
-      wsrep_node_address={{ inventory_hostname }}
-      wsrep-node-name={{ inventory_hostname }}
-      {% if mariadb_cluster_preferred_donors | default([]) | length > 0 %}
-      # NOTE: the comma at the end is not a typo, see https://fromdual.com/define-preferred-sst-donor-for-galera-cluster
-      wsrep_sst_donor={{ mariadb_cluster_preferred_donors | join(',') }},
-      {% endif %}
-      wsrep_provider_options=gcache.size=512M;socket.ssl=yes;socket.ssl_ca=/certs/wsrep-ca.crt;socket.ssl_cert=/certs/wsrep.crt;socket.ssl_key=/certs/wsrep.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568;
-      [sst]
-      tca=/certs/sst-ca.crt
-      tcert=/certs/sst.crt
-      encrypt=2
-      [mariabackup]
-      ssl-verify-server-cert = false
-    dest: "{{ mariadb_cluster_base_dir }}/my.cnf"
-    owner: "{{ mariadb_cluster_user }}"
-    group: "{{ mariadb_cluster_group }}"
-    mode: "0440"
-  register: _mariadb_set_config
-  tags: [mariadb, db]
+- name: Check certificates
+  ansible.builtin.include_tasks: check_certs.yaml
+  tags: always
 
 - name: "Check connectivity"
   tags: [mariadb, connectivity]
@@ -115,7 +17,7 @@
     - name: Test connectivity to all hosts
       ansible.builtin.ping:
       register: ping_result
-      ignore_errors: yes
+      ignore_errors: true
 
     - name: Build list of online hosts
       ansible.builtin.set_fact:
@@ -125,7 +27,7 @@
     - name: Aggregate online hosts across all hosts
       ansible.builtin.set_fact:
         _all_online_hosts: "{{ groups[group_names[0]] | map('extract', hostvars, 'mariadb_cluster_online_hosts') | select('defined') | flatten | unique | list }}"
-      run_once: yes
+      run_once: true
       when: group_names | length > 0
 
     - name: Display connectivity results
@@ -135,7 +37,7 @@
           Online hosts: {{ _all_online_hosts | length }}
           Offline hosts: {{ (groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length) - (_all_online_hosts | length) }}
           Online host list: {{ _all_online_hosts | sort }}
-      run_once: yes
+      run_once: true
 
     - name: Check if ALL hosts are online
       ansible.builtin.assert:
@@ -143,8 +45,8 @@
           - _all_online_hosts | length == (groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length)
         success_msg: "✅ SUCCESS: All {{ groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length }} hosts in the group are online"
         fail_msg: "❌ FAILURE: Not all hosts are online. {{ _all_online_hosts | length }}/{{ groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length }} hosts are reachable"
-      run_once: yes
-      ignore_errors: yes
+      run_once: true
+      ignore_errors: true
       register: all_hosts_check
 
     - name: Check if at least TWO hosts are online
@@ -153,8 +55,8 @@
           - _all_online_hosts | length >= 2
         success_msg: "✅ SUCCESS: At least 2 hosts are online ({{ _all_online_hosts | length }} hosts reachable)"
         fail_msg: "❌ FAILURE: Less than 2 hosts are online (only {{ _all_online_hosts | length }} host(s) reachable)"
-      run_once: yes
-      ignore_errors: yes
+      run_once: true
+      ignore_errors: true
       register: min_hosts_check
 
     - name: Final summary
@@ -165,50 +67,13 @@
           All hosts online: {{ 'YES' if all_hosts_check is succeeded else 'NO' }}
           At least 2 hosts online: {{ 'YES' if min_hosts_check is succeeded else 'NO' }}
           ============================================================
-      run_once: yes
-
-- name: Check certificate expiration for multiple certificates
-  tags: [mariadb, certificates]
-  block:
-    - name: Get certificate expiration date
-      ansible.builtin.command: openssl x509 -in "{{ item }}" -noout -enddate
-      register: _cert_enddate
-      changed_when: false
-      loop: "{{ mariadb_cluster_certificate_paths }}"
-
-    - name: Check if each certificate is expired using openssl
-      ansible.builtin.command: openssl x509 -in "{{ item.item }}" -noout -checkend 0
-      register: _cert_validity_check
-      failed_when: false
-      changed_when: false
-      loop: "{{ _cert_enddate.results }}"
-
-    - name: Build certificate status list
-      ansible.builtin.set_fact:
-        _cert_expired: "{{ _cert_expired | default([]) + [{'path': item.0.item, 'expired': item.1.rc != 0, 'expiry_date': item.0.stdout | regex_replace('notAfter=', '') | trim}] }}"
-      loop: "{{ _cert_enddate.results | zip(_cert_validity_check.results) | list }}"
-
-    - name: Display certificate status
-      ansible.builtin.debug:
-        msg: "Certificate {{ item.path }}: {{ 'EXPIRED' if item.expired else 'Valid' }} (expires: {{ item.expiry_date }})"
-      loop: "{{ _cert_expired }}"
-
-    - name: Fail if any certificate is expired
-      ansible.builtin.fail:
-        msg: |
-          One or more certificates have expired:
-          {% for cert in _cert_expired %}
-          {% if cert.expired %}
-          - {{ cert.path }}: expired {{ cert.expiry_date }}
-          {% endif %}
-          {% endfor %}
-      when: _cert_expired | selectattr('expired', 'equalto', true) | list | length > 0
+      run_once: true
 
 - name: Get container information
   tags: [mariadb]
   block:
     - name: Get container information
-      docker_container_info:
+      community.docker.docker_container_info:
         name: "{{ mariadb_cluster_container_name }}"
       register: container_info
 
@@ -243,7 +108,7 @@
           ansible.builtin.set_fact:
             uptime_seconds: "{{ uptime_seconds.stdout }}"
             uptime_minutes: "{{ uptime_seconds.stdout | int / 60 }}"
-            running_and_stabilized: "{{ uptime_seconds.stdout | int / 60 >= 2 }}" # at least running for 2 minutes
+            running_and_stabilized: "{{ uptime_seconds.stdout | int / 60 >= 2 }}"  # at least running for 2 minutes
             running: "{{ uptime_seconds.stdout | int >= 0 }}"
           when: container_info.container.State.Running
 
@@ -266,12 +131,12 @@
   ansible.builtin.getent:
     database: passwd
     key: "{{ mariadb_cluster_user }}"
-  tags: always
+  tags: [mariadb]
 
 - name: Build user string
   ansible.builtin.set_fact:
     _mariadb_cluster_user_string: "{{ getent_passwd[mariadb_cluster_user][1] }}"
-  tags: always
+  tags: [mariadb]
 
 - name: Create mariadb docker network
   community.docker.docker_network:
@@ -292,6 +157,7 @@
       ansible.builtin.shell: |
         grep -Fxq "safe_to_bootstrap: 1" {{ mariadb_cluster_storage_dir }}/grastate.dat
       register: bootstrap_check
+      changed_when: false
       ignore_errors: true
 
     - name: Set per-host fact if safe to bootstrap
@@ -300,7 +166,7 @@
 
     - name: Gather safe_to_bootstrap info from all nodes
       ansible.builtin.set_fact:
-        bootstrap_candidates: "{{ groups.dbs | map('extract', hostvars) | list | json_query('[?is_safe_to_bootstrap].inventory_hostname') }}"
+        bootstrap_candidates: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[?is_safe_to_bootstrap].inventory_hostname') }}"
       run_once: true
 
     - name: "Set bootstrap_candidates"
@@ -346,9 +212,6 @@
       ansible.builtin.command: "docker logs --since=1m {{ mariadb_cluster_container_name }}"
       changed_when: false
       register: container_logs
-    - name: debug
-      debug:
-        var: container_logs
 
     - name: Find correct logline
       ansible.builtin.set_fact:
@@ -364,7 +227,7 @@
 
     - name: "Map and set data for extracted position"
       ansible.builtin.set_fact:
-        _data: "{{ groups.dbs | map('extract', hostvars) | list | json_query('[].{host: inventory_hostname, pos: extracted_number }') }}"
+        _data: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[].{host: inventory_hostname, pos: extracted_number }') }}"
 
     - name: "Sort data"
       ansible.builtin.command: "python3 -c 'import sys, json; data = json.load(sys.stdin); sorted_data = sorted(data, key=lambda x: int(x[\"pos\"]), reverse=True); print(sorted_data[0][\"host\"])'"

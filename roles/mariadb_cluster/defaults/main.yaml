@@ -1,4 +1,13 @@
 ---
+# renovate: datasource=github-tags depName=bitnami/mariadb-galera
+mariadb_cluster_version: "11.8.2"
+mariadb_cluster_image: "bitnami/mariadb-galera:{{ mariadb_version }}"
+
+# renovate: datasource=github-tags depName=prom/mysqld-exporter
+mariadb_cluster_mysqld_exporter_version: "v0.17.2"
+mariadb_cluster_mysqld_exporter_image: "prom/mysqld-exporter:{{ mariadb_cluster_mysqld_exporter_version }}"
+
+
 mariadb_cluster_user: "mariadb"
 mariadb_cluster_group: "mariadb"
 
@@ -20,22 +29,12 @@ mariadb_cluster_certificate_paths:
   - "{{ mariadb_cluster_certs_dir }}/wsrep-ca.crt"
 
 mariadb_cluster_online_hosts: []
-
 mariadb_cluster_ansible_group: "dbs"
-
 mariadb_cluster_preferred_donors: []
-
-# renovate: datasource=github-tags depName=bitnami/mariadb-galera
-mariadb_cluster_version: "11.8.2"
-mariadb_cluster_image: "bitnami/mariadb-galera:{{ mariadb_version }}"
-
-# renovate: datasource=github-tags depName=prom/mysqld-exporter
-mariadb_cluster_mysqld_exporter_version: "v0.17.2"
-mariadb_cluster_mysqld_exporter_image: "prom/mysqld-exporter:{{ mysqld_exporter_version }}"
 
 mariadb_cluster_master: "{{ groups[mariadb_cluster_ansible_group][1] }}"
 
 mariadb_cluster_galera_backup_user: backup
 
-mariadb_cluster_galera_cluster_address_default: "gcomm://{% for node in groups['dbs'] %}{{ node }}:4567{% if not loop.last %},{% endif %}{% endfor %}"
+mariadb_cluster_galera_cluster_address_default: "gcomm://{% for node in groups[mariadb_cluster_ansible_group] %}{{ node }}:4567{% if not loop.last %},{% endif %}{% endfor %}"
 mariadb_cluster_galera_cluster_address: "{{ mariadb_cluster_galera_cluster_address_default }}"
