@@ -37,7 +37,6 @@
     done
     echo "Max attempts reached without 2 consecutive successes"
     exit 1
-  register: _result
   changed_when: false
   no_log: true
   tags: [mariadb]

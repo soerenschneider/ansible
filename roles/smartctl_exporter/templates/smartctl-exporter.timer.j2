@@ -1,0 +1,9 @@
+[Unit]
+Description=Run smartmon script regularly
+
+[Timer]
+OnCalendar={{ smartctl_exporter_interval }}
+Persistent=true
+
+[Install]
+WantedBy=timers.target

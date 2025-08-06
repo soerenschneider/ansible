@@ -24,8 +24,7 @@
 - name: "Run tasks firewall_rules"
   ansible.builtin.include_tasks: firewall_rules_{{ ansible_os_family | lower }}.yml
   when: [ansible_system != "OpenBSD", not inventory_hostname.startswith("k8s-"), ufw_enabled | default(true)]
-  ignore_errors: true
-  register: ignore_errors_register
+  ignore_errors: true  # noqa: ignore-errors
   tags: [base, firewall]
 
 - name: "Include role raspberry"

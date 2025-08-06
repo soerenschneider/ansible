@@ -1,128 +1,128 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    desired_version: "{{ dyndns_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    dyndns_local_binary: ""
+    dyndns_installed_version: ""
+    dyndns_desired_version: "{{ dyndns_version | default('') }}"
+    dyndns_download_archive: ""
+    dyndns_download_signature: ""
+    dyndns_stopped_service: ""
+    dyndns_github_release: ""
+    dyndns_go_os: ""
+    dyndns_go_arch: ""
+    dyndns_checksum_signature_file: ""
+    dyndns_checksum_file: ""
+    dyndns_full_filename: ""
+    dyndns_release_checksum: ""
   tags: [dyndns, dyndns-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: dyndns_local_binary
   tags: [dyndns, dyndns-install, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: dyndns_local_binary.stat.exists
   tags: [dyndns, dyndns-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'
-      register: installed_version
+      register: dyndns_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        dyndns_installed_version: "{{ dyndns_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ dyndns_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: dyndns_desired_version is not defined or not dyndns_desired_version
   tags: [dyndns, dyndns-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: dyndns_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: dyndns_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        dyndns_desired_version: "{{ dyndns_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ dyndns_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not dyndns_local_binary.stat.exists or dyndns_desired_version != dyndns_installed_version
   tags: [dyndns, dyndns-install, deps]
   block:
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        dyndns_go_os: "{{ ansible_system | lower }}"
+        dyndns_go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_signature_file: /tmp/{{ binary_name }}-checksums.sha256.sig
-        checksum_file: /tmp/{{ binary_name }}-checksums.sha256
-        full_filename: "{{ binary_name }}-{{ go_os }}-{{ go_arch }}"
+        dyndns_checksum_signature_file: /tmp/{{ binary_name }}-checksums.sha256.sig
+        dyndns_checksum_file: /tmp/{{ binary_name }}-checksums.sha256
+        dyndns_full_filename: "{{ binary_name }}-{{ dyndns_go_os }}-{{ dyndns_go_arch }}"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+        dyndns_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [dyndns_full_filename in item, (not dyndns_local_binary.stat.exists or dyndns_installed_version != dyndns_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + dyndns_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
-        dest: /tmp/{{ full_filename }}
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ dyndns_desired_version }}/{{ dyndns_full_filename }}
+        dest: /tmp/{{ dyndns_full_filename }}
+        checksum: sha256:{{ dyndns_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: dyndns_download_archive
+      until: dyndns_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ dyndns_desired_version }}/checksum.sha256
+        dest: "{{ dyndns_checksum_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: dyndns_download_signature
+      until: dyndns_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum signature
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256.sig
-        dest: "{{ checksum_signature_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ dyndns_desired_version }}/checksum.sha256.sig
+        dest: "{{ dyndns_checksum_signature_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: dyndns_download_signature
+      until: dyndns_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ checksum_file }}
+      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ dyndns_checksum_file }}
       changed_when: false
 
     - name: Stop service
@@ -130,11 +130,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: dyndns_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: /tmp/{{ full_filename }}
+        src: /tmp/{{ dyndns_full_filename }}
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -146,7 +146,7 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ checksum_signature_file }}", "{{ checksum_file }}", "/tmp/{{ full_filename }}"]
+      with_items: ["{{ dyndns_checksum_signature_file }}", "{{ dyndns_checksum_file }}", "/tmp/{{ dyndns_full_filename }}"]
       failed_when: false
 
     - name: Restart service
@@ -154,4 +154,4 @@
         name: "{{ service_name }}"
         state: restarted
       failed_when: false
-      when: stopped_service is defined and stopped_service is changed
+      when: dyndns_stopped_service is defined and dyndns_stopped_service is changed

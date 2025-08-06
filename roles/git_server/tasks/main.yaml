@@ -6,7 +6,7 @@
 
 - name: "Ensure git-shell is available"
   ansible.builtin.command: "which git-shell"
-  register: "_git_shell"
+  register: "git_server_shell"
   changed_when: false
   tags: [git-server]
 

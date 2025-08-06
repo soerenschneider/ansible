@@ -12,55 +12,55 @@
     - name: Print debug information
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/node_exporter --version 2>&1 | head -n1 | awk '{print $3}'
       changed_when: false
-      register: node_exporter_installed_version
+      register: node_exporter_node_exporter_installed_version
 
     - name: Print debug information
       ansible.builtin.set_fact:
-        node_exporter_installed_version: v{{ node_exporter_installed_version.stdout }}
+        node_exporter_node_exporter_installed_version: v{{ node_exporter_node_exporter_installed_version.stdout }}
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed: {{ node_exporter_installed_version }}, wanted: {{ node_exporter_version }}"
+        msg: "Installed: {{ node_exporter_node_exporter_installed_version }}, wanted: {{ node_exporter_version }}"
 
 - name: Install node_exporter {{ node_exporter_version }}
-  when: not node_exporter_binary.stat.exists or node_exporter_version != node_exporter_installed_version
+  when: not node_exporter_binary.stat.exists or node_exporter_version != node_exporter_node_exporter_installed_version
   tags: [monitoring, node_exporter, node_exporter-install, deps]
   block:
     - name: Set OS for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        node_exporter_go_os: "{{ ansible_system | lower }}"
+        node_exporter_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
         node_exporter_checksum: "{{ item.split(' ')[0] }}"
       with_items: ["{{ lookup('url', 'https://github.com/prometheus/node_exporter/releases/download/' + node_exporter_version + '/sha256sums.txt', wantlist=True) | list }}"]
-      when: ((go_os) + '-' + (go_arch) + '.tar.gz') in item and (not node_exporter_binary.stat.exists or node_exporter_version != node_exporter_installed_version)
+      when: ((node_exporter_go_os) + '-' + (node_exporter_go_arch) + '.tar.gz') in item and (not node_exporter_binary.stat.exists or node_exporter_version != node_exporter_node_exporter_installed_version)
 
     - name: Download node_exporter archive
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/prometheus/node_exporter/releases/download/{{ node_exporter_version }}/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}.tar.gz
-        dest: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}.tar.gz
+        url: https://github.com/prometheus/node_exporter/releases/download/{{ node_exporter_version }}/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}.tar.gz
+        dest: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}.tar.gz
         checksum: sha256:{{ node_exporter_checksum }}
         mode: "0640"
-      register: _download_archive
-      until: _download_archive is succeeded
+      register: _node_exporter_download_archive
+      until: _node_exporter_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Extract archive...
       become: false
       ansible.builtin.unarchive:
-        src: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}.tar.gz
+        src: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}.tar.gz
         dest: /tmp
-        creates: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}/node_exporter
+        creates: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}/node_exporter
         remote_src: true
       check_mode: false
 
     - name: Copy node_exporter binary
       ansible.builtin.copy:
-        src: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}/{{ item }}
+        src: /tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}/{{ item }}
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -73,4 +73,4 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ['/tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}', '/tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ go_os }}-{{ go_arch }}.tar.gz']
+      with_items: ['/tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}', '/tmp/node_exporter-{{ node_exporter_version[1:] }}.{{ node_exporter_go_os }}-{{ node_exporter_go_arch }}.tar.gz']

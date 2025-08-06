@@ -2,110 +2,110 @@
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: gobot_lux_local_binary
   tags: [gobot-lux, gobot-lux-install, gobot, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: gobot_lux_local_binary.stat.exists
   tags: [gobot-lux, gobot-lux-install, gobot, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'
-      register: installed_version
+      register: gobot_lux_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        gobot_lux_installed_version: "{{ gobot_lux_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ gobot_lux_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: gobot_lux_desired_version is not defined or not gobot_lux_desired_version
   tags: [gobot-lux, gobot-lux-install, gobot, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: gobot_lux_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: gobot_lux_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        gobot_lux_desired_version: "{{ gobot_lux_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ gobot_lux_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not gobot_lux_local_binary.stat.exists or gobot_lux_desired_version != gobot_lux_installed_version
   tags: [gobot-lux, gobot-lux-install, gobot, deps]
   block:
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        gobot_lux_go_os: "{{ ansible_system | lower }}"
+        gobot_lux_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_signature_file: /tmp/{{ binary_name }}-checksums.sha256.sig
-        checksum_file: /tmp/{{ binary_name }}-checksums.sha256
-        full_filename: "{{ binary_name }}-{{ go_os }}-{{ go_arch }}"
+        gobot_lux_checksum_signature_file: /tmp/{{ binary_name }}-checksums.sha256.sig
+        gobot_lux_checksum_file: /tmp/{{ binary_name }}-checksums.sha256
+        gobot_lux_full_filename: "{{ binary_name }}-{{ gobot_lux_go_os }}-{{ gobot_lux_go_arch }}"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+        gobot_lux_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [gobot_lux_full_filename in item, (not gobot_lux_local_binary.stat.exists or gobot_lux_installed_version != gobot_lux_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + gobot_lux_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
-        dest: /tmp/{{ full_filename }}
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ gobot_lux_desired_version }}/{{ gobot_lux_full_filename }}
+        dest: /tmp/{{ gobot_lux_full_filename }}
+        checksum: sha256:{{ gobot_lux_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: gobot_lux_download_archive
+      until: gobot_lux_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ gobot_lux_desired_version }}/checksum.sha256
+        dest: "{{ gobot_lux_checksum_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: gobot_lux_download_signature
+      until: gobot_lux_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum signature
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256.sig
-        dest: "{{ checksum_signature_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ gobot_lux_desired_version }}/checksum.sha256.sig
+        dest: "{{ gobot_lux_checksum_signature_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: gobot_lux_download_signature
+      until: gobot_lux_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ checksum_file }}
+      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ gobot_lux_checksum_file }}
       changed_when: false
 
     - name: Stop service
@@ -113,11 +113,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: gobot_lux_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: /tmp/{{ full_filename }}
+        src: /tmp/{{ gobot_lux_full_filename }}
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -130,11 +130,11 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ checksum_signature_file }}", "{{ checksum_file }}", "/tmp/{{ full_filename }}"]
+      with_items: ["{{ gobot_lux_checksum_signature_file }}", "{{ gobot_lux_checksum_file }}", "/tmp/{{ gobot_lux_full_filename }}"]
       failed_when: false
 
     - name: Restart service
       ansible.builtin.service:
         name: "{{ service_name }}"
         state: restarted
-      when: stopped_service is defined and stopped_service is changed
+      when: gobot_lux_stopped_service is defined and gobot_lux_stopped_service is changed

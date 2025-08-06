@@ -7,5 +7,5 @@ postgres_group: "postgres"
 postgres_network: "pgnet"
 
 postgres_db_user: "postgres"
-#postgres_db_password: ""
+# postgres_db_password: ""
 postgres_db_name: "postgres"

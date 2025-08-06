@@ -58,7 +58,7 @@
   with_items: ["{{ vault_tls.cert_file }}", "{{ vault_tls.key_file }}"]
   when: [vault_tls_key.stat is defined, vault_tls_cert.stat is defined]
   ignore_errors: true
-  register: ignore_errors_register
+  register: vault_ignore_errors_register
   tags: [vault, vault-configure]
 
 - name: Create config

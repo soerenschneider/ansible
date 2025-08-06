@@ -1,71 +1,71 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    desired_version: "{{ vector_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    vector_local_binary: ""
+    vector_installed_version: ""
+    vector_desired_version: "{{ vector_version | default('') }}"
+    vector_download_archive: ""
+    vector_download_signature: ""
+    vector_stopped_service: ""
+    vector_github_release: ""
+    vector_go_os: ""
+    vector_go_arch: ""
+    vector_checksum_signature_file: ""
+    vector_checksum_file: ""
+    vector_full_filename: ""
+    vector_release_checksum: ""
   tags: [vector, vector-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: vector_local_binary
   tags: [vector, vector-install, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: vector_local_binary.stat.exists
   tags: [vector, vector-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | awk '{print $2}'
-      register: installed_version
+      register: vector_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: v{{ installed_version.stdout }}
+        vector_installed_version: v{{ vector_installed_version.stdout }}
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ vector_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: vector_desired_version is not defined or not vector_desired_version
   tags: [vector, vector-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: vector_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: vector_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        vector_desired_version: "{{ vector_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ vector_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not vector_local_binary.stat.exists or vector_desired_version != vector_installed_version
   tags: [vector, vector-install, deps]
   block:
     - name: Generate temp dir
@@ -73,55 +73,55 @@
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: _download_dir
+      register: vector_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
-        _download_dir: "{{ _download_dir.path }}"
-        extraction_dir: "{{ _download_dir.path }}/{{ binary_name }}"
+        vector_go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
+        vector_download_dir: "{{ vector_download_dir.path }}"
+        vector_extraction_dir: "{{ vector_download_dir.path }}/{{ binary_name }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256"
-        full_filename: "{{ binary_name }}-{{ desired_version[1:] }}-{{ go_arch }}-unknown-linux-gnu{% if go_arch in ['arm', 'armv7'] %}eabihf{% endif %}.tar.gz"
+        vector_checksum_file: "{{ vector_download_dir }}/{{ binary_name }}-checksums.sha256"
+        vector_full_filename: "{{ binary_name }}-{{ vector_desired_version[1:] }}-{{ vector_go_arch }}-unknown-linux-gnu{% if vector_go_arch in ['arm', 'armv7'] %}eabihf{% endif %}.tar.gz"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/{{ binary_name }}-{{ desired_version[1:] }}-SHA256SUMS', wantlist=True) | list }}"]
+        vector_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [vector_full_filename in item, (not vector_local_binary.stat.exists or vector_installed_version != vector_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + vector_desired_version + '/{{ binary_name }}-{{ vector_desired_version[1:] }}-SHA256SUMS', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
-        dest: "{{ _download_dir }}/{{ full_filename }}"
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ vector_desired_version }}/{{ vector_full_filename }}
+        dest: "{{ vector_download_dir }}/{{ vector_full_filename }}"
+        checksum: sha256:{{ vector_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: vector_download_archive
+      until: vector_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ binary_name }}-{{ desired_version[1:] }}-SHA256SUMS
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ vector_desired_version }}/{{ binary_name }}-{{ vector_desired_version[1:] }}-SHA256SUMS
+        dest: "{{ vector_checksum_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: vector_download_signature
+      until: vector_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Unpack binaries from archive
       become: false
       ansible.builtin.unarchive:
-        src: "{{ _download_dir }}/{{ full_filename }}"
-        dest: "{{ _download_dir }}"
+        src: "{{ vector_download_dir }}/{{ vector_full_filename }}"
+        dest: "{{ vector_download_dir }}"
         remote_src: true
         list_files: true
       register: _vector_unarchive
@@ -132,11 +132,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: vector_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ _download_dir }}/{{ _vector_unarchive.files[0] }}/bin/{{ item }}"
+        src: "{{ vector_download_dir }}/{{ _vector_unarchive.files[0] }}/bin/{{ item }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"

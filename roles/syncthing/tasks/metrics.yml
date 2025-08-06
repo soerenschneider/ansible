@@ -15,7 +15,7 @@
     owner: root
     group: root
     mode: "0644"
-  register: _systemd_reload_daemon
+  register: syncthing_systemd_reload_daemon
   tags: [syncthing, syncthing-metrics]
 
 - name: Add systemd timer for syncthing dirs metrics
@@ -25,7 +25,7 @@
     owner: root
     group: root
     mode: "0644"
-  register: _systemd_reload_daemon
+  register: syncthing_systemd_reload_daemon
   tags: [syncthing, syncthing-metrics]
 
 - name: Add envs for configs

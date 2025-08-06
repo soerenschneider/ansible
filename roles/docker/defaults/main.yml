@@ -1,0 +1,6 @@
+---
+# renovate: datasource=docker depName=gcr.io/cadvisor/cadvisor
+docker_cadvisor_version: "v0.52.1"
+docker_enable_cadvisor: true
+
+docker_cadvisor_port: 9180

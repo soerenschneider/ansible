@@ -13,7 +13,7 @@
     name: samba_share_fusefs
     state: true
     persistent: true
-  when: [samba.export_fusefs | default(false), ansible_selinux]
+  when: [false, samba.export_fusefs | default(false), ansible_selinux]
   tags: [samba, samba-configure]
 
 - name: Set facts

@@ -2,7 +2,7 @@
 - name: Install restic
   ansible.builtin.package:
     name: [restic, git]
-  register: _init_restic
+  register: restic_init_restic
   tags: [restic, backup]
 
 - name: Clone scripts
@@ -105,6 +105,6 @@
     name: restic-init@{{ item.key }}
     state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
   with_items: "{{ restic_backups | dict2items }}"
-  when: _init_restic is changed  # noqa: no-handler
+  when: restic_init_restic is changed  # noqa: no-handler
   no_log: true
   tags: [restic, backup]

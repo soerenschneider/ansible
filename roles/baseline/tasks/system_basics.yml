@@ -48,7 +48,7 @@
 
 - name: Set timezone
   community.general.timezone:
-    name: "{{ timezone | default('UTC') }}"
+    name: "{{ baseline_timezone | default('UTC') }}"
   tags: [base, timezone]
 
 - name: "Install chronyd (RHEL)"

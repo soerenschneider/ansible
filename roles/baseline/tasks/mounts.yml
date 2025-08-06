@@ -11,7 +11,7 @@
     path: /etc/fstab
     regexp: '^([^#\s]+)\s+{{ item.mount | regex_escape }}\s+({{ item.fstype }})\s+([^\s]*?)(\s+\d+\s+\d+)(.*)$'
     line: '\1 {{ item.mount }} \2 \3,noatime\4\5'
-    backrefs: yes
+    backrefs: true
   when: item.fstype in ['ext2', 'ext3', 'ext4', 'xfs', 'btrfs'] and 'noatime' not in (item.options | default(''))
   with_items: "{{ ansible_mounts | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$') | list }}"
   notify: remount filesystems

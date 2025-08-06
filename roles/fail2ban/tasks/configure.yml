@@ -2,14 +2,14 @@
 - name: Detect local files
   ansible.builtin.stat:
     path: "{{ item.logpath }}"
-  register: logpaths
+  register: fail2ban_logpaths
   with_items: "{{ fail2ban_services }}"
   tags: [fail2ban, fail2ban-configure]
 
 - name: Set facts
   ansible.builtin.set_fact:
-    existing_logpaths: "{{ existing_logpaths | default([]) + [item.item.name] }}"
-  with_items: "{{ logpaths.results }}"
+    fail2ban_existing_logpaths: "{{ fail2ban_existing_logpaths | default([]) + [item.item.name] }}"
+  with_items: "{{ fail2ban_logpaths.results }}"
   when: item.stat.exists
   tags: [fail2ban, fail2ban-configure]
 

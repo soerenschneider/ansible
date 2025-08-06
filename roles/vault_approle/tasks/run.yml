@@ -11,7 +11,7 @@
 - name: "Create base directory if file does not exist"
   ansible.builtin.stat:
     path: "{{ item.config.secret_id_file | dirname }}"
-  register: file_stat
+  register: vault_approle_file_stat
   changed_when: false
 
 - name: "Create base directory"
@@ -21,7 +21,7 @@
     owner: "{{ item.config.secret_id_file_user }}"
     group: "{{ item.config.secret_id_file_group }}"
     mode: "0750"
-  when: not file_stat.stat.exists
+  when: not vault_approle_file_stat.stat.exists
 
 - name: "Create secret_id file if not existent"
   ansible.builtin.copy:
@@ -36,39 +36,39 @@
 - name: "Check if secret_id file exists"
   ansible.builtin.stat:
     path: "{{ item.config.secret_id_file }}"
-  register: _secret_id_file
+  register: vault_approle_secret_id_file
   tags: [vault-approle, vault-approle-rotate]
 
 - name: "Try login with existing credentials"
   ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output login --role-id={{ item.config.role_name }} --secret-id-file={{ item.config.secret_id_file }}
-  when: _secret_id_file.stat.exists and _secret_id_file.stat.size > 0
-  register: _login
+  when: vault_approle_secret_id_file.stat.exists and vault_approle_secret_id_file.stat.size > 0
+  register: vault_approle_login
   changed_when: false
   failed_when: false
   tags: [vault-approle, vault-approle-rotate]
 
 - name: "Rotate secret_id"
-  when: _login.skipped is defined or "rc" in _login and _login.rc != 0
+  when: vault_approle_login.skipped is defined or "rc" in vault_approle_login and vault_approle_login.rc != 0
   tags: [vault-approle, vault-approle-rotate]
   block:
     - name: "Create new wrapped secret_id"
       ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output add-secret-id {% if item.config.cidr_lookup_host | default('') | length > 0 %}-a={{ item.config.cidr_lookup_host }}{% endif %} --metadata host={{ inventory_hostname }} --role-name={{ item.config.role_name }} --wrap-ttl=600
-      register: _vault_output
-      when: _login.skipped is defined or _login.rc != 0
+      register: vault_approle_secret_id_output
+      when: vault_approle_login.skipped is defined or vault_approle_login.rc != 0
       become: false
       delegate_to: localhost
       changed_when: true
 
     - name: "Extract data from response"
       ansible.builtin.set_fact:
-        vault_wrapped_token: "{{ (_vault_output.stdout | from_json).vault_response.token }}"
-      when: _login.skipped is defined or _login.rc != 0
+        vault_approle_wrapped_token: "{{ (vault_approle_secret_id_output.stdout | from_json).vault_response.token }}"
+      when: vault_approle_login.skipped is defined or vault_approle_login.rc != 0
       become: false
       delegate_to: localhost
 
     - name: "Store wrapped secret_id"
       ansible.builtin.copy:
-        content: "{{ vault_wrapped_token }}"
+        content: "{{ vault_approle_wrapped_token }}"
         dest: "{{ item.config.secret_id_file }}"
         owner: root
         group: root
@@ -78,6 +78,6 @@
     - name: "Unwrap token and store to file"
       ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output unwrap-secret-id --secret-id-file="{{ item.config.secret_id_file }}"
       environment:
-        VAULT_TOKEN: "{{ vault_wrapped_token }}"
+        VAULT_TOKEN: "{{ vault_approle_wrapped_token }}"
       changed_when: true
       when: item.config.unwrap_before_save | default(False)

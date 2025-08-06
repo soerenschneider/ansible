@@ -1,72 +1,72 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    k0s_desired_version: "{{ k0s_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    k0s_local_binary: ""
+    k0s_installed_version: ""
+    k0s_k0s_desired_version: "{{ k0s_version | default('') }}"
+    k0s_download_archive: ""
+    k0s_download_signature: ""
+    k0s_stopped_service: ""
+    k0s_github_release: ""
+    k0s_go_os: ""
+    k0s_go_arch: ""
+    k0s_checksum_signature_file: ""
+    k0s_checksum_file: ""
+    k0s_full_filename: ""
+    k0s_release_checksum: ""
   tags: [k0s, k0s-install]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: k0s_local_binary
+  register: k0s_k0s_local_binary
   tags: [k0s, k0s-install]
 
 - name: Check installed version
-  when: k0s_local_binary.stat.exists
+  when: k0s_k0s_local_binary.stat.exists
   tags: [k0s, k0s-install]
   block:
     - name: Check installed version
       ansible.builtin.shell:
         cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} version 2>&1 | awk '{print $1}'"
         executable: /bin/bash
-      register: k0s_installed_version
+      register: k0s_k0s_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        k0s_installed_version: "{{ k0s_installed_version.stdout }}"
+        k0s_k0s_installed_version: "{{ k0s_k0s_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ k0s_installed_version }}"
+        msg: "Installed version: {{ k0s_k0s_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: k0s_desired_version is not defined or not k0s_desired_version
+  when: k0s_k0s_desired_version is not defined or not k0s_k0s_desired_version
   tags: [k0s, k0s-install]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: k0s_github_release
       retries: 3
       delay: 5
 
     - name: Set github release
       ansible.builtin.set_fact:
-        k0s_desired_version: "{{ github_release.json.tag_name }}"
+        k0s_k0s_desired_version: "{{ k0s_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ k0s_desired_version }}"
+        msg: "Latest GitHub version: {{ k0s_k0s_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not k0s_local_binary.stat.exists or k0s_desired_version != k0s_installed_version
+  when: not k0s_k0s_local_binary.stat.exists or k0s_k0s_desired_version != k0s_k0s_installed_version
   tags: [k0s, k0s-install]
   block:
     - name: Generate temp dir
@@ -74,48 +74,48 @@
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: _download_dir
+      register: k0s_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
-        _download_dir: "{{ _download_dir.path }}"
-        extraction_dir: "{{ _download_dir.path }}/{{ binary_name }}"
+        k0s_go_os: "{{ ansible_system | lower }}"
+        k0s_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        k0s_download_dir: "{{ k0s_download_dir.path }}"
+        k0s_extraction_dir: "{{ k0s_download_dir.path }}/{{ binary_name }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_file: "{{ _download_dir }}/{{ binary_name }}-sha256sums.txt"
-        full_filename: "{{ binary_name }}-{{ k0s_desired_version }}-{{ go_arch }}"
+        k0s_checksum_file: "{{ k0s_download_dir }}/{{ binary_name }}-sha256sums.txt"
+        k0s_full_filename: "{{ binary_name }}-{{ k0s_k0s_desired_version }}-{{ k0s_go_arch }}"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [item.endswith(full_filename), (not k0s_local_binary.stat.exists or k0s_installed_version != k0s_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + k0s_desired_version + '/sha256sums.txt', wantlist=True) | list }}"]
+        k0s_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [item.endswith(k0s_full_filename), (not k0s_k0s_local_binary.stat.exists or k0s_k0s_installed_version != k0s_k0s_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + k0s_k0s_desired_version + '/sha256sums.txt', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ k0s_desired_version }}/{{ full_filename }}
-        dest: "{{ _download_dir }}/{{ full_filename }}"
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ k0s_k0s_desired_version }}/{{ k0s_full_filename }}
+        dest: "{{ k0s_download_dir }}/{{ k0s_full_filename }}"
+        checksum: sha256:{{ k0s_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: k0s_download_archive
+      until: k0s_download_archive is succeeded
       retries: 1
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ k0s_desired_version }}/sha256sums.txt
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ k0s_k0s_desired_version }}/sha256sums.txt
+        dest: "{{ k0s_checksum_file }}"
         mode: "0640"
-      register: k0s_download_signature
-      until: k0s_download_signature is succeeded
+      register: k0s_k0s_download_signature
+      until: k0s_k0s_download_signature is succeeded
       retries: 5
       delay: 2
 
@@ -124,11 +124,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: k0s_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ _download_dir }}/{{ full_filename }}"
+        src: "{{ k0s_download_dir }}/{{ k0s_full_filename }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -141,11 +141,11 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ _download_dir }}"]
+      with_items: ["{{ k0s_download_dir }}"]
       failed_when: false
 
     - name: Restart service
       ansible.builtin.service:
         name: "{{ service_name }}"
         state: restarted
-      when: stopped_service is defined and stopped_service is changed
+      when: k0s_stopped_service is defined and k0s_stopped_service is changed

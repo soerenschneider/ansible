@@ -1,73 +1,73 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    desired_version: "{{ minio_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    minio_local_binary: ""
+    minio_installed_version: ""
+    minio_desired_version: "{{ minio_version | default('') }}"
+    minio_download_archive: ""
+    minio_download_signature: ""
+    minio_stopped_service: ""
+    minio_github_release: ""
+    minio_go_os: ""
+    minio_go_arch: ""
+    minio_checksum_signature_file: ""
+    minio_checksum_file: ""
+    minio_full_filename: ""
+    minio_release_checksum: ""
   tags: [minio, minio-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: minio_local_binary
   tags: [minio, minio-install, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: minio_local_binary.stat.exists
   tags: [minio, minio-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell:
         cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | head -n1 | awk '{print $3}'"
         executable: /bin/bash
-      register: installed_version
+      register: minio_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        minio_installed_version: "{{ minio_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ minio_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: minio_desired_version is not defined or not minio_desired_version
   tags: [minio, minio-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: minio_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: minio_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        minio_desired_version: "{{ minio_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ minio_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not minio_local_binary.stat.exists or minio_desired_version != minio_installed_version
   tags: [minio, minio-install, deps]
   block:
     - name: Generate temp dir
@@ -75,44 +75,44 @@
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: _download_dir
+      register: minio_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
-        _download_dir: "{{ _download_dir.path }}"
-        extraction_dir: "{{ _download_dir.path }}/{{ binary_name }}"
+        minio_go_os: "{{ ansible_system | lower }}"
+        minio_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        minio_download_dir: "{{ minio_download_dir.path }}"
+        minio_extraction_dir: "{{ minio_download_dir.path }}/{{ binary_name }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_signature_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256.sig"
-        checksum_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256"
-        full_filename: "{{ binary_name }}.{{ desired_version }}"
-        minio_url: https://dl.min.io/server/minio/release/{{ go_os }}-{{ go_arch }}/minio.{{ desired_version }}
+        minio_checksum_signature_file: "{{ minio_download_dir }}/{{ binary_name }}-checksums.sha256.sig"
+        minio_checksum_file: "{{ minio_download_dir }}/{{ binary_name }}-checksums.sha256"
+        minio_full_filename: "{{ binary_name }}.{{ minio_desired_version }}"
+        minio_url: https://dl.min.io/server/minio/release/{{ minio_go_os }}-{{ minio_go_arch }}/minio.{{ minio_desired_version }}
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
+        minio_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [minio_full_filename in item, (not minio_local_binary.stat.exists or minio_installed_version != minio_desired_version)]
       with_items: ["{{ lookup('url', minio_url + '.sha256sum', wantlist=True) | list }}"]
     - name: Print debug information
       ansible.builtin.debug:
-        var: release_checksum
+        var: minio_release_checksum
       tags: minio
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
         # checkov:skip=CKV2_ANSIBLE_2:false positive
-        dest: "{{ _download_dir }}/{{ full_filename }}"
-        checksum: sha256:{{ release_checksum }}
+        dest: "{{ minio_download_dir }}/{{ minio_full_filename }}"
+        checksum: sha256:{{ minio_release_checksum }}
         url: "{{ minio_url }}"
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: minio_download_archive
+      until: minio_download_archive is succeeded
       retries: 5
       delay: 2
 
@@ -121,11 +121,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: minio_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ _download_dir }}/{{ full_filename }}"
+        src: "{{ minio_download_dir }}/{{ minio_full_filename }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -138,7 +138,7 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ _download_dir }}"]
+      with_items: ["{{ minio_download_dir }}"]
       failed_when: false
 
     - name: Restart service
@@ -146,4 +146,4 @@
         name: "{{ service_name }}"
         state: restarted
       failed_when: false
-      when: stopped_service is defined and stopped_service is changed
+      when: minio_stopped_service is defined and minio_stopped_service is changed

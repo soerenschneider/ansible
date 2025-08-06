@@ -25,12 +25,12 @@
 
     - name: Detect binary for signify-openbsd
       ansible.builtin.command: which signify-openbsd
-      register: signify_openbsd_location
+      register: baseline_signify_openbsd_location
       changed_when: false
 
     - name: Add link for signify
       ansible.builtin.file:
-        src: "{{ signify_openbsd_location.stdout }}"
+        src: "{{ baseline_signify_openbsd_location.stdout }}"
         path: /usr/bin/signify
         state: link
         owner: root

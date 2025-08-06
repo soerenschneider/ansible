@@ -30,7 +30,7 @@
 - name: Check whether adblocker file is already populated
   ansible.builtin.stat:
     path: "{{ unbound_adblocker_adblocker_file }}"
-  register: _adblocker_file
+  register: unbound_adblocker_file_stat
   tags: [unbound, adblocker]
 
 - name: Add weekly cron job to update adblocker db (Linux)
@@ -51,7 +51,7 @@
     group: root
     mode: "0644"
   with_items: [unbound-update-adblocker-db.service, unbound-update-adblocker-db.timer]
-  register: _adblocker_systemd_units
+  register: unbound_adblocker_systemd_units
   tags: [unbound, adblocker]
   when: ansible_system == "Linux"
 
@@ -66,7 +66,7 @@
 - name: Initialize adblocker db (Linux)
   ansible.builtin.command: bash /usr/local/bin/unbound_update_adblocker_db
   ignore_errors: true
-  register: ignore_errors_register
-  when: _adblocker_file.stat.size < 1
+  register: unbound_ignore_errors_register
+  when: unbound_adblocker_file_stat.stat.size < 1
   changed_when: true
   tags: [unbound, adblocker]

@@ -52,13 +52,13 @@
       ansible.builtin.find:
         paths: "{{ sc_agent_conf_dir }}"
         file_type: "file"
-      register: "_found_files"
+      register: "sc_agent_conf_found_files"
 
     - name: "Remove files not in the dictionary"
       ansible.builtin.file:
         path: "{{ item.path }}"
         state: "absent"
-      loop: "{{ _found_files.files }}"
+      loop: "{{ sc_agent_conf_found_files.files }}"
       when: item.path | basename not in sc_agent_conf_d.keys() | map('string') | list
 
     - name: Create config

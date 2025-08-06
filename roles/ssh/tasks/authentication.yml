@@ -38,21 +38,21 @@
 
 - name: Assemble AuthenticationMethods (Linux)
   ansible.builtin.set_fact:
-    auth_methods: "{% if ssh_2fa_enabled and ssh_force_pubkey_and_2fa %}publickey,keyboard-interactive{% else %}publickey{% endif %}"
+    ssh_auth_methods: "{% if ssh_2fa_enabled and ssh_force_pubkey_and_2fa %}publickey,keyboard-interactive{% else %}publickey{% endif %}"
   when: ansible_system == "Linux"
   tags: [ssh, base]
 
 - name: Assemble AuthenticationMethods (OpenBSD)
   ansible.builtin.set_fact:
-    auth_methods: "{% if ssh_2fa_enabled and ssh_force_pubkey_and_2fa %}publickey,password{% else %}publickey{% endif %}"
+    ssh_auth_methods: "{% if ssh_2fa_enabled and ssh_force_pubkey_and_2fa %}publickey,password{% else %}publickey{% endif %}"
   when: ansible_system == "OpenBSD"
   tags: [ssh, base]
 
-- name: Set 'AuthenticationMethods {{ auth_methods }}'
+- name: Set 'AuthenticationMethods {{ ssh_auth_methods }}'
   ansible.builtin.lineinfile:
     dest: /etc/ssh/sshd_config
     regexp: ^#?AuthenticationMethods
-    line: AuthenticationMethods {{ auth_methods }}
+    line: AuthenticationMethods {{ ssh_auth_methods }}
   notify: Restart_sshd
   tags: [ssh, base]
 

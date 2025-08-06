@@ -2,114 +2,114 @@
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: oauth2_proxy_local_binary
   tags: [oauth2-proxy, oauth2-proxy-install]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: oauth2_proxy_local_binary.stat.exists
   tags: [oauth2-proxy, oauth2-proxy-install]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | awk '{print $2}'
-      register: installed_version
+      register: oauth2_proxy_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        oauth2_proxy_installed_version: "{{ oauth2_proxy_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ oauth2_proxy_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: oauth2_proxy_desired_version is not defined or not oauth2_proxy_desired_version
   tags: [oauth2-proxy, oauth2-proxy-install]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: oauth2_proxy_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: oauth2_proxy_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        oauth2_proxy_desired_version: "{{ oauth2_proxy_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ oauth2_proxy_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not oauth2_proxy_local_binary.stat.exists or oauth2_proxy_desired_version != oauth2_proxy_installed_version
   tags: [oauth2-proxy, oauth2-proxy-install]
   block:
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        basename: "{{ binary_name }}-{{ desired_version }}.{{ go_os }}-{{ go_arch }}"
+        oauth2_proxy_basename: "{{ binary_name }}-{{ oauth2_proxy_desired_version }}.{{ oauth2_proxy_go_os }}-{{ oauth2_proxy_go_arch }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        archive_filename: "{{ basename }}.tar.gz"
-        archive_checksum: "{{ basename }}-sha256sum.txt"
-        unarchived_dir: oauth2-proxy-{{ desired_version }}.{{ go_os }}-{{ go_arch }}
+        oauth2_proxy_archive_filename: "{{ oauth2_proxy_basename }}.tar.gz"
+        oauth2_proxy_archive_checksum: "{{ oauth2_proxy_basename }}-sha256sum.txt"
+        oauth2_proxy_unarchived_dir: oauth2-proxy-{{ oauth2_proxy_desired_version }}.{{ oauth2_proxy_go_os }}-{{ oauth2_proxy_go_arch }}
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [basename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/{{ archive_checksum }}', wantlist=True) | list }}"]
+        oauth2_proxy_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [oauth2_proxy_basename in item, (not oauth2_proxy_local_binary.stat.exists or oauth2_proxy_installed_version != oauth2_proxy_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + oauth2_proxy_desired_version + '/{{ oauth2_proxy_archive_checksum }}', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ archive_filename }}
-        dest: /tmp/{{ archive_filename }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ oauth2_proxy_desired_version }}/{{ oauth2_proxy_archive_filename }}
+        dest: /tmp/{{ oauth2_proxy_archive_filename }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: oauth2_proxy_download_archive
+      until: oauth2_proxy_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Unpack binaries from archive
       become: false
       ansible.builtin.unarchive:
-        src: /tmp/{{ archive_filename }}
+        src: /tmp/{{ oauth2_proxy_archive_filename }}
         dest: /tmp
-        creates: /tmp/{{ unarchived_dir }}/oauth2-proxy
+        creates: /tmp/{{ oauth2_proxy_unarchived_dir }}/oauth2-proxy
         remote_src: true
       check_mode: false
 
     - name: Get local checksum
       ansible.builtin.stat:
-        path: /tmp/{{ unarchived_dir }}/oauth2-proxy
+        path: /tmp/{{ oauth2_proxy_unarchived_dir }}/oauth2-proxy
         checksum_algorithm: sha256
-      register: _local_checksum
+      register: oauth2_proxy_local_checksum
 
     - name: Fail if checksums don't match
       ansible.builtin.fail:
-        msg: Expected {{ release_checksum }}, got {{ _local_checksum.stat.checksum }}
-      when: _local_checksum.stat.checksum != release_checksum
+        msg: Expected {{ oauth2_proxy_release_checksum }}, got {{ oauth2_proxy_local_checksum.stat.checksum }}
+      when: oauth2_proxy_local_checksum.stat.checksum != oauth2_proxy_release_checksum
 
     - name: Try to stop oauth2-proxy if it is running
       ansible.builtin.systemd:
         name: "{{ service_name }}@*.service"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: oauth2_proxy_stopped_service
 
     - name: Copy oauth2-proxy binary
       ansible.builtin.copy:
-        src: /tmp/oauth2-proxy-{{ desired_version }}.{{ go_os }}-{{ go_arch }}/{{ item }}
+        src: /tmp/oauth2-proxy-{{ oauth2_proxy_desired_version }}.{{ oauth2_proxy_go_os }}-{{ oauth2_proxy_go_arch }}/{{ item }}
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -122,11 +122,11 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["/tmp/{{ unarchived_dir }}", "/tmp/{{ archive_filename }}"]
+      with_items: ["/tmp/{{ oauth2_proxy_unarchived_dir }}", "/tmp/{{ oauth2_proxy_archive_filename }}"]
       failed_when: false
 
     - name: Start service
       ansible.builtin.systemd:
         name: "{{ service_name }}@*.service"
         state: started
-      when: stopped_service is defined and stopped_service is changed
+      when: oauth2_proxy_stopped_service is defined and oauth2_proxy_stopped_service is changed

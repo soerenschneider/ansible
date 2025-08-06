@@ -1,71 +1,71 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    desired_version: "{{ vault_unsealer_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    vault_unsealer_local_binary: ""
+    vault_unsealer_installed_version: ""
+    vault_unsealer_desired_version: "{{ vault_unsealer_version | default('') }}"
+    vault_unsealer_download_archive: ""
+    vault_unsealer_download_signature: ""
+    vault_unsealer_stopped_service: ""
+    vault_unsealer_github_release: ""
+    vault_unsealer_go_os: ""
+    vault_unsealer_go_arch: ""
+    vault_unsealer_checksum_signature_file: ""
+    vault_unsealer_checksum_file: ""
+    vault_unsealer_full_filename: ""
+    vault_unsealer_release_checksum: ""
   tags: [vault-unsealer, vault-unsealer-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: vault_unsealer_local_binary
   tags: [vault-unsealer, vault-unsealer-install, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: vault_unsealer_local_binary.stat.exists
   tags: [vault-unsealer, vault-unsealer-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $2}'
-      register: installed_version
+      register: vault_unsealer_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        vault_unsealer_installed_version: "{{ vault_unsealer_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ vault_unsealer_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: vault_unsealer_desired_version is not defined or not vault_unsealer_desired_version
   tags: [vault-unsealer, vault-unsealer-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: vault_unsealer_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: vault_unsealer_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        vault_unsealer_desired_version: "{{ vault_unsealer_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ vault_unsealer_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not vault_unsealer_local_binary.stat.exists or vault_unsealer_desired_version != vault_unsealer_installed_version
   tags: [vault-unsealer, vault-unsealer-install, deps]
   block:
     - name: Generate temp dir
@@ -73,65 +73,65 @@
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: _download_dir
+      register: vault_unsealer_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
-        _download_dir: "{{ _download_dir.path }}"
-        extraction_dir: "{{ _download_dir.path }}/{{ binary_name }}"
+        vault_unsealer_go_os: "{{ ansible_system | lower }}"
+        vault_unsealer_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
+        vault_unsealer_download_dir: "{{ vault_unsealer_download_dir.path }}"
+        vault_unsealer_extraction_dir: "{{ vault_unsealer_download_dir.path }}/{{ binary_name }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_signature_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256.sig"
-        checksum_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256"
-        full_filename: "{{ binary_name }}-{{ go_os }}-{{ go_arch }}"
+        vault_unsealer_checksum_signature_file: "{{ vault_unsealer_download_dir }}/{{ binary_name }}-checksums.sha256.sig"
+        vault_unsealer_checksum_file: "{{ vault_unsealer_download_dir }}/{{ binary_name }}-checksums.sha256"
+        vault_unsealer_full_filename: "{{ binary_name }}-{{ vault_unsealer_go_os }}-{{ vault_unsealer_go_arch }}"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+        vault_unsealer_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [vault_unsealer_full_filename in item, (not vault_unsealer_local_binary.stat.exists or vault_unsealer_installed_version != vault_unsealer_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + vault_unsealer_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
-        dest: "{{ _download_dir }}/{{ full_filename }}"
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ vault_unsealer_desired_version }}/{{ vault_unsealer_full_filename }}
+        dest: "{{ vault_unsealer_download_dir }}/{{ vault_unsealer_full_filename }}"
+        checksum: sha256:{{ vault_unsealer_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: vault_unsealer_download_archive
+      until: vault_unsealer_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ vault_unsealer_desired_version }}/checksum.sha256
+        dest: "{{ vault_unsealer_checksum_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: vault_unsealer_download_signature
+      until: vault_unsealer_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum signature
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256.sig
-        dest: "{{ checksum_signature_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ vault_unsealer_desired_version }}/checksum.sha256.sig
+        dest: "{{ vault_unsealer_checksum_signature_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: vault_unsealer_download_signature
+      until: vault_unsealer_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ checksum_file }}
+      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ vault_unsealer_checksum_file }}
       changed_when: false
 
     - name: Stop service
@@ -139,11 +139,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: vault_unsealer_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ _download_dir }}/{{ full_filename }}"
+        src: "{{ vault_unsealer_download_dir }}/{{ vault_unsealer_full_filename }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -156,11 +156,11 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ _download_dir }}"]
+      with_items: ["{{ vault_unsealer_download_dir }}"]
       failed_when: false
 
     - name: Restart service
       ansible.builtin.systemd:
         name: "{{ service_name }}"
         state: restarted
-      when: stopped_service is defined and stopped_service is changed
+      when: vault_unsealer_stopped_service is defined and vault_unsealer_stopped_service is changed

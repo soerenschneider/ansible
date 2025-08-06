@@ -1,16 +1,12 @@
 # {{ ansible_managed }}
 [Unit]
-Description=shutdown-listener
-After=network.target
-
-# restart forever
-StartLimitIntervalSec=0
+Description=smartmon
 
 [Service]
 Type=simple
 User=root
 Group=root
-ExecStart=/usr/local/bin/smartctl_exporter --smartctl.interval={{ smartctl_exporter_interval }}
+ExecStart=/bin/bash -c '/usr/local/sbin/smartmon.sh > {{ prometheus_text_dir }}/smartmon.prom.tmp && mv {{ prometheus_text_dir }}/smartmon.prom.tmp {{ prometheus_text_dir }}/smartmon.prom'
 
 PrivateTmp=true
 ProtectHome=true
@@ -19,11 +15,7 @@ ProtectKernelModules=true
 ProtectKernelTunables=true
 ProtectSystem=full
 
-SyslogIdentifier=shutdown-listener
-
-# restart forever
-Restart=always
-RestartSec=60
+SyslogIdentifier=smartmon
 
 [Install]
 WantedBy=multi-user.target

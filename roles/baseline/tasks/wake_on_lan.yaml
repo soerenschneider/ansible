@@ -20,13 +20,13 @@
 
       [Install]
       WantedBy=multi-user.target
-  register: _wol_service
+  register: baseline_wol_service
   tags: [base, ethtool, wol, wake-on-lan]
 
 - name: "Enable and start wol.service"
   ansible.builtin.systemd:
     name: "wol.service"
     enabled: true
-    daemon_reload: "{% if _wol_service is changed %}true{% else %}false{% endif %}"
+    daemon_reload: "{% if baseline_wol_service is changed %}true{% else %}false{% endif %}"
     state: started
   tags: [base, ethtool, wol, wake-on-lan]

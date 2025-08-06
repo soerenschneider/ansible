@@ -17,8 +17,8 @@
 
 - name: Slurp authorized_keys
   ansible.builtin.slurp:
-    src: /home/{{ ansible_user }}/.ssh/authorized_keys
-  register: _ssh_key
+    src: "/home/{{ ansible_user }}/.ssh/authorized_keys"
+  register: baseline_ssh_key
   become_user: "{{ ansible_user }}"
   become: false
   tags: [base, default_users]
@@ -26,69 +26,69 @@
 - name: Fail on missing authorized_key file
   ansible.builtin.fail:
     msg: "No keys found at: {{ lookup('env', 'HOME') }}/.ssh/authorized_keys"
-  when: _ssh_key['content'] | length == 0
+  when: baseline_ssh_key['content'] | length == 0
   tags: [base, default_users]
 
 - name: "Create group and add user to group"
-  when: default_users_groups is not defined or default_users_groups | length == 0
+  when: baseline_default_users_groups is not defined or baseline_default_users_groups | length == 0
   tags: [base, default_users]
   block:
-    - name: Create group {{ default_users_name }}
+    - name: Create group {{ baseline_default_users_name }}
       ansible.builtin.group:
-        name: "{{ default_users_name }}"
+        name: "{{ baseline_default_users_name }}"
 
     - name: Set default groups our user belongs to
       ansible.builtin.set_fact:
-        default_users_groups: ["{{ default_users_name }}", adm, sudo, ssh]
+        baseline_default_users_groups: ["{{ baseline_default_users_name }}", adm, sudo, ssh]
 
-- name: Create group {{ default_users_name }}
+- name: Create group {{ baseline_default_users_name }}
   ansible.builtin.group:
-    name: "{{ default_users_name }}"
+    name: "{{ baseline_default_users_name }}"
   tags: [base, default_users]
 
-- name: Create user {{ default_users_name }}
+- name: Create user {{ baseline_default_users_name }}
   ansible.builtin.user:
-    name: "{{ default_users_name }}"
-    group: "{{ default_users_group | default(default_users_name) }}"
-    groups: "{{ default_users_groups }}"
-    shell: "{{ default_users_shell | default('/bin/bash') }}"
+    name: "{{ baseline_default_users_name }}"
+    group: "{{ baseline_default_users_group | default(baseline_default_users_name) }}"
+    groups: "{{ baseline_default_users_groups }}"
+    shell: "{{ baseline_default_users_shell | default('/bin/bash') }}"
     append: true
-  register: user_created
+  register: baseline_user_created
   tags: [base, default_users]
 
 - name: Set authorized_keys
   ansible.posix.authorized_key:
-    user: "{{ default_users_name }}"
-    key: "{{ _ssh_key['content'] | b64decode }}"
+    user: "{{ baseline_default_users_name }}"
+    key: "{{ baseline_ssh_key['content'] | b64decode }}"
   tags: [base, default_users]
 
 - name: Remember old user name
   ansible.builtin.set_fact:
-    old_user: "{{ ansible_user }}"
+    baseline_old_user: "{{ ansible_user }}"
   tags: [base, default_users]
 
 - name: Reset ansible user
   ansible.builtin.set_fact:
-    ansible_user: "{{ default_users_name }}"
-  when: [default_users_name is defined, default_users_name | length > 0]
+    ansible_user: "{{ baseline_default_users_name }}"
+  when: [baseline_default_users_name is defined, baseline_default_users_name | length > 0]
   tags: [base, default_users]
 
 - name: Reboot on changed user
   ansible.builtin.reboot:
-  when: user_created is changed  # noqa: no-handler
+  when: baseline_user_created is changed  # noqa: no-handler
   tags: [base, default_users]
 
 - name: "Delete old user and group"
-  when: [old_user != "root", default_users_name is defined, default_users_name | length > 0]
+  when: [baseline_old_user != "root", baseline_default_users_name is defined, baseline_default_users_name | length > 0]
   tags: [base, default_users]
   block:
     - name: Delete old user
       ansible.builtin.user:
-        name: "{{ old_user }}"
+        name: "{{ baseline_old_user }}"
         state: absent
         force: true
 
     - name: Delete old user group
       ansible.builtin.group:
-        name: "{{ old_user }}"
+        name: "{{ baseline_old_user }}"
         state: absent

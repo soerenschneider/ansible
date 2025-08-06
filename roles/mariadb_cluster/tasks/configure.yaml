@@ -68,5 +68,5 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
-  register: _mariadb_set_config
+  register: mariadb_cluster_set_config
   tags: [mariadb, mariadb-configure]

@@ -40,7 +40,7 @@
 - name: Run keycloak
   community.docker.docker_container:
     name: "{{ keycloak_container_name }}"
-    image: "quay.io/phasetwo/keycloak-crdb:{{ keycloak_version }}"
+    image: "{{ keycloak_image }}"
     user: "{{ _keycloak_user_string }}"
     networks:
       - name: "{{ keycloak_docker_network }}"
@@ -52,12 +52,10 @@
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:9000:9000"
     env:
-      KC_DB_SCHEMA: "public"
-      KC_DB_URL_PROPERTIES: "useCockroachMetadata=true"
-      KC_DB: "{{ keycloak_db_name | default('cockroach') }}"
+      KC_DB: "{{ keycloak_db_name }}"
       KC_TRANSACTION_XA_ENABLED: "false"
       KC_TRANSACTION_JTA_ENABLED: "false"
-      KC_DB_URL: "jdbc:cockroachdb://{{ keycloak_db_host }}:{{ keycloak_db_port }}/{{ keycloak_db_database }}"
+      KC_DB_URL: "jdbc:mariadb://{{ keycloak_db_host }}:3306/{{ keycloak_db_database }}?useSSL=true&requireSSL=true&verifyServerCertificate=false"
       KC_DB_USERNAME: "{{ keycloak_db_user }}"
       KC_DB_PASSWORD: "{{ keycloak_db_password }}"
       KC_HTTP_ENABLED: "true"

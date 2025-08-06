@@ -9,7 +9,7 @@
     name: "systemd-journald"
     state: "restarted"
 
-- name: "remount filesystems"
+- name: "Remount filesystems"
   ansible.posix.mount:
     path: "{{ item }}"
     state: remounted

@@ -40,3 +40,22 @@
     state: started
   with_items: [docker-prune.service, docker-prune.timer]
   tags: [docker]
+
+- name: Start cAdvisor container
+  community.docker.docker_container:
+    name: cadvisor
+    image: "gcr.io/cadvisor/cadvisor:{{ docker_cadvisor_version }}"
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "127.0.0.1:{{ docker_cadvisor_port }}:{{ docker_cadvisor_port }}"
+    command:
+      - "-store_container_labels=false"
+      - "-port={{ docker_cadvisor_port }}"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+  when: docker_enable_cadvisor
+  tags: [docker, deps, cadvisor]

@@ -20,7 +20,7 @@
 
 - name: Check for prometheus SELinux module
   ansible.builtin.command: semodule -l | grep prometheus
-  register: _module_exists
+  register: node_exporter_semodule_exists
   when: ansible_selinux
   changed_when: false
   failed_when: false
@@ -31,7 +31,7 @@
     path: "{{ node_exporter_textfile_dir }}"
     src: tmpfs
     fstype: tmpfs
-    opts: size={{ node_exporter_ramdisk_size_mb }}m,mode=0770,nodev,nosuid,uid={{ node_exporter_user }},gid={{ node_exporter_group }}{% if _module_exists.rc is defined and _module_exists.rc == 0 %},context=system_u:object_r:node_exporter_data_t:s0{% endif %}
+    opts: size={{ node_exporter_ramdisk_size_mb }}m,mode=0770,nodev,nosuid,uid={{ node_exporter_user }},gid={{ node_exporter_group }}{% if node_exporter_semodule_exists.rc is defined and node_exporter_semodule_exists.rc == 0 %},context=system_u:object_r:node_exporter_data_t:s0{% endif %}
     state: mounted
   when: [node_exporter_textfile_is_ramdisk | bool, ansible_system == "Linux"]
   tags: [monitoring, node_exporter, node_exporter-configure]

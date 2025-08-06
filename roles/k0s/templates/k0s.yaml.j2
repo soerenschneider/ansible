@@ -1,0 +1,11 @@
+---
+apiVersion: k0s.k0sproject.io/v1beta1
+kind: ClusterConfig
+spec:
+  api:
+    extraArgs:
+      oidc-issuer-url: https://auth.ez.soeren.cloud/realms/master
+      oidc-client-id: kubernetes
+      oidc-groups-claim: groups
+      oidc-groups-prefix: 'idp-groups:'
+      oidc-username-prefix: 'idp:'

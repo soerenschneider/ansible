@@ -4,34 +4,34 @@
   block:
     - name: Get certificate expiration date
       ansible.builtin.command: openssl x509 -in "{{ item }}" -noout -enddate
-      register: _cert_enddate
+      register: mariadb_cluster_cert_enddate
       changed_when: false
       loop: "{{ mariadb_cluster_certificate_paths }}"
 
     - name: Check if each certificate is expired using openssl
       ansible.builtin.command: openssl x509 -in "{{ item.item }}" -noout -checkend 0
-      register: _cert_validity_check
+      register: mariadb_cluster_cert_validity_check
       failed_when: false
       changed_when: false
-      loop: "{{ _cert_enddate.results }}"
+      loop: "{{ mariadb_cluster_cert_enddate.results }}"
 
     - name: Build certificate status list
       ansible.builtin.set_fact:
-        _cert_expired: "{{ _cert_expired | default([]) + [{'path': item.0.item, 'expired': item.1.rc != 0, 'expiry_date': item.0.stdout | regex_replace('notAfter=', '') | trim}] }}"
-      loop: "{{ _cert_enddate.results | zip(_cert_validity_check.results) | list }}"
+        mariadb_cluster_cert_expired: "{{ mariadb_cluster_cert_expired | default([]) + [{'path': item.0.item, 'expired': item.1.rc != 0, 'expiry_date': item.0.stdout | regex_replace('notAfter=', '') | trim}] }}"
+      loop: "{{ mariadb_cluster_cert_enddate.results | zip(mariadb_cluster_cert_validity_check.results) | list }}"
 
     - name: Display certificate status
       ansible.builtin.debug:
         msg: "Certificate {{ item.path }}: {{ 'EXPIRED' if item.expired else 'Valid' }} (expires: {{ item.expiry_date }})"
-      loop: "{{ _cert_expired }}"
+      loop: "{{ mariadb_cluster_cert_expired }}"
 
     - name: Fail if any certificate is expired
       ansible.builtin.fail:
         msg: |
           One or more certificates have expired:
-          {% for cert in _cert_expired %}
+          {% for cert in mariadb_cluster_cert_expired %}
           {% if cert.expired %}
           - {{ cert.path }}: expired {{ cert.expiry_date }}
           {% endif %}
           {% endfor %}
-      when: _cert_expired | selectattr('expired', 'equalto', true) | list | length > 0
+      when: mariadb_cluster_cert_expired | selectattr('expired', 'equalto', true) | list | length > 0

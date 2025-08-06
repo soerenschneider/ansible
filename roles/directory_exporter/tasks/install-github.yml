@@ -1,71 +1,71 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    local_binary: ""
-    installed_version: ""
-    desired_version: "{{ directory_exporter_version | default('') }}"
-    download_archive: ""
-    download_signature: ""
-    stopped_service: ""
-    github_release: ""
-    go_os: ""
-    go_arch: ""
-    checksum_signature_file: ""
-    checksum_file: ""
-    full_filename: ""
-    release_checksum: ""
+    directory_exporter_local_binary: ""
+    directory_exporter_installed_version: ""
+    directory_exporter_desired_version: "{{ directory_exporter_version | default('') }}"
+    directory_exporter_download_archive: ""
+    directory_exporter_download_signature: ""
+    directory_exporter_stopped_service: ""
+    directory_exporter_github_release: ""
+    directory_exporter_go_os: ""
+    directory_exporter_go_arch: ""
+    directory_exporter_checksum_signature_file: ""
+    directory_exporter_checksum_file: ""
+    directory_exporter_full_filename: ""
+    directory_exporter_release_checksum: ""
   tags: [directory-exporter, directory-exporter-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: local_binary
+  register: directory_exporter_local_binary
   tags: [directory-exporter, directory-exporter-install, deps]
 
 - name: Check installed version
-  when: local_binary.stat.exists
+  when: directory_exporter_local_binary.stat.exists
   tags: [directory-exporter, directory-exporter-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail &&  /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'
-      register: installed_version
+      register: directory_exporter_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        installed_version: "{{ installed_version.stdout }}"
+        directory_exporter_installed_version: "{{ directory_exporter_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ installed_version }}"
+        msg: "Installed version: {{ directory_exporter_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: desired_version is not defined or not desired_version
+  when: directory_exporter_desired_version is not defined or not directory_exporter_desired_version
   tags: [directory-exporter, directory-exporter-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: github_release
+      register: directory_exporter_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: directory_exporter_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        desired_version: "{{ github_release.json.tag_name }}"
+        directory_exporter_desired_version: "{{ directory_exporter_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ desired_version }}"
+        msg: "Latest GitHub version: {{ directory_exporter_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not local_binary.stat.exists or desired_version != installed_version
+  when: not directory_exporter_local_binary.stat.exists or directory_exporter_desired_version != directory_exporter_installed_version
   tags: [directory-exporter, directory-exporter-install, deps]
   block:
     - name: Generate temp dir
@@ -73,63 +73,63 @@
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: _download_dir
+      register: directory_exporter_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        go_os: "{{ ansible_system | lower }}"
-        go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        directory_exporter_go_os: "{{ ansible_system | lower }}"
+        directory_exporter_go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        checksum_signature_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256.sig"
-        checksum_file: "{{ _download_dir }}/{{ binary_name }}-checksums.sha256"
-        full_filename: "{{ binary_name }}-{{ go_os }}-{{ go_arch }}"
+        directory_exporter_checksum_signature_file: "{{ directory_exporter_download_dir }}/{{ binary_name }}-checksums.sha256.sig"
+        directory_exporter_checksum_file: "{{ directory_exporter_download_dir }}/{{ binary_name }}-checksums.sha256"
+        directory_exporter_full_filename: "{{ binary_name }}-{{ directory_exporter_go_os }}-{{ directory_exporter_go_arch }}"
       changed_when: false
 
     - name: Get checksum for archive
       ansible.builtin.set_fact:
-        release_checksum: "{{ item.split(' ')[0] }}"
-      when: [full_filename in item, (not local_binary.stat.exists or installed_version != desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+        directory_exporter_release_checksum: "{{ item.split(' ')[0] }}"
+      when: [directory_exporter_full_filename in item, (not directory_exporter_local_binary.stat.exists or directory_exporter_installed_version != directory_exporter_desired_version)]
+      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + directory_exporter_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/{{ full_filename }}
-        dest: "{{ _download_dir }}/{{ full_filename }}"
-        checksum: sha256:{{ release_checksum }}
+        url: https://github.com/{{ github_repo }}/releases/download/{{ directory_exporter_desired_version }}/{{ directory_exporter_full_filename }}
+        dest: "{{ directory_exporter_download_dir }}/{{ directory_exporter_full_filename }}"
+        checksum: sha256:{{ directory_exporter_release_checksum }}
         mode: "0640"
-      register: download_archive
-      until: download_archive is succeeded
+      register: directory_exporter_download_archive
+      until: directory_exporter_download_archive is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256
-        dest: "{{ checksum_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ directory_exporter_desired_version }}/checksum.sha256
+        dest: "{{ directory_exporter_checksum_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: directory_exporter_download_signature
+      until: directory_exporter_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Download release checksum signature
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ desired_version }}/checksum.sha256.sig
-        dest: "{{ checksum_signature_file }}"
+        url: https://github.com/{{ github_repo }}/releases/download/{{ directory_exporter_desired_version }}/checksum.sha256.sig
+        dest: "{{ directory_exporter_checksum_signature_file }}"
         mode: "0640"
-      register: download_signature
-      until: download_signature is succeeded
+      register: directory_exporter_download_signature
+      until: directory_exporter_download_signature is succeeded
       retries: 5
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ checksum_file }}
+      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ directory_exporter_checksum_file }}
       changed_when: false
 
     - name: Stop service
@@ -137,11 +137,11 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      register: stopped_service
+      register: directory_exporter_stopped_service
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ _download_dir }}/{{ full_filename }}"
+        src: "{{ directory_exporter_download_dir }}/{{ directory_exporter_full_filename }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -154,11 +154,11 @@
       ansible.builtin.file:
         state: absent
         path: "{{ item }}"
-      with_items: ["{{ _download_dir }}"]
+      with_items: ["{{ directory_exporter_download_dir }}"]
       failed_when: false
 
     - name: Restart service
       ansible.builtin.service:
         name: "{{ service_name }}"
         state: restarted
-      when: stopped_service is defined and stopped_service is changed
+      when: directory_exporter_stopped_service is defined and directory_exporter_stopped_service is changed

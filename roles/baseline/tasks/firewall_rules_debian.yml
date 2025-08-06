@@ -1,18 +1,18 @@
 ---
 - name: Set facts
   ansible.builtin.set_fact:
-    firewall_rules: "{{ [{'from': ['any'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"
+    firewall_rules: "{{ [{'from': ['any'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"  # noqa: var-naming[no-role-prefix]
   tags: [firewall, always]
 
 - name: Collect TCP rules
   ansible.builtin.set_fact:
-    fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+    fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
   loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'tcp') | list }}"
   tags: [firewall, always]
 
 - name: Collect UDP rules
   ansible.builtin.set_fact:
-    fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"
+    fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
   loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'udp') | list }}"
   tags: [firewall, always]
 

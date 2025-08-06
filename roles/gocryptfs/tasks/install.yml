@@ -11,16 +11,16 @@
   block:
     - name: Check installed version
       ansible.builtin.shell: set -o pipefail && /usr/local/bin/gocryptfs -version | awk '{print $2}'
-      register: gocryptfs_installed_version
+      register: gocryptfs_gocryptfs_installed_version
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.set_fact:
-        gocryptfs_installed_version: "{{ gocryptfs_installed_version.stdout }}"
+        gocryptfs_gocryptfs_installed_version: "{{ gocryptfs_gocryptfs_installed_version.stdout }}"
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ gocryptfs_installed_version }}"
+        msg: "Installed version: {{ gocryptfs_gocryptfs_installed_version }}"
 
 - name: "Fetch version info"
   when: gocryptfs_version is not defined or gocryptfs_version | length == 0
@@ -30,23 +30,23 @@
       ansible.builtin.uri:
         url: https://api.github.com/repos/rfjakob/gocryptfs/releases/latest
         return_content: true
-      register: github_release
+      register: gocryptfs_github_release
       retries: 3
       delay: 5
-      until: github_release is not failed
+      until: gocryptfs_github_release is not failed
 
     - name: Set gocryptfs release
       ansible.builtin.set_fact:
-        gocryptfs_version: "{{ github_release.json.tag_name }}"
+        gocryptfs_version: "{{ gocryptfs_github_release.json.tag_name }}"
 
 - name: Set OS for generating download link
   ansible.builtin.set_fact:
-    go_os: "{{ ansible_system | lower }}"
-    go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' }}"
+    gocryptfs_go_os: "{{ ansible_system | lower }}"
+    gocryptfs_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' }}"
   tags: [gocryptfs, gocryptfs-install, deps]
 
 - name: "Download artifacts"
-  when: not gocryptfs_binary.stat.exists or gocryptfs_version != gocryptfs_installed_version
+  when: not gocryptfs_binary.stat.exists or gocryptfs_version != gocryptfs_gocryptfs_installed_version
   tags: [gocryptfs, gocryptfs-install, deps]
   block:
     - name: Create download directory
@@ -71,8 +71,8 @@
         url: "{{ gocryptfs_url }}"
         dest: /tmp/gocryptfs/{{ gocryptfs_archive }}
         mode: "0640"
-      register: download_gocryptfs
-      until: download_gocryptfs is succeeded
+      register: gocryptfs_download_archive
+      until: gocryptfs_download_archive is succeeded
       retries: 5
       delay: 2
 
@@ -83,8 +83,8 @@
         url: "{{ gocryptfs_url }}.asc"
         dest: /tmp/gocryptfs/{{ gocryptfs_archive }}.asc
         mode: "0640"
-      register: download_gocryptfs_checksum
-      until: download_gocryptfs_checksum is succeeded
+      register: gocryptfs_download_checksum
+      until: gocryptfs_download_checksum is succeeded
       retries: 5
       delay: 2
 
