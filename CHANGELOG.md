@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.0.2](https://github.com/soerenschneider/ansible/compare/v1.0.1...v1.0.2) (2025-08-06)
+
+
+### Bug Fixes
+
+* **deps:** update dependency ansible to v11.8.0 ([a27f885](https://github.com/soerenschneider/ansible/commit/a27f8857d70ff02f076faea21b7ddb57bcb8158b))
+* **deps:** update dependency ansible.posix to v2.1.0 ([adeb6a5](https://github.com/soerenschneider/ansible/commit/adeb6a5327c2e833187c09eda963aafc3fafeb7c))
+* **deps:** update dependency community.docker to v4.7.0 ([45b8faa](https://github.com/soerenschneider/ansible/commit/45b8faade5d8ef020fcf038a2c10ab06ce101d04))
+* **deps:** update dependency community.general to v11.1.2 ([69cf824](https://github.com/soerenschneider/ansible/commit/69cf8240a8955013de144f89352ff3d65e902f43))
+* **deps:** update dependency community.sops to v2.2.1 ([7f82f31](https://github.com/soerenschneider/ansible/commit/7f82f31f61e6f2915bfbac786bdaef93fe320438))
+* **deps:** update dependency hashicorp/vault to v1.20.1 ([cfc9022](https://github.com/soerenschneider/ansible/commit/cfc9022ae3a4e46961f6e001b69f85270cfd7ccc))
+* **deps:** update dependency k0sproject/k0s to v1.33.3+k0s.0 ([0fdb49a](https://github.com/soerenschneider/ansible/commit/0fdb49abecc5a3fe640bbc559d60eaceb814c77d))
+* **deps:** update dependency navidrome/navidrome to v0.58.0 ([bbc357e](https://github.com/soerenschneider/ansible/commit/bbc357efaa0d60aafa347b6af6e145109ae2b7b7))
+* **deps:** update dependency rfjakob/gocryptfs to v2.6.0 ([a6f137e](https://github.com/soerenschneider/ansible/commit/a6f137e22ee5f2f32a884f4f10b6ad0bf84407ec))
+
 ## [1.0.1](https://github.com/soerenschneider/ansible/compare/v1.0.0...v1.0.1) (2025-08-06)
 
 
