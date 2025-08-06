@@ -8,6 +8,7 @@
     inventory_path: "{{ lookup('env', 'ANSIBLE_INVENTORY') | dirname }}"
   tasks:
     - name: Get user home dir
+      tags: always
       block:
         - name: Get home dir of default_user via getent
           ansible.builtin.command: "getent passwd {{ default_user }}"
@@ -26,7 +27,6 @@
             path: "{{ target_user_home }}"
           register: user_home_dir
           when: target_user_home is defined
-      tags: always
 
     - name: Determine hostname (without ansible facts)
       ansible.builtin.command: hostname
