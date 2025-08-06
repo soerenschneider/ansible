@@ -232,7 +232,3 @@
         - name: Run initial master as slave
           ansible.builtin.include_tasks: tasks/mariadb_run_slaves.yaml
           when: inventory_hostname == mariadb_cluster_master
-
-    - name: Run exporter
-      ansible.builtin.include_tasks: tasks/mariadb_run_exporter.yaml
-      tags: [mariadb, exporter, mysql]
