@@ -22,7 +22,7 @@
 
 - name: "Set syncthing_local_devices variable"
   ansible.builtin.set_fact:
-    syncthing_local_devices: "{{ syncthing_local_devices | default([]) + item.devices }} "
+    syncthing_local_devices: "{{ syncthing_local_devices | default([]) + (item.devices | default([])) }}"
   with_items: "{{ syncthing_folders | default([]) }}"
   tags: [syncthing, syncthing-configure]
 
