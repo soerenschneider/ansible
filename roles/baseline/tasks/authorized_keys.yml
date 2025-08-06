@@ -19,7 +19,7 @@
 
 - name: Add current user to authorized_keys_users
   ansible.builtin.set_fact:
-    baseline_authorized_keys_users: "{{ authorized_keys_users | default([]) + [ansible_user] | unique }}"
+    baseline_authorized_keys_users: "{{ authorized_keys_users | default([]) + ([ansible_user] if ansible_user is defined else []) | unique }}"
   tags: [base, authorized_keys, ssh]
 
 - name: Add hardware keys exclusively without any restrictions
