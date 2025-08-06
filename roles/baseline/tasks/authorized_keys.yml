@@ -17,7 +17,7 @@
     baseline_soft_keys: "{{ authorized_keys_soft | map(attribute='pub') | join('\n') }}"
   tags: [base, authorized_keys, ssh]
 
-- name: Add current user '{{ ansible_user }}' to authorized_keys_users
+- name: Add current user to authorized_keys_users
   ansible.builtin.set_fact:
     baseline_authorized_keys_users: "{{ authorized_keys_users | default([]) + [ansible_user] | unique }}"
   tags: [base, authorized_keys, ssh]
