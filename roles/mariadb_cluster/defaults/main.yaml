@@ -1,7 +1,7 @@
 ---
 # renovate: datasource=github-tags depName=bitnami/mariadb-galera
 mariadb_cluster_version: "11.8.2"
-mariadb_cluster_image: "bitnami/mariadb-galera:{{ mariadb_version }}"
+mariadb_cluster_image: "bitnami/mariadb-galera:{{ mariadb_cluster_version }}"
 
 # renovate: datasource=github-tags depName=prom/mysqld-exporter
 mariadb_cluster_mysqld_exporter_version: "v0.17.2"
