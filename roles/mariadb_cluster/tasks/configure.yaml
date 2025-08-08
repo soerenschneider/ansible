@@ -5,7 +5,7 @@
     dest: "{{ mariadb_cluster_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_user }}"
-    mode: "0700"
+    mode: "0740"
   with_fileglob:
     - "templates/mariadb-initdb/*.j2"
   tags: [mariadb, mariadb-configure]
@@ -16,7 +16,7 @@
     dest: "{{ mariadb_cluster_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_user }}"
-    mode: "0700"
+    mode: "0740"
   with_fileglob:
     - "{{ playbook_dir }}/templates/mariadb-initdb/*.j2"
   tags: [mariadb, mariadb-configure]
@@ -31,7 +31,7 @@
     dest: "{{ mariadb_cluster_base_dir }}/env"
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
-    mode: "0400"
+    mode: "0440"
   tags: [mariadb, mariadb-configure]
 
 - name: Add my.cnf

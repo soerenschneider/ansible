@@ -44,5 +44,5 @@
     echo "Max attempts reached without 2 consecutive successes"
     exit 1
   changed_when: false
-  no_log: true
+  #no_log: true
   tags: [mariadb, mariadb-recover]
