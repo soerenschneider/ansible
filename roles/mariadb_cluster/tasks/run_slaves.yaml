@@ -13,7 +13,7 @@
       --wsrep-cluster-address={{ mariadb_cluster_galera_cluster_address }}
     env_file: "{{ mariadb_cluster_base_dir }}/env"
     volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", "/var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf"]
-  tags: [docker, mariadb, mysql]
+  tags: [mariadb, mariadb-recover]
 
 - name: Wait for slaves to be ready (2 consecutive pings)
   ansible.builtin.shell: |
@@ -39,4 +39,4 @@
     exit 1
   changed_when: false
   no_log: true
-  tags: [mariadb]
+  tags: [mariadb, mariadb-recover]
