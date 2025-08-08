@@ -125,7 +125,7 @@
 
         - name: End playbook as all instances are running and stable
           ansible.builtin.meta: end_play
-          when: mariadb_cluster_set_config is not changed and groups[mariadb_cluster_ansible_group] | length == mariadb_cluster_mariadb_cluster_running_and_stabilized_instances | length
+          when: mariadb_cluster_set_config is defined and mariadb_cluster_set_config is not changed and groups[mariadb_cluster_ansible_group] | length == mariadb_cluster_mariadb_cluster_running_and_stabilized_instances | length
 
 - name: Get UID for generated user
   ansible.builtin.getent:
@@ -147,7 +147,7 @@
   community.docker.docker_container:
     name: "{{ mariadb_cluster_container_name }}"
     state: stopped
-  when: mariadb_cluster_set_config is changed and groups[mariadb_cluster_ansible_group] | length == mariadb_cluster_mariadb_cluster_running_and_stabilized_instances | default([]) | length
+  when: mariadb_cluster_set_config is defined and mariadb_cluster_set_config is changed and groups[mariadb_cluster_ansible_group] | length == mariadb_cluster_mariadb_cluster_running_and_stabilized_instances | default([]) | length
   tags: [mariadb, mariadb-recover]
 
 - name: Check if it's safe to bootstrap existing cluster
