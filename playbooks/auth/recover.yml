@@ -3,6 +3,8 @@
   hosts: auth
   gather_facts: true
   any_errors_fatal: true
+  vars:
+    mariadb_cluster_ansible_group: "auth"
   tasks:
     - name: Create docker network
       community.docker.docker_network:
