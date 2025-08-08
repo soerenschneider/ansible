@@ -1,0 +1,15 @@
+---
+- name: Install MariaDB cluster
+  hosts: auth
+  gather_facts: true
+  any_errors_fatal: true
+  tasks:
+    - name: Create docker network
+      community.docker.docker_network:
+        name: "{{ keycloak_docker_network }}"
+      tags: [docker, keycloak, postgres]
+
+    - name: "Include role 'mariadb_cluster'"
+      ansible.builtin.include_role:
+        name: mariadb_cluster
+      tags: always

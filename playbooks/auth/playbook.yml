@@ -4,24 +4,32 @@
   become: true
   gather_facts: true
   any_errors_fatal: true
-  vars:
-    postgres_network: "{{ keycloak_docker_network }}"
   tasks:
-    - name: Include role platform
+    - name: "Include role 'platform'"
       ansible.builtin.include_role:
-        name: platform
+        name: "platform"
+      tags: always
+
+    - name: "Include role 'ansible_node'"
+      ansible.builtin.include_role:
+        name: "ansible_node"
       tags: always
 
     - name: "Run tasks haproxy.yml"
-      ansible.builtin.include_tasks: tasks/haproxy.yml
+      ansible.builtin.include_tasks: "tasks/haproxy.yml"
       tags: always
 
-    - name: Include role 'postgres'
+    - name: "Create docker network"
+      community.docker.docker_network:
+        name: "{{ keycloak_docker_network }}"
+      tags: [docker, keycloak, postgres]
+
+    - name: "Include role 'mariadb_cluster'"
       ansible.builtin.include_role:
-        name: postgres
+        name: "mariadb_cluster"
       tags: always
 
-    - name: Include role 'keycloak'
+    - name: "Include role 'keycloak'"
       ansible.builtin.include_role:
-        name: keycloak
+        name: "keycloak"
       tags: always
