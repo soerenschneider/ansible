@@ -1,0 +1,105 @@
+---
+- name: "Ensure user exists"
+  ansible.builtin.user:
+    name: "{{ ansible_node_user }}"
+    shell: "/bin/bash"
+    system: true
+    groups: "{{ ansible_node_user_groups | default(omit) }}"
+    create_home: true
+  tags: [ansible_node, ansible-node]
+
+- name: "Create .ssh directory for ansible user"
+  ansible.builtin.file:
+    path: "{{ ansible_node_ssh_dir }}"
+    state: "directory"
+    owner: "{{ ansible_node_user }}"
+    group: "{{ ansible_node_user }}"
+    mode: '0700'
+  tags: [ansible_node, ansible-node]
+
+- name: Generate SSH key pair for ansible user (if not exists)
+  become_user: "{{ ansible_node_user }}"
+  become: true
+  community.crypto.openssh_keypair:
+    path: "{{ ansible_node_ssh_key_path }}"
+    type: "rsa"
+    size: 4096
+    force: false
+    mode: '0600'
+  tags: [ansible_node, ansible-node]
+
+- name: Read the generated public key
+  ansible.builtin.slurp:
+    src: "{{ ansible_node_ssh_key_path }}.pub"
+  register: ansible_node_pubkey_read
+  tags: [ansible_node, ansible-node]
+
+- name: Set host public key fact
+  ansible.builtin.set_fact:
+    ansible_node_pubkey: "{{ ansible_node_pubkey_read.content | b64decode }}"
+  tags: [ansible_node, ansible-node]
+
+- name: Collect other hosts' public keys (excluding self)
+  ansible.builtin.set_fact:
+    ansible_node_pubkeys: >-
+      {{
+        groups[ansible_node_inventory_group]
+        | difference([inventory_hostname])
+        | map('extract', hostvars, 'ansible_node_pubkey')
+        | list
+      }}
+  tags: [ansible_node, ansible-node]
+
+- name: Install other hosts' public keys
+  ansible.posix.authorized_key:
+    user: "{{ ansible_node_user }}"
+    key: "{{ item }}"
+    state: present
+  loop: "{{ ansible_node_pubkeys }}"
+  tags: [ansible_node, ansible-node]
+
+- name: "Create known_hosts file if not existent"
+  ansible.builtin.file:
+    path: "/home/{{ ansible_node_user }}/.ssh/known_hosts"
+    state: "touch"
+    mode: "0640"
+    modification_time: "preserve"
+    access_time: "preserve"
+  tags: [ansible_node, ansible-node]
+
+- name: "Remove existing cert-authority entries in known_hosts"
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_node_user }}/.ssh/known_hosts"
+    regexp: "^@cert-authority"
+    state: "absent"
+  tags: [ansible_node, ansible-node]
+
+- name: "Add cert authorities"
+  ansible.builtin.lineinfile:
+    path: "/home/{{ ansible_node_user }}/.ssh/known_hosts"
+    line: "@cert-authority {{ item.domain }} {{ item.cert }}"
+    regexp: "^@cert-authority {{ item.domain }}"
+    insertbefore: "BOF"
+  with_items: "{{ ssh_ca_certs | default([]) }}"
+  tags: [ansible_node, ansible-node]
+
+- name: "Assemble inventory content"
+  ansible.builtin.set_fact:
+    ansible_node_inventory_lines: |
+      [{{ ansible_node_inventory_group }}]
+      {% for host in groups[ansible_node_inventory_group] %}
+      {{ hostvars[host].inventory_hostname }}
+      {% endfor %}
+  tags: [ansible_node, ansible-node]
+
+- name: "Write inventory file to disk"
+  ansible.builtin.copy:
+    dest: "{{ ansible_node_inventory_path }}"
+    content: "{{ ansible_node_inventory_lines }}"
+    mode: '0644'
+  tags: [ansible_node, ansible-node]
+
+- name: "Install ansible"
+  ansible.builtin.package:
+    name: ansible
+  tags: [ansible_node, ansible-node]

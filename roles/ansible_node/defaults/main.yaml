@@ -1,0 +1,7 @@
+---
+ansible_node_user: "ansible"
+#  ansible_node_user_groups:
+#  ansible_node_inventory_group:
+ansible_node_ssh_dir: "/home/{{ ansible_node_user }}/.ssh"
+ansible_node_ssh_key_path: "{{ ansible_node_ssh_dir }}/id_rsa"
+ansible_node_inventory_path: "/home/{{ ansible_node_user }}/inventory"
