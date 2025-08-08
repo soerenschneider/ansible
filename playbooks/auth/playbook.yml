@@ -15,6 +15,11 @@
         name: "ansible_node"
       tags: always
 
+    - name: "Install dependencies to run playbook autonomously via ansible-pull"
+      ansible.builtin.package:
+        name: "python3-jmespath"
+      tags: [always, deps]
+
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: "tasks/haproxy.yml"
       tags: always
