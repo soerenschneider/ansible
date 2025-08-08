@@ -10,6 +10,7 @@ mariadb_cluster_mysqld_exporter_image: "prom/mysqld-exporter:{{ mariadb_cluster_
 mariadb_cluster_user: "mariadb"
 mariadb_cluster_group: "mariadb"
 
+mariadb_cluster_root_user: "root"
 mariadb_cluster_replication_user: "replication"
 mariadb_cluster_base_dir: "/var/lib/mariadb"
 mariadb_cluster_storage_dir: "{{ mariadb_cluster_base_dir }}/data"

@@ -21,7 +21,7 @@
     max_attempts=600
     attempt=0
     while [ $attempt -lt $max_attempts ]; do
-      if docker exec {{ mariadb_cluster_container_name }} mariadb-admin ping --ssl-verify-server-cert=false -u{{ mariadb_cluster_root_user | default('root') }} -p{{ mariadb_cluster_root_password }} >/dev/null 2>&1; then
+      if docker exec {{ mariadb_cluster_container_name }} mariadb-admin ping --ssl-verify-server-cert=false >/dev/null 2>&1; then
         success_count=$((success_count + 1))
         echo "Ping successful ($success_count/2)"
         if [ $success_count -ge 2 ]; then
@@ -38,5 +38,4 @@
     echo "Max attempts reached without 2 consecutive successes"
     exit 1
   changed_when: false
-  #no_log: true
   tags: [mariadb, mariadb-recover]
