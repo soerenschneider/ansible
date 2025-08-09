@@ -12,12 +12,17 @@
     - name: "Check for mariadb readiness"
       ansible.builtin.include_tasks: run_healthcheck.yaml
       vars:
-        mariadb_cluster_healthcheck_max_attempts: 15
+        mariadb_cluster_healthcheck_max_attempts: 30
+        mariadb_cluster_healthcheck_success_checks_required: 10
       tags: always
+
+    - name: "Reset variable"
+      ansible.builtin.set_fact:
+        mariadb_cluster_container_healthcheck_passed: []
 
     - name: "Set variable that marks passed healthcheck"
       ansible.builtin.set_fact:
-        mariadb_cluster_container_healthcheck_passed: "{{ mariadb_cluster_container_healthcheck_passed | default([]) + [inventory_hostname] }}"
+        mariadb_cluster_container_healthcheck_passed: "{{ mariadb_cluster_container_healthcheck_passed + [inventory_hostname] }}"
 
     - name: "Aggregate hosts with healthchecks passed"
       ansible.builtin.set_fact:

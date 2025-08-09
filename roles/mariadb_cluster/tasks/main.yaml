@@ -38,6 +38,17 @@
     name: "{{ mariadb_cluster_docker_network }}"
   tags: [mariadb, mariadb-recover]
 
+- name: Some healthy members of the cluster detected, run missing slaves and exit once healthcheck passes
+  when: mariadb_cluster_hosts_with_healthcheck_passed | default(0) | length > 0
+  tags: [mariadb, mariadb-recover]
+  block:
+    - name: Run missing slaves to connect to existing cluster
+      ansible.builtin.include_tasks: tasks/run_slaves.yaml
+      when: inventory_hostname not in mariadb_cluster_hosts_with_healthcheck_passed
+
+    - name: Check cluster health and exit playbook early if all members healthy
+      ansible.builtin.include_tasks: check_containers.yaml
+
 - name: Stop mariadb container as config has been updated
   community.docker.docker_container:
     name: "{{ mariadb_cluster_container_name }}"
