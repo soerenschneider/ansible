@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.0](https://github.com/soerenschneider/ansible/compare/v1.0.2...v1.1.0) (2025-08-09)
+
+
+### Features
+
+* increase security by conditionally rotating key every n month ([61204b1](https://github.com/soerenschneider/ansible/commit/61204b1180e28c9dcb2c5fb0c815aef94de4095c))
+* increase security by restricting ssh keypair to individual ip address ([84aa8d3](https://github.com/soerenschneider/ansible/commit/84aa8d30ce477ef198896c73dd79cf33b9aec7ec))
+
+
+### Bug Fixes
+
+* **deps:** update dependency hashicorp/vault to v1.20.2 ([#137](https://github.com/soerenschneider/ansible/issues/137)) ([5ed9535](https://github.com/soerenschneider/ansible/commit/5ed9535e5f2c7e7f03466d032798e07357a46d13))
+* **deps:** update docker/login-action action to v3.5.0 ([#135](https://github.com/soerenschneider/ansible/issues/135)) ([758489d](https://github.com/soerenschneider/ansible/commit/758489dd082b1e97019e7682f0b44907e665c7a8))
+* **deps:** update docker/metadata-action action to v5.8.0 ([#133](https://github.com/soerenschneider/ansible/issues/133)) ([041f9b0](https://github.com/soerenschneider/ansible/commit/041f9b05dbfb444c0b69bebf873da65f41f44c43))
+
 ## [1.0.2](https://github.com/soerenschneider/ansible/compare/v1.0.1...v1.0.2) (2025-08-06)
 
 
