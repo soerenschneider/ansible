@@ -51,22 +51,29 @@
     ansible_node_pubkey: "{{ ansible_node_pubkey_read.content | b64decode }}"
   tags: [ansible_node, ansible-node]
 
-- name: Collect other hosts' public keys (excluding self)
+- name: Collect other hosts' public keys and IPs (excluding self)
   ansible.builtin.set_fact:
     ansible_node_pubkeys: >-
       {{
-        groups[ansible_node_inventory_group]
-        | difference([inventory_hostname])
-        | map('extract', hostvars, 'ansible_node_pubkey')
-        | list
+        (ansible_node_pubkeys | default([])) + [ {
+          'pub_key': hostvars[item].ansible_node_pubkey,
+          'addresses': (
+            [hostvars[item].ansible_default_ipv4.address] +
+            ([hostvars[item].safe_ip_address] if 'safe_ip_address' in hostvars[item] else [])
+          ) | unique
+        } ]
       }}
+  loop: "{{ groups[ansible_node_inventory_group] }}"
+  loop_control:
+    loop_var: item
   tags: [ansible_node, ansible-node]
 
 - name: Install other hosts' public keys
   ansible.posix.authorized_key:
     user: "{{ ansible_node_user }}"
-    key: "{{ item }}"
+    key: "{{ item.pub_key }}"
     state: present
+    key_options: no-port-forwarding,from="{{ item.addresses | join(',') if ansible_default_ipv4.address not in item.addresses else (['127.0.0.1', '::1'] + item.addresses) | join(',') }}"
   loop: "{{ ansible_node_pubkeys }}"
   tags: [ansible_node, ansible-node]
 
