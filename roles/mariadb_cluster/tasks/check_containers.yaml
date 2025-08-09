@@ -14,7 +14,6 @@
       vars:
         mariadb_cluster_healthcheck_max_attempts: 30
         mariadb_cluster_healthcheck_success_checks_required: 10
-      tags: always
 
     - name: "Reset variable"
       ansible.builtin.set_fact:
