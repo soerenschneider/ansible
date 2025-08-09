@@ -38,3 +38,6 @@ mariadb_cluster_galera_backup_user: backup
 
 mariadb_cluster_galera_cluster_address_default: "gcomm://{% for node in groups[mariadb_cluster_ansible_group] %}{{ node }}:4567{% if not loop.last %},{% endif %}{% endfor %}"
 mariadb_cluster_galera_cluster_address: "{{ mariadb_cluster_galera_cluster_address_default }}"
+
+mariadb_cluster_healthcheck_max_attempts: 600
+mariadb_cluster_healthcheck_success_checks_required: 5

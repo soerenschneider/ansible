@@ -1,0 +1,27 @@
+---
+- name: "Check for mariadb readiness"
+  ansible.builtin.shell: |
+    success_count=0
+    max_attempts={{ mariadb_cluster_healthcheck_max_attempts }}
+    attempt=0
+    checks_required={{ mariadb_cluster_healthcheck_success_checks_required }}
+    while [ $attempt -lt $max_attempts ]; do
+      if docker exec {{ mariadb_cluster_container_name }} mariadb-admin status --ssl-verify-server-cert=false; then
+        success_count=$((success_count + 1))
+        echo "Ping successful ($success_count/2)"
+        if [ $success_count -ge $checks_required ]; then
+          echo "$checks_required consecutive checks successful!"
+          exit 0
+        fi
+      else
+        success_count=0
+        echo "check failed, resetting counter"
+      fi
+      attempt=$((attempt + 1))
+      sleep 1
+    done
+    echo "Max attempts reached without $checks_required consecutive successes"
+    exit 1
+  changed_when: false
+  no_log: true
+  tags: [mariadb, mariadb-recover]
