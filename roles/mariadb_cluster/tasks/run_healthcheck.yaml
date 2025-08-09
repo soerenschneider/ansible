@@ -23,5 +23,5 @@
     echo "Max attempts reached without $checks_required consecutive successes"
     exit 1
   changed_when: false
-  no_log: true
+  no_log: false
   tags: [mariadb, mariadb-recover]
