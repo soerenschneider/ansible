@@ -5,3 +5,5 @@ ansible_node_user: "ansible"
 ansible_node_ssh_dir: "/home/{{ ansible_node_user }}/.ssh"
 ansible_node_ssh_key_path: "{{ ansible_node_ssh_dir }}/id_rsa"
 ansible_node_inventory_path: "/home/{{ ansible_node_user }}/inventory"
+
+ansible_node_ssh_max_key_age_months: 6
