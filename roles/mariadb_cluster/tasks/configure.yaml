@@ -8,6 +8,7 @@
     mode: "0740"
   with_fileglob:
     - "templates/mariadb-initdb/*.j2"
+  register: mariadb_cluster_configure_task_initdb_scripts
   tags: [mariadb, mariadb-configure]
 
 - name: Create mariadb initdb scripts from playbook templates
@@ -19,6 +20,7 @@
     mode: "0740"
   with_fileglob:
     - "{{ playbook_dir }}/templates/mariadb-initdb/*.j2"
+  register: mariadb_cluster_configure_task_playbook_initdb_scripts
   tags: [mariadb, mariadb-configure]
 
 - name: Create env file
@@ -32,6 +34,7 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
+  register: mariadb_cluster_configure_task_set_env
   tags: [mariadb, mariadb-configure]
 
 - name: Create root password file
@@ -42,6 +45,7 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
+  register: mariadb_cluster_configure_task_set_password_file
   tags: [mariadb, mariadb-configure]
 
 - name: Add my.cnf
@@ -81,5 +85,15 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
-  register: mariadb_cluster_set_config
+  register: mariadb_cluster_configure_task_set_my_cnf
+  tags: [mariadb, mariadb-configure]
+
+- name: Determine if mariadb config changed
+  ansible.builtin.set_fact:
+    mariadb_cluster_config_changed: >-
+      {{ mariadb_cluster_configure_task_initdb_scripts.changed
+         or mariadb_cluster_configure_task_playbook_initdb_scripts.changed
+         or mariadb_cluster_configure_task_set_env.changed
+         or mariadb_cluster_configure_task_set_password_file.changed
+         or mariadb_cluster_configure_task_set_my_cnf.changed }}
   tags: [mariadb, mariadb-configure]
