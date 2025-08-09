@@ -29,7 +29,7 @@ mariadb_cluster_certificate_paths:
   - "{{ mariadb_cluster_certs_dir }}/wsrep-ca.crt"
 
 mariadb_cluster_online_hosts: []
-mariadb_cluster_ansible_group: "dbs"
+mariadb_cluster_ansible_group: "{{ groups[group_names[0]] }}"
 mariadb_cluster_preferred_donors: []
 
 mariadb_cluster_master: "{{ groups[mariadb_cluster_ansible_group][1] }}"
