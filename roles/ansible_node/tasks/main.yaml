@@ -40,18 +40,18 @@
     mode: '0600'
   tags: [ansible_node, ansible-node]
 
-- name: Read the generated public key
+- name: "Read the generated public key"
   ansible.builtin.slurp:
     src: "{{ ansible_node_ssh_key_path }}.pub"
   register: ansible_node_pubkey_read
   tags: [ansible_node, ansible-node]
 
-- name: Set host public key fact
+- name: "Set host public key fact"
   ansible.builtin.set_fact:
     ansible_node_pubkey: "{{ ansible_node_pubkey_read.content | b64decode }}"
   tags: [ansible_node, ansible-node]
 
-- name: Collect other hosts' public keys and IPs (excluding self)
+- name: "Collect other hosts' public keys and IPs"
   ansible.builtin.set_fact:
     ansible_node_pubkeys: >-
       {{
@@ -68,7 +68,7 @@
     loop_var: item
   tags: [ansible_node, ansible-node]
 
-- name: Install other hosts' public keys
+- name: "Install other hosts' public keys"
   ansible.posix.authorized_key:
     user: "{{ ansible_node_user }}"
     key: "{{ item.pub_key }}"
