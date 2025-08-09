@@ -24,11 +24,21 @@
 - name: Create env file
   ansible.builtin.copy:
     content: |
-      MARIADB_ROOT_PASSWORD={{ mariadb_cluster_root_password }}
+      MARIADB_ROOT_PASSWORD_FILE=/etc/mysql/password-root
       MARIADB_CHARACTER_SET=utf8mb4
       MARIADB_COLLATE=utf8mb4_unicode_520_ci
       TZ=UTC
     dest: "{{ mariadb_cluster_base_dir }}/env"
+    owner: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0440"
+  tags: [mariadb, mariadb-configure]
+
+- name: Create root password file
+  ansible.builtin.copy:
+    content: |
+      {{ mariadb_cluster_root_password }}
+    dest: "{{ mariadb_cluster_base_dir }}/password-root"
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"

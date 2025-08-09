@@ -7,12 +7,18 @@
     restart_policy: always
     networks:
       - name: "{{ mariadb_cluster_docker_network }}"
+        aliases:
+          - "{{ inventory_hostname }}"
     log_driver: journald
     ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
     command: |
       --wsrep-cluster-address={{ mariadb_cluster_galera_cluster_address }}
     env_file: "{{ mariadb_cluster_base_dir }}/env"
-    volumes: ["{{ mariadb_cluster_certs_dir }}:/certs:ro", "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z", "/var/lib/mariadb/my.cnf:/etc/mysql/conf.d/galera.cnf"]
+    volumes:
+      - "{{ mariadb_cluster_certs_dir }}:/certs:ro"
+      - "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z"
+      - "{{ mariadb_cluster_base_dir }}/password-root:/etc/mysql/password-root:ro"
+      - "{{ mariadb_cluster_base_dir }}/my.cnf:/etc/mysql/conf.d/galera.cnf"
   tags: [mariadb, mariadb-recover]
 
 - name: Wait for slaves to be ready (2 consecutive pings)
