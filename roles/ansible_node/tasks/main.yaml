@@ -17,14 +17,26 @@
     mode: '0700'
   tags: [ansible_node, ansible-node]
 
-- name: Generate SSH key pair for ansible user (if not exists)
+- name: "Check ssh keypair age"
+  ansible.builtin.stat:
+    path: "{{ ansible_node_ssh_key_path }}"
+  register: "ansible_node_ssh_key_stat"
+  tags: [ansible_node, ansible-node]
+
+- name: "Set fact if ssh keypair is older than 6 months"
+  ansible.builtin.set_fact:
+    ansible_node_rotate_ssh_key: "{{ (ansible_date_time.epoch | int) - (ansible_node_ssh_key_stat.stat.mtime | default(0)) > (6 * 30 * 24 * 3600) }}"
+  when: ansible_node_ssh_key_stat.stat.exists is defined and ansible_node_ssh_key_stat.stat.exists
+  tags: [ansible_node, ansible-node]
+
+- name: "Conditionally generate SSH key pair for ansible user"
   become_user: "{{ ansible_node_user }}"
   become: true
   community.crypto.openssh_keypair:
     path: "{{ ansible_node_ssh_key_path }}"
     type: "rsa"
     size: 4096
-    force: false
+    force: "{{ ansible_node_rotate_ssh_key | default(true) }}"
     mode: '0600'
   tags: [ansible_node, ansible-node]
 
