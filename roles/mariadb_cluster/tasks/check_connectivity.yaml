@@ -1,0 +1,58 @@
+---
+- name: "Check connectivity"
+  tags: [mariadb, connectivity, mariadb-recover]
+  block:
+    - name: Test connectivity to all hosts
+      ansible.builtin.ping:
+      register: mariadb_cluster_ping_result
+      ignore_errors: true
+
+    - name: Build list of online hosts
+      ansible.builtin.set_fact:
+        mariadb_cluster_online_hosts: "{{ mariadb_cluster_online_hosts + [inventory_hostname] }}"
+      when: mariadb_cluster_ping_result is succeeded
+
+    - name: Aggregate online hosts across all hosts
+      ansible.builtin.set_fact:
+        mariadb_cluster_all_online_hosts: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars, 'mariadb_cluster_online_hosts') | select('defined') | flatten | unique | list }}"
+      run_once: true
+      when: group_names | length > 0
+
+    - name: Display connectivity results
+      ansible.builtin.debug:
+        msg: |
+          Total hosts in group '{{ mariadb_cluster_ansible_group }}': {{ groups[mariadb_cluster_ansible_group] | length }}
+          Online hosts: {{ mariadb_cluster_all_online_hosts | length }}
+          Offline hosts: {{ (groups[mariadb_cluster_ansible_group] | length) - (mariadb_cluster_all_online_hosts | length) }}
+          Online host list: {{ mariadb_cluster_all_online_hosts | sort }}
+      run_once: true
+
+    - name: Check if all hosts are online
+      ansible.builtin.assert:
+        that:
+          - mariadb_cluster_all_online_hosts | length == (groups[mariadb_cluster_ansible_group] | length if group_names | length > 0 else groups['all'] | length)
+        success_msg: "✅ SUCCESS: All {{ groups[mariadb_cluster_ansible_group] | length if group_names | length > 0 else groups['all'] | length }} hosts in the group are online"
+        fail_msg: "❌ FAILURE: Not all hosts are online. {{ mariadb_cluster_all_online_hosts | length }}/{{ groups[mariadb_cluster_ansible_group] | length if group_names | length > 0 else groups['all'] | length }} hosts are reachable"
+      run_once: true
+      ignore_errors: true
+      register: mariadb_cluster_all_hosts_check
+
+    - name: Check if at least two hosts are online
+      ansible.builtin.assert:
+        that:
+          - mariadb_cluster_all_online_hosts | length >= 2
+        success_msg: "✅ SUCCESS: At least 2 hosts are online ({{ mariadb_cluster_all_online_hosts | length }} hosts reachable)"
+        fail_msg: "❌ FAILURE: Less than 2 hosts are online (only {{ mariadb_cluster_all_online_hosts | length }} host(s) reachable)"
+      run_once: true
+      ignore_errors: true
+      register: mariadb_cluster_min_hosts_check
+
+    - name: Final summary
+      ansible.builtin.debug:
+        msg: |
+          ==================== CONNECTIVITY SUMMARY ====================
+          Group: {{ mariadb_cluster_ansible_group if group_names | length > 0 else 'ungrouped' }}
+          All hosts online: {{ 'YES' if mariadb_cluster_all_hosts_check is succeeded else 'NO' }}
+          At least 2 hosts online: {{ 'YES' if mariadb_cluster_min_hosts_check is succeeded else 'NO' }}
+          ============================================================
+      run_once: true

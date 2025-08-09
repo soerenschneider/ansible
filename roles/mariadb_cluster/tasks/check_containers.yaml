@@ -1,0 +1,38 @@
+---
+- name: Get container information
+  community.docker.docker_container_info:
+    name: "{{ mariadb_cluster_container_name }}"
+  register: mariadb_cluster_container_info
+  tags: [mariadb, mariadb-recover]
+
+- name: Run healthcheck
+  when: mariadb_cluster_container_info.exists
+  tags: [mariadb, mariadb-recover]
+  block:
+    - name: "Check for mariadb readiness"
+      ansible.builtin.include_tasks: run_healthcheck.yaml
+      vars:
+        mariadb_cluster_healthcheck_max_attempts: 15
+      tags: always
+
+    - name: "Set variable that marks passed healthcheck"
+      ansible.builtin.set_fact:
+        mariadb_cluster_container_healthcheck_passed: "{{ mariadb_cluster_container_healthcheck_passed | default([]) + [inventory_hostname] }}"
+
+    - name: "Aggregate hosts with healthchecks passed"
+      ansible.builtin.set_fact:
+        mariadb_cluster_hosts_with_healthcheck_passed: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars, 'mariadb_cluster_container_healthcheck_passed') | select('defined') | flatten | unique | list }}"
+      run_once: true
+
+    - name: "Print hosts with passed healthchecks"
+      ansible.builtin.debug:
+        var: mariadb_cluster_hosts_with_healthcheck_passed
+      run_once: true
+
+    - name: "End playbook as all healthchecks passed"
+      ansible.builtin.meta: end_play
+      when: mariadb_cluster_hosts_with_healthcheck_passed | length == groups[mariadb_cluster_ansible_group] | length
+  rescue:
+    - name: Print when errors
+      ansible.builtin.debug:
+        msg: "Healthcheck failed, continuing"

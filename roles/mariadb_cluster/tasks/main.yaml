@@ -11,121 +11,21 @@
   ansible.builtin.include_tasks: check_certs.yaml
   tags: always
 
-- name: "Check connectivity"
-  tags: [mariadb, connectivity, mariadb-recover]
-  block:
-    - name: Test connectivity to all hosts
-      ansible.builtin.ping:
-      register: mariadb_cluster_ping_result
-      ignore_errors: true
+- name: Check connectivity
+  ansible.builtin.include_tasks: check_connectivity.yaml
+  tags: always
 
-    - name: Build list of online hosts
-      ansible.builtin.set_fact:
-        mariadb_cluster_online_hosts: "{{ mariadb_cluster_online_hosts + [inventory_hostname] }}"
-      when: mariadb_cluster_ping_result is succeeded
+# this task is mainly used to exit the playbook early if all healthchecks pass
+# therefore, only run it if there are no pending changes to the containers
+- name: Check containers
+  ansible.builtin.include_tasks: check_containers.yaml
+  when: not mariadb_cluster_install_changed and not mariadb_cluster_config_changed
+  tags: always
 
-    - name: Aggregate online hosts across all hosts
-      ansible.builtin.set_fact:
-        mariadb_cluster_all_online_hosts: "{{ groups[group_names[0]] | map('extract', hostvars, 'mariadb_cluster_online_hosts') | select('defined') | flatten | unique | list }}"
-      run_once: true
-      when: group_names | length > 0
-
-    - name: Display connectivity results
-      ansible.builtin.debug:
-        msg: |
-          Total hosts in group '{{ group_names[0] if group_names | length > 0 else 'ungrouped' }}': {{ groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length }}
-          Online hosts: {{ mariadb_cluster_all_online_hosts | length }}
-          Offline hosts: {{ (groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length) - (mariadb_cluster_all_online_hosts | length) }}
-          Online host list: {{ mariadb_cluster_all_online_hosts | sort }}
-      run_once: true
-
-    - name: Check if ALL hosts are online
-      ansible.builtin.assert:
-        that:
-          - mariadb_cluster_all_online_hosts | length == (groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length)
-        success_msg: "✅ SUCCESS: All {{ groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length }} hosts in the group are online"
-        fail_msg: "❌ FAILURE: Not all hosts are online. {{ mariadb_cluster_all_online_hosts | length }}/{{ groups[group_names[0]] | length if group_names | length > 0 else groups['all'] | length }} hosts are reachable"
-      run_once: true
-      ignore_errors: true
-      register: mariadb_cluster_all_hosts_check
-
-    - name: Check if at least TWO hosts are online
-      ansible.builtin.assert:
-        that:
-          - mariadb_cluster_all_online_hosts | length >= 2
-        success_msg: "✅ SUCCESS: At least 2 hosts are online ({{ mariadb_cluster_all_online_hosts | length }} hosts reachable)"
-        fail_msg: "❌ FAILURE: Less than 2 hosts are online (only {{ mariadb_cluster_all_online_hosts | length }} host(s) reachable)"
-      run_once: true
-      ignore_errors: true
-      register: mariadb_cluster_min_hosts_check
-
-    - name: Final summary
-      ansible.builtin.debug:
-        msg: |
-          ==================== CONNECTIVITY SUMMARY ====================
-          Group: {{ group_names[0] if group_names | length > 0 else 'ungrouped' }}
-          All hosts online: {{ 'YES' if mariadb_cluster_all_hosts_check is succeeded else 'NO' }}
-          At least 2 hosts online: {{ 'YES' if mariadb_cluster_min_hosts_check is succeeded else 'NO' }}
-          ============================================================
-      run_once: true
-
-- name: Get container information
-  tags: [mariadb, mariadb-recover]
-  block:
-    - name: Get container information
-      community.docker.docker_container_info:
-        name: "{{ mariadb_cluster_container_name }}"
-      register: mariadb_cluster_container_info
-
-    - name: Display container status
-      when: mariadb_cluster_container_info.exists
-      block:
-        - name: Debug
-          ansible.builtin.debug:
-            msg: |
-              Container: {{ mariadb_cluster_container_name }}
-              State: {{ mariadb_cluster_container_info.container.State.Status }}
-              Running: {{ mariadb_cluster_container_info.container.State.Running }}
-              Restart Count: {{ mariadb_cluster_container_info.container.RestartCount }}
-              Started At: {{ mariadb_cluster_container_info.container.State.StartedAt }}
-          when: mariadb_cluster_container_info.exists
-
-        - name: Check if container is in restart loop
-          ansible.builtin.debug:
-            msg: "WARNING: Container {{ mariadb_cluster_container_name }} has restarted {{ mariadb_cluster_container_info.container.RestartCount }} times"
-          when: mariadb_cluster_container_info.container.RestartCount | int > 5
-
-        - name: Calculate uptime
-          ansible.builtin.shell: |
-            started_epoch=$(date -d "{{ mariadb_cluster_container_info.container.State.StartedAt }}" +%s)
-            current_epoch=$(date +%s)
-            echo $((current_epoch - started_epoch))
-          register: mariadb_cluster_uptime_seconds
-          when: mariadb_cluster_container_info.container.State.Running
-          changed_when: false
-
-        - name: Set fact
-          ansible.builtin.set_fact:
-            mariadb_cluster_uptime_seconds: "{{ mariadb_cluster_uptime_seconds.stdout }}"
-            mariadb_cluster_uptime_minutes: "{{ mariadb_cluster_uptime_seconds.stdout | int / 60 }}"
-            mariadb_cluster_running_and_stabilized: "{{ mariadb_cluster_uptime_seconds.stdout | int / 60 >= 2 }}"  # at least running for 2 minutes
-            mariadb_cluster_running: "{{ mariadb_cluster_uptime_seconds.stdout | int >= 0 }}"
-          when: mariadb_cluster_container_info.container.State.Running
-
-        - name: Display uptime in human readable format
-          ansible.builtin.debug:
-            msg: "Container {{ mariadb_cluster_container_name }} has been running for {{ (mariadb_cluster_uptime_seconds | int / 3600) | round(2) }} hours ({{ (mariadb_cluster_uptime_seconds | int / 86400) | round(2) }} days)"
-          when: mariadb_cluster_container_info.container.State.Running
-
-        - name: Gather all hosts that are already running
-          ansible.builtin.set_fact:
-            mariadb_cluster_mariadb_cluster_running_and_stabilized_instances: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[?mariadb_cluster_running_and_stabilized].inventory_hostname') }}"
-            mariadb_cluster_running_instances: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[?mariadb_cluster_running].inventory_hostname') }}"
-          run_once: true
-
-        - name: End playbook as all instances are running and stable
-          ansible.builtin.meta: end_play
-          when: mariadb_cluster_set_config is defined and mariadb_cluster_set_config is not changed and groups[mariadb_cluster_ansible_group] | length == mariadb_cluster_mariadb_cluster_running_and_stabilized_instances | length
+- name: fail
+  fail:
+    msg: test
+  tags: always
 
 - name: Get UID for generated user
   ansible.builtin.getent:
@@ -153,39 +53,52 @@
 - name: Check if it's safe to bootstrap existing cluster
   tags: [mariadb, mariadb-recover]
   block:
-    - name: "Check if 'safe_to_bootstrap: 1' is in grastate.dat"
-      ansible.builtin.shell: |
-        grep -Fxq "safe_to_bootstrap: 1" {{ mariadb_cluster_storage_dir }}/grastate.dat
-      register: mariadb_cluster_bootstrap_check
-      changed_when: false
-      ignore_errors: true
+    - name: "Check if 'grastate.dat' file exists"
+      ansible.builtin.stat:
+        path: "{{ mariadb_cluster_storage_dir }}/grastate.dat"
+      register: mariadb_cluster_grastate_stat
 
-    - name: Set per-host fact if safe to bootstrap
+    - name: "Set variable based on existence of grastate.dat"
       ansible.builtin.set_fact:
-        mariadb_cluster_is_safe_to_bootstrap: "{{ mariadb_cluster_bootstrap_check.rc == 0 }}"
+        mariadb_cluster_grastate_exists: "{{ mariadb_cluster_grastate_stat.stat.exists }}"
 
-    - name: Gather safe_to_bootstrap info from all nodes
-      ansible.builtin.set_fact:
-        mariadb_cluster_bootstrap_candidates: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[?mariadb_cluster_is_safe_to_bootstrap].inventory_hostname') }}"
-      run_once: true
+    - name: Examine grastate.dat file
+      when: mariadb_cluster_grastate_exists
+      block:
+        - name: "Check if 'safe_to_bootstrap: 1' is in grastate.dat"
+          ansible.builtin.shell: |
+            grep -Fxq "safe_to_bootstrap: 1" {{ mariadb_cluster_storage_dir }}/grastate.dat
+          register: mariadb_cluster_bootstrap_check
+          changed_when: false
+          ignore_errors: true
 
-    - name: "Set mariadb_cluster_bootstrap_candidates"
-      ansible.builtin.debug:
-        var: mariadb_cluster_bootstrap_candidates
+        - name: Set per-host fact if safe to bootstrap
+          ansible.builtin.set_fact:
+            mariadb_cluster_is_safe_to_bootstrap: "{{ mariadb_cluster_bootstrap_check.rc == 0 }}"
 
-    - name: "Set mariadb_cluster_host_with_highest_number"
-      ansible.builtin.set_fact:
-        mariadb_cluster_host_with_highest_number: "{{ mariadb_cluster_bootstrap_candidates[0] }}"
-      run_once: true
-      when: mariadb_cluster_bootstrap_candidates | length > 0
-      tags: [mariadb, mysql]
+        - name: Gather safe_to_bootstrap info from all nodes
+          ansible.builtin.set_fact:
+            mariadb_cluster_bootstrap_candidates: "{{ groups[mariadb_cluster_ansible_group] | map('extract', hostvars) | list | json_query('[?mariadb_cluster_is_safe_to_bootstrap].inventory_hostname') }}"
+          run_once: true
 
-    - name: "Print mariadb_cluster_host_with_highest_number"
-      ansible.builtin.debug:
-        var: mariadb_cluster_host_with_highest_number
+        - name: "Set mariadb_cluster_bootstrap_candidates"
+          ansible.builtin.debug:
+            var: mariadb_cluster_bootstrap_candidates
+
+        - name: "Set mariadb_cluster_host_with_highest_number"
+          ansible.builtin.set_fact:
+            mariadb_cluster_host_with_highest_number: "{{ mariadb_cluster_bootstrap_candidates[0] }}"
+          run_once: true
+          when: mariadb_cluster_bootstrap_candidates | length > 0
+
+        - name: "Print mariadb_cluster_host_with_highest_number"
+          ansible.builtin.debug:
+            var: mariadb_cluster_host_with_highest_number
 
 - name: Run wsrep-recover
-  when: mariadb_cluster_bootstrap_candidates | length == 0 and mariadb_cluster_container_info.exists
+  when:
+    - mariadb_cluster_bootstrap_candidates | default([]) | length == 0
+    - mariadb_cluster_grastate_exists
   tags: [mariadb, mariadb-recover]
   block:
     - name: Figure out most recent commit
