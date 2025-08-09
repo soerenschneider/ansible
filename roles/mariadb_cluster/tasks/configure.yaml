@@ -47,7 +47,7 @@
 - name: Add my.cnf
   ansible.builtin.copy:
     content: |
-      [client]
+      [mariadb-admin]
       user = {{ mariadb_cluster_root_user }}
       password = {{ mariadb_cluster_root_password }}
       [mariadb]
