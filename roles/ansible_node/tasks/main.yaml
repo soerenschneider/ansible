@@ -81,6 +81,8 @@
   ansible.builtin.file:
     path: "/home/{{ ansible_node_user }}/.ssh/known_hosts"
     state: "touch"
+    owner: "{{ ansible_node_user }}"
+    group: "{{ ansible_node_user }}"
     mode: "0640"
     modification_time: "preserve"
     access_time: "preserve"
