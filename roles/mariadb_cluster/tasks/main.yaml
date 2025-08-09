@@ -19,7 +19,7 @@
 # therefore, only run it if there are no pending changes to the containers
 - name: Check containers
   ansible.builtin.include_tasks: check_containers.yaml
-  when: not mariadb_cluster_install_changed and not mariadb_cluster_config_changed
+  when: not mariadb_cluster_install_changed | default(false) and not mariadb_cluster_config_changed | default(false)
   tags: always
 
 - name: Get UID for generated user
