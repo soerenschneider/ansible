@@ -22,11 +22,6 @@
   when: not mariadb_cluster_install_changed and not mariadb_cluster_config_changed
   tags: always
 
-- name: fail
-  fail:
-    msg: test
-  tags: always
-
 - name: Get UID for generated user
   ansible.builtin.getent:
     database: passwd
