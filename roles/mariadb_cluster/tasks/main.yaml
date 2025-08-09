@@ -39,7 +39,7 @@
   tags: [mariadb, mariadb-recover]
 
 - name: Some healthy members of the cluster detected, run missing slaves and exit once healthcheck passes
-  when: mariadb_cluster_hosts_with_healthcheck_passed | default(0) | length > 0
+  when: mariadb_cluster_hosts_with_healthcheck_passed | default([]) | length > 0
   tags: [mariadb, mariadb-recover]
   block:
     - name: Run missing slaves to connect to existing cluster
