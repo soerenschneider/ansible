@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.1.0](https://github.com/soerenschneider/ansible/compare/v1.0.2...v1.1.0) (2025-08-15)
+
+
+### Features
+
+* increase security by conditionally rotating key every n month ([61204b1](https://github.com/soerenschneider/ansible/commit/61204b1180e28c9dcb2c5fb0c815aef94de4095c))
+* increase security by restricting ssh keypair to individual ip address ([84aa8d3](https://github.com/soerenschneider/ansible/commit/84aa8d30ce477ef198896c73dd79cf33b9aec7ec))
+
+
+### Bug Fixes
+
+* **deps:** update actions/checkout action to v4.3.0 ([#141](https://github.com/soerenschneider/ansible/issues/141)) ([b942b90](https://github.com/soerenschneider/ansible/commit/b942b907f644a05f1c61b79bbe25829ab8d675df))
+* **deps:** update ansible/ansible-lint action to v25.8.1 ([#146](https://github.com/soerenschneider/ansible/issues/146)) ([9e223d2](https://github.com/soerenschneider/ansible/commit/9e223d226e366fe5446bb4cd2c1df7908a995dc3))
+* **deps:** update dependency ansible to v11.9.0 ([#144](https://github.com/soerenschneider/ansible/issues/144)) ([368cd09](https://github.com/soerenschneider/ansible/commit/368cd09b7e0e92d64b20f3346061841377d75237))
+* **deps:** update dependency community.general to v11.2.0 ([#142](https://github.com/soerenschneider/ansible/issues/142)) ([82d9e71](https://github.com/soerenschneider/ansible/commit/82d9e71ff47107df922f7d155b76506e87431fcb))
+* **deps:** update dependency hashicorp/vault to v1.20.2 ([#137](https://github.com/soerenschneider/ansible/issues/137)) ([5ed9535](https://github.com/soerenschneider/ansible/commit/5ed9535e5f2c7e7f03466d032798e07357a46d13))
+* **deps:** update dependency rfjakob/gocryptfs to v2.6.1 ([#140](https://github.com/soerenschneider/ansible/issues/140)) ([7bcb9ff](https://github.com/soerenschneider/ansible/commit/7bcb9ffa1257fa88412b02f4cbc5d351bfc1c020))
+* **deps:** update dependency sigoden/dufs to v0.44.0 ([#147](https://github.com/soerenschneider/ansible/issues/147)) ([5707e12](https://github.com/soerenschneider/ansible/commit/5707e1208d8d43945cc85b0f9da1cdf1162aed37))
+* **deps:** update dependency vectordotdev/vector to v0.49.0 ([#145](https://github.com/soerenschneider/ansible/issues/145)) ([dc3ba2f](https://github.com/soerenschneider/ansible/commit/dc3ba2fd6ee3d8c11b0aa7ff294b6abde1af2228))
+* **deps:** update docker/login-action action to v3.5.0 ([#135](https://github.com/soerenschneider/ansible/issues/135)) ([758489d](https://github.com/soerenschneider/ansible/commit/758489dd082b1e97019e7682f0b44907e665c7a8))
+* **deps:** update docker/metadata-action action to v5.8.0 ([#133](https://github.com/soerenschneider/ansible/issues/133)) ([041f9b0](https://github.com/soerenschneider/ansible/commit/041f9b05dbfb444c0b69bebf873da65f41f44c43))
+* **deps:** update python docker tag to v3.13.6 ([#139](https://github.com/soerenschneider/ansible/issues/139)) ([445a75d](https://github.com/soerenschneider/ansible/commit/445a75da1d41494726e6b8835d4a13bc7b93212e))
+
 ## [1.0.2](https://github.com/soerenschneider/ansible/compare/v1.0.1...v1.0.2) (2025-08-06)
 
 
