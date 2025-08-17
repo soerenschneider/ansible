@@ -12,6 +12,10 @@ User={{ vault_unsealer_user }}
 Group={{ vault_unsealer_group }}
 ExecStart=/usr/local/bin/vault-unsealer -conf "{{ vault_unsealer_config_file }}"
 
+{% if vault_unsealer_env_file != "" %}
+EnvironmentFile={{ vault_unsealer_env_file }}
+{% endif %}
+
 PrivateTmp=true
 ProtectHome=true
 ProtectControlGroups=true
