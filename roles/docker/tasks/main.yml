@@ -20,7 +20,7 @@
 
 - name: Create or update Docker daemon config for log rotation
   ansible.builtin.copy:
-    dest: /etc/docker/daemon.json
+    dest: "/etc/docker/daemon.json"
     content: |
       {
         "log-driver": "json-file",
@@ -29,17 +29,17 @@
           "max-file": "3"
         }
       }
-    owner: root
-    group: root
-    mode: '0644'
+    owner: "root"
+    group: "root"
+    mode: "0644"
   tags: [docker]
 
 - name: Add cleanup systemd units
   ansible.builtin.template:
     src: "{{ item }}.j2"
-    dest: /etc/systemd/system/{{ item }}
-    owner: root
-    group: root
+    dest: "/etc/systemd/system/{{ item }}"
+    owner: "root"
+    group: "root"
     mode: "0644"
   register: _docker_prune_svc
   with_items: [docker-prune.service, docker-prune.timer]
@@ -47,11 +47,11 @@
 
 - name: Enable prune timer and service
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: "docker-prune.{{ item }}"
     daemon_reload: true
     enabled: true
     state: started
-  with_items: [docker-prune.service, docker-prune.timer]
+  with_items: [service, timer]
   tags: [docker]
 
 - name: Start cAdvisor container
