@@ -3,7 +3,7 @@ vault_unsealer_user: vault
 vault_unsealer_group: vault
 vault_unsealer_service_name: vault-unsealer
 
-vault_unsealer_config_file: /etc/vault-unsealer.json
+vault_unsealer_config_file: /etc/vault-unsealer.yaml
 vault_unsealer_config: {}
 # renovate: datasource=github-releases depName=soerenschneider/vault-unsealer
 vault_unsealer_version: v1.1.1

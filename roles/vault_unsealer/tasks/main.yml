@@ -24,7 +24,7 @@
 
 - name: Add config
   ansible.builtin.copy:
-    content: "{{ vault_unsealer_config | to_nice_json }}"
+    content: "{{ vault_unsealer_config | to_nice_yaml }}"
     dest: "{{ vault_unsealer_config_file }}"
     owner: "{{ vault_unsealer_user }}"
     group: "{{ vault_unsealer_group }}"
