@@ -4,7 +4,7 @@
     name: "{{ mariadb_cluster_group }}"
     system: true
   register: mariadb_cluster_install_group
-  tags: [mariadb, exporter, mariadb-install]
+  tags: [mariadb, exporter, mariadb-install, bootstrap]
 
 - name: Create mariadb user
   ansible.builtin.user:
@@ -12,7 +12,7 @@
     group: "{{ mariadb_cluster_group }}"
     system: true
   register: mariadb_cluster_install_user
-  tags: [mariadb, exporter, mariadb-install]
+  tags: [mariadb, exporter, mariadb-install, bootstrap]
 
 - name: Create mariadb dir
   ansible.builtin.file:
@@ -22,7 +22,7 @@
     group: "{{ mariadb_cluster_group }}"
     mode: "0770"
   register: mariadb_cluster_install_base_dir
-  tags: [mariadb, mariadb-install]
+  tags: [mariadb, mariadb-install, bootstrap]
 
 - name: Create mariadb storage dir
   ansible.builtin.file:
@@ -32,7 +32,7 @@
     group: "{{ mariadb_cluster_group }}"
     mode: "0770"
   register: mariadb_cluster_install_storage_dir
-  tags: [mariadb, mariadb-install]
+  tags: [mariadb, mariadb-install, bootstrap]
 
 - name: Create mariadb certs dir
   ansible.builtin.file:
@@ -42,7 +42,7 @@
     group: "{{ mariadb_cluster_group }}"
     mode: "0770"
   register: mariadb_cluster_install_certs_dir
-  tags: [mariadb, mariadb-install]
+  tags: [mariadb, mariadb-install, bootstrap]
 
 - name: Create mariadb initdb dir
   ansible.builtin.file:
@@ -52,13 +52,13 @@
     group: "{{ mariadb_cluster_group }}"
     mode: "0770"
   register: mariadb_cluster_install_initdb_dir
-  tags: [mariadb, mariadb-install]
+  tags: [mariadb, mariadb-install, bootstrap]
 
 - name: Pull mariadb docker image
   community.docker.docker_image_pull:
     name: "{{ mariadb_cluster_image }}"
   register: mariadb_cluster_install_container_image
-  tags: [mariadb, mariadb-install]
+  tags: [mariadb, mariadb-install, bootstrap]
 
 - name: Determine if mariadb installation changed
   ansible.builtin.set_fact:
@@ -70,4 +70,4 @@
          or mariadb_cluster_install_certs_dir.changed
          or mariadb_cluster_install_initdb_dir.changed
          or mariadb_cluster_install_container_image.changed }}
-  tags: [mariadb, mariadb-configure]
+  tags: [mariadb, mariadb-install, bootstrap]

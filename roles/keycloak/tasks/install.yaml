@@ -3,7 +3,7 @@
   ansible.builtin.user:
     name: "{{ keycloak_user }}"
     system: true
-  tags: [keycloak]
+  tags: [keycloak, keycloak-install, bootstrap]
 
 - name: Create keycloak dir
   ansible.builtin.file:
@@ -12,7 +12,7 @@
     owner: "{{ keycloak_user }}"
     group: "root"
     mode: "0750"
-  tags: [keycloak]
+  tags: [keycloak, keycloak-install, bootstrap]
 
 - name: Create keycloak dir storage
   ansible.builtin.file:
@@ -24,18 +24,18 @@
   with_items:
     - "{{ keycloak_storage_dir | default('/var/lib/keycloak/storage') }}"
     - "{{ keycloak_certs_dir | default('/var/lib/keycloak/certs') }}"
-  tags: [docker, keycloak]
+  tags: [keycloak, keycloak-install, bootstrap]
 
 - name: Get UID for generated user
   ansible.builtin.getent:
     database: passwd
     key: "{{ keycloak_user }}"
-  tags: always
+  tags: [keycloak, keycloak-install, deps, bootstrap]
 
 - name: Build user string
   ansible.builtin.set_fact:
     _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}"
-  tags: always
+  tags: [keycloak, keycloak-install, deps, bootstrap]
 
 - name: Run keycloak
   community.docker.docker_container:
@@ -44,14 +44,13 @@
     user: "{{ _keycloak_user_string }}"
     networks:
       - name: "{{ keycloak_docker_network }}"
-        aliases:
-          - "{{ inventory_hostname }}"
     restart_policy: "always"
     recreate: true
     published_ports:
       - "127.0.0.1:8080:8080"
       - "127.0.0.1:9000:9000"
     env:
+      KC_CACHE: local
       KC_DB: "{{ keycloak_db_name }}"
       KC_TRANSACTION_XA_ENABLED: "false"
       KC_TRANSACTION_JTA_ENABLED: "false"
@@ -69,4 +68,4 @@
       - start
     volumes:
       - /var/lib/keycloak/certs:/certs:ro
-  tags: [docker, keycloak]
+  tags: [keycloak, keycloak-install, bootstrap, deps]

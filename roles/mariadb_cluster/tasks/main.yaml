@@ -7,9 +7,9 @@
   ansible.builtin.include_tasks: configure.yaml
   tags: always
 
-- name: Check certificates
-  ansible.builtin.include_tasks: check_certs.yaml
-  tags: always
+#- name: Check certificates
+#  ansible.builtin.include_tasks: check_certs.yaml
+#  tags: always
 
 - name: Check connectivity
   ansible.builtin.include_tasks: check_connectivity.yaml
@@ -26,12 +26,12 @@
   ansible.builtin.getent:
     database: passwd
     key: "{{ mariadb_cluster_user }}"
-  tags: [mariadb, mariadb-recover]
+  tags: [mariadb, exporter, mariadb-recover]
 
 - name: Build user string
   ansible.builtin.set_fact:
     _mariadb_cluster_user_string: "{{ getent_passwd[mariadb_cluster_user][1] }}"
-  tags: [mariadb, mariadb-recover]
+  tags: [mariadb, exporter, mariadb-recover]
 
 - name: Create mariadb docker network
   community.docker.docker_network:
