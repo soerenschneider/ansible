@@ -1,4 +1,4 @@
 ---
 # renovate: datasource=github-releases depName=rfjakob/gocryptfs versioning=semver-coerced
-gocryptfs_version: v2.6.0
+gocryptfs_version: v2.6.1
 gocryptfs_fuse_allow_other: true

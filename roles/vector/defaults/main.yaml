@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=vectordotdev/vector
-vector_version: v0.48.0
+vector_version: v0.49.0
 vector_config_file: /etc/vector/vector.yaml
 vector_user: vector
 vector_group: vector
