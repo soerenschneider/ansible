@@ -1,0 +1,18 @@
+---
+- name: Add and apply clusterrolebinding
+  tags: [k0s, k0s-configure, k0s-oidc]
+  when:
+    - k0s_oidc_groups_prefix != ""
+    - k0s_oidc_admin_group != ""
+  block:
+    - name: "Create clusterrolebinding"
+      ansible.builtin.template:
+        src: "oidc-clusterrolebinding.yaml.j2"
+        dest: "/root/clusterrolebinding.yaml"
+        owner: "root"
+        group: "root"
+        mode: "0640"
+
+    - name: "Create clusterrolebinding"
+      ansible.builtin.command:
+        cmd: "k0s kubectl apply -f /root/clusterrolebinding.yaml"

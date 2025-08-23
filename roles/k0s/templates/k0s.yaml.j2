@@ -3,9 +3,7 @@ apiVersion: k0s.k0sproject.io/v1beta1
 kind: ClusterConfig
 spec:
   api:
+{% if k0s_extra_args | default([]) | length > 0 %}
     extraArgs:
-      oidc-issuer-url: https://auth.ez.soeren.cloud/realms/master
-      oidc-client-id: kubernetes
-      oidc-groups-claim: groups
-      oidc-groups-prefix: 'idp-groups:'
-      oidc-username-prefix: 'idp:'
+{{ k0s_extra_args | to_nice_yaml(indent=2) | indent(6, true) }}
+{% endif %}

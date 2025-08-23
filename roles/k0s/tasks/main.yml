@@ -5,6 +5,33 @@
     binary_name: k0s
     github_repo: k0sproject/k0s
     service_name: k0s
+  tags: always
+
+- name: Build k0s extra args
+  set_fact:
+    k0s_extra_args: >-
+      {{
+        {
+          'oidc-issuer-url': k0s_oidc_issuer_url,
+          'oidc-client-id': k0s_oidc_client_id,
+          'oidc-groups-claim': k0s_oidc_groups_claim,
+          'oidc-groups-prefix': k0s_oidc_groups_prefix,
+          'oidc-username-prefix': k0s_oidc_username_prefix
+        }
+        | dict2items
+        | selectattr('value', 'ne', '')
+        | items2dict
+      }}
+  tags: [k0s, k0s-configure]
+
+- name: "Create k0s config"
+  ansible.builtin.template:
+    src: "k0s.yaml.j2"
+    dest: "{{ k0s_config_file }}"
+    owner: "root"
+    group: "root"
+    mode: "0640"
+  notify: "Restart k0s"
   tags: [k0s, k0s-configure]
 
 - name: Create systemd unit
@@ -28,3 +55,11 @@
     name: "{{ k0s_service_name }}"
     state: "{% if k0s_service_enabled %}started{% else %}stopped{% endif %}"
   tags: [k0s, k0s-configure]
+
+- name: "Generate kubeconf"
+  ansible.builtin.include_tasks: kubeconf.yaml
+  tags: always
+
+- name: "Configure OIDC"
+  ansible.builtin.include_tasks: oidc.yaml
+  tags: always

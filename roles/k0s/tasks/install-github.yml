@@ -14,17 +14,17 @@
     k0s_checksum_file: ""
     k0s_full_filename: ""
     k0s_release_checksum: ""
-  tags: [k0s, k0s-install]
+  tags: [k0s, k0s-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
   register: k0s_k0s_local_binary
-  tags: [k0s, k0s-install]
+  tags: [k0s, k0s-install, deps]
 
 - name: Check installed version
   when: k0s_k0s_local_binary.stat.exists
-  tags: [k0s, k0s-install]
+  tags: [k0s, k0s-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell:
@@ -45,7 +45,7 @@
 
 - name: Fetch latest release information from github
   when: k0s_k0s_desired_version is not defined or not k0s_k0s_desired_version
-  tags: [k0s, k0s-install]
+  tags: [k0s, k0s-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
@@ -67,7 +67,7 @@
 
 - name: "Download artifacts"
   when: not k0s_k0s_local_binary.stat.exists or k0s_k0s_desired_version != k0s_k0s_installed_version
-  tags: [k0s, k0s-install]
+  tags: [k0s, k0s-install, deps]
   block:
     - name: Generate temp dir
       become: false

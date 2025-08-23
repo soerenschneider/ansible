@@ -1,0 +1,77 @@
+---
+- name: Get kubeconfig from k0s
+  command: k0s kubeconfig admin
+  register: kubeconfig_raw
+  tags: [kubeconf]
+
+- name: Parse cluster data
+  set_fact:
+    cluster_info:
+      name: '{{ k0s_cluster_name if k0s_cluster_name != "" else inventory_hostname }}'
+      ca_data: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster['certificate-authority-data'] }}"
+      server: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster.server }}"
+  tags: [kubeconf]
+
+- name: Store cluster info centrally
+  set_fact:
+    all_clusters: "{{ all_clusters | default([]) + [cluster_info] }}"
+  run_once: true
+  delegate_to: localhost
+  tags: [kubeconf]
+
+- name: Write CA cert files
+  copy:
+    content: "{{ item.ca_data | b64decode }}"
+    dest: "/tmp/{{ item.name }}-ca.crt"
+  loop: "{{ all_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  run_once: true
+  delegate_to: localhost
+  become: false
+  tags: [kubeconf]
+
+- name: Set cluster in kubeconfig
+  command: >
+    kubectl config set-cluster {{ item.name }}
+    --server={{ item.server }}
+    --certificate-authority=/tmp/{{ item.name }}-ca.crt
+    --embed-certs=true
+  loop: "{{ all_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  become: false
+  run_once: true
+  delegate_to: localhost
+  tags: [kubeconf]
+
+- name: Set user with OIDC
+  command: >
+    kubectl config set-credentials {{ item.name }}-oidc
+    --exec-api-version=client.authentication.k8s.io/v1
+    --exec-command=kubectl
+    --exec-arg=oidc-login
+    --exec-arg=get-token
+    --exec-arg=--oidc-issuer-url={{ k0s_oidc_issuer_url }}
+    --exec-arg=--oidc-client-id={{ k0s_oidc_client_id }}
+    --exec-interactive-mode=Always
+  loop: "{{ all_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  run_once: true
+  delegate_to: localhost
+  become: false
+  tags: [kubeconf]
+
+- name: Set context
+  command: >
+    kubectl config set-context {{ item.name }}
+    --cluster={{ item.name }}
+    --user={{ item.name }}-oidc
+  loop: "{{ all_clusters }}"
+  loop_control:
+    label: "{{ item.name }}"
+  run_once: true
+  delegate_to: localhost
+  become: false
+  tags: [kubeconf]
