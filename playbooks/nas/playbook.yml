@@ -80,7 +80,7 @@
     - name: "Run role rclone"
       ansible.builtin.include_role:
         name: rclone
-      when: fileserver_mode == "active"
+      when: fileserver_mode | default('passive') == "active"
       tags: always
 
     - name: "Run role gocryptfs"
