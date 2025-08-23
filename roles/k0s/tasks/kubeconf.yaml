@@ -24,8 +24,6 @@
   ansible.builtin.copy:
     content: "{{ item.ca_data | b64decode }}"
     dest: "/tmp/{{ item.name }}-ca.crt"
-    owner: "root"
-    group: "root"
     mode: "0644"
   loop: "{{ k0s_all_clusters }}"
   loop_control:
@@ -49,33 +47,38 @@
   delegate_to: localhost
   tags: [k0s, kubeconf]
 
-- name: Set user with OIDC  # noqa: no-changed-when
-  ansible.builtin.command: >
-    kubectl config set-credentials {{ item.name }}-oidc
-    --exec-api-version=client.authentication.k8s.io/v1
-    --exec-command=kubectl
-    --exec-arg=oidc-login
-    --exec-arg=get-token
-    --exec-arg=--oidc-issuer-url={{ k0s_oidc_issuer_url }}
-    --exec-arg=--oidc-client-id={{ k0s_oidc_client_id }}
-    --exec-interactive-mode=Always
-  loop: "{{ k0s_all_clusters }}"
-  loop_control:
-    label: "{{ item.name }}"
-  run_once: true
-  delegate_to: localhost
-  become: false
+- name: "Set user with OIDC"
   tags: [k0s, kubeconf]
+  when:
+    - k0s_oidc_issuer_url != ""
+    - k0s_oidc_client_id != ""
+  block:
+    - name: Set user with OIDC  # noqa: no-changed-when
+      ansible.builtin.command: >
+        kubectl config set-credentials {{ item.name }}-oidc
+        --exec-api-version=client.authentication.k8s.io/v1
+        --exec-command=kubectl
+        --exec-arg=oidc-login
+        --exec-arg=get-token
+        --exec-arg=--oidc-issuer-url={{ k0s_oidc_issuer_url }}
+        --exec-arg=--oidc-client-id={{ k0s_oidc_client_id }}
+        --exec-interactive-mode=Always
+      loop: "{{ k0s_all_clusters }}"
+      loop_control:
+        label: "{{ item.name }}"
+      run_once: true
+      delegate_to: localhost
+      become: false
 
-- name: Set context  # noqa: no-changed-when
-  ansible.builtin.command: >
-    kubectl config set-context {{ item.name }}
-    --cluster={{ item.name }}
-    --user={{ item.name }}-oidc
-  loop: "{{ k0s_all_clusters }}"
-  loop_control:
-    label: "{{ item.name }}"
-  run_once: true
-  delegate_to: localhost
-  become: false
-  tags: [k0s, kubeconf]
+    - name: Set context  # noqa: no-changed-when
+      ansible.builtin.command: >
+        kubectl config set-context {{ item.name }}
+        --cluster={{ item.name }}
+        --user={{ item.name }}-oidc
+      loop: "{{ k0s_all_clusters }}"
+      loop_control:
+        label: "{{ item.name }}"
+      run_once: true
+      delegate_to: localhost
+      become: false
+      tags: [k0s, kubeconf]

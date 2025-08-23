@@ -2,6 +2,7 @@
 - name: "Remove NoSchedule taint"
   ansible.builtin.command: "k0s kubectl taint nodes --all node-role.kubernetes.io/control-plane-"
   when: k0s_controllers_remove_noschedule
+  failed_when: false
   tags: [k0s, k0s-configure]
 
 - name: "Add and apply clusterrolebinding for OIDC"
