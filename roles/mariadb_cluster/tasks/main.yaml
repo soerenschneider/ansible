@@ -7,10 +7,6 @@
   ansible.builtin.include_tasks: configure.yaml
   tags: always
 
-#- name: Check certificates
-#  ansible.builtin.include_tasks: check_certs.yaml
-#  tags: always
-
 - name: Check connectivity
   ansible.builtin.include_tasks: check_connectivity.yaml
   tags: always
