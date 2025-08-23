@@ -1,26 +1,26 @@
 ---
 - name: Get kubeconfig from k0s
-  command: k0s kubeconfig admin
+  ansible.builtin.command: k0s kubeconfig admin
   register: kubeconfig_raw
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Parse cluster data
-  set_fact:
+  ansible.builtin.set_fact:
     cluster_info:
       name: '{{ k0s_cluster_name if k0s_cluster_name != "" else inventory_hostname }}'
       ca_data: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster['certificate-authority-data'] }}"
       server: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster.server }}"
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Store cluster info centrally
-  set_fact:
+  ansible.builtin.set_fact:
     all_clusters: "{{ all_clusters | default([]) + [cluster_info] }}"
   run_once: true
   delegate_to: localhost
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Write CA cert files
-  copy:
+  ansible.builtin.copy:
     content: "{{ item.ca_data | b64decode }}"
     dest: "/tmp/{{ item.name }}-ca.crt"
   loop: "{{ all_clusters }}"
@@ -29,10 +29,10 @@
   run_once: true
   delegate_to: localhost
   become: false
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Set cluster in kubeconfig
-  command: >
+  ansible.builtin.command: >
     kubectl config set-cluster {{ item.name }}
     --server={{ item.server }}
     --certificate-authority=/tmp/{{ item.name }}-ca.crt
@@ -43,10 +43,10 @@
   become: false
   run_once: true
   delegate_to: localhost
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Set user with OIDC
-  command: >
+  ansible.builtin.command: >
     kubectl config set-credentials {{ item.name }}-oidc
     --exec-api-version=client.authentication.k8s.io/v1
     --exec-command=kubectl
@@ -61,10 +61,10 @@
   run_once: true
   delegate_to: localhost
   become: false
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]
 
 - name: Set context
-  command: >
+  ansible.builtin.command: >
     kubectl config set-context {{ item.name }}
     --cluster={{ item.name }}
     --user={{ item.name }}-oidc
@@ -74,4 +74,4 @@
   run_once: true
   delegate_to: localhost
   become: false
-  tags: [kubeconf]
+  tags: [k0s, kubeconf]

@@ -5,7 +5,7 @@
     - k0s_oidc_groups_prefix != ""
     - k0s_oidc_admin_group != ""
   block:
-    - name: "Create clusterrolebinding"
+    - name: "Create clusterrolebinding manifest"
       ansible.builtin.template:
         src: "oidc-clusterrolebinding.yaml.j2"
         dest: "/root/clusterrolebinding.yaml"
@@ -16,3 +16,8 @@
     - name: "Create clusterrolebinding"
       ansible.builtin.command:
         cmd: "k0s kubectl apply -f /root/clusterrolebinding.yaml"
+
+    - name: "Delete clusterrolebinding manifest"
+      ansible.builtin.file:
+        path: "/root/clusterrolebinding.yaml"
+        state: "absent"
