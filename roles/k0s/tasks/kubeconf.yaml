@@ -1,20 +1,20 @@
 ---
 - name: Get kubeconfig from k0s
   ansible.builtin.command: k0s kubeconfig admin
-  register: kubeconfig_raw
+  register: k0s_kubeconfig_raw
   tags: [k0s, kubeconf]
 
 - name: Parse cluster data
   ansible.builtin.set_fact:
-    cluster_info:
+    k0s_cluster_info:
       name: '{{ k0s_cluster_name if k0s_cluster_name != "" else inventory_hostname }}'
-      ca_data: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster['certificate-authority-data'] }}"
-      server: "{{ (kubeconfig_raw.stdout | from_yaml).clusters[0].cluster.server }}"
+      ca_data: "{{ (k0s_kubeconfig_raw.stdout | from_yaml).clusters[0].cluster['certificate-authority-data'] }}"
+      server: "{{ (k0s_kubeconfig_raw.stdout | from_yaml).clusters[0].cluster.server }}"
   tags: [k0s, kubeconf]
 
 - name: Store cluster info centrally
   ansible.builtin.set_fact:
-    all_clusters: "{{ all_clusters | default([]) + [cluster_info] }}"
+    k0s_all_clusters: "{{ k0s_all_clusters | default([]) + [k0s_cluster_info] }}"
   run_once: true
   delegate_to: localhost
   tags: [k0s, kubeconf]
@@ -23,7 +23,10 @@
   ansible.builtin.copy:
     content: "{{ item.ca_data | b64decode }}"
     dest: "/tmp/{{ item.name }}-ca.crt"
-  loop: "{{ all_clusters }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop: "{{ k0s_all_clusters }}"
   loop_control:
     label: "{{ item.name }}"
   run_once: true
@@ -37,7 +40,7 @@
     --server={{ item.server }}
     --certificate-authority=/tmp/{{ item.name }}-ca.crt
     --embed-certs=true
-  loop: "{{ all_clusters }}"
+  loop: "{{ k0s_all_clusters }}"
   loop_control:
     label: "{{ item.name }}"
   become: false
@@ -55,7 +58,7 @@
     --exec-arg=--oidc-issuer-url={{ k0s_oidc_issuer_url }}
     --exec-arg=--oidc-client-id={{ k0s_oidc_client_id }}
     --exec-interactive-mode=Always
-  loop: "{{ all_clusters }}"
+  loop: "{{ k0s_all_clusters }}"
   loop_control:
     label: "{{ item.name }}"
   run_once: true
@@ -68,7 +71,7 @@
     kubectl config set-context {{ item.name }}
     --cluster={{ item.name }}
     --user={{ item.name }}-oidc
-  loop: "{{ all_clusters }}"
+  loop: "{{ k0s_all_clusters }}"
   loop_control:
     label: "{{ item.name }}"
   run_once: true

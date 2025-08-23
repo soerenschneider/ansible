@@ -16,6 +16,7 @@
     - name: "Create clusterrolebinding"
       ansible.builtin.command:
         cmd: "k0s kubectl apply -f /root/clusterrolebinding.yaml"
+      changed_when: false
 
     - name: "Delete clusterrolebinding manifest"
       ansible.builtin.file:
