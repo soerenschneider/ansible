@@ -25,7 +25,7 @@
 
 - name: "Set fact if ssh keypair is older than max allowed age"
   ansible.builtin.set_fact:
-    ansible_node_rotate_ssh_key: "{{ (ansible_date_time.epoch | int) - (ansible_node_ssh_key_stat.stat.mtime | default(0)) > ( ansible_node_ssh_max_key_age_months  * 30 * 24 * 3600) }}"
+    ansible_node_rotate_ssh_key: "{{ (ansible_date_time.epoch | int) - (ansible_node_ssh_key_stat.stat.mtime | default(0)) > (ansible_node_ssh_max_key_age_months  * 30 * 24 * 3600) }}"
   when: ansible_node_ssh_key_stat.stat.exists is defined and ansible_node_ssh_key_stat.stat.exists
   tags: [ansible_node, ansible-node]
 
