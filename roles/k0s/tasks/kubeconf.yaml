@@ -2,6 +2,7 @@
 - name: Get kubeconfig from k0s
   ansible.builtin.command: k0s kubeconfig admin
   register: k0s_kubeconfig_raw
+  changed_when: false
   tags: [k0s, kubeconf]
 
 - name: Parse cluster data

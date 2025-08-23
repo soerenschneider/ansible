@@ -8,7 +8,7 @@
   tags: always
 
 - name: Build k0s extra args
-  set_fact:
+  ansible.builtin.set_fact:
     k0s_extra_args: >-
       {{
         {
