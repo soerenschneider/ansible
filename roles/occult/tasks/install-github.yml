@@ -27,7 +27,9 @@
   tags: [occult, occult-install, deps]
   block:
     - name: Check installed version
-      ansible.builtin.shell: set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'
+      ansible.builtin.shell:
+        cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $1}'"
+        executable: "/bin/bash"
       register: occult_installed_version
       changed_when: false
 
