@@ -9,10 +9,22 @@
 
 - name: Create systemd unit
   ansible.builtin.template:
-    src: k0s.service.j2
-    dest: /etc/systemd/system/k0s.service
-    owner: root
-    group: root
+    src: "k0s.service.j2"
+    dest: "/etc/systemd/system/{{ k0s_service_name }}.service"
+    owner: "root"
+    group: "root"
     mode: "0644"
   notify: "Restart k0s"
+  tags: [k0s, k0s-configure]
+
+- name: "Enable/disable systemd unit"
+  ansible.builtin.systemd:
+    name: "{{ k0s_service_name }}"
+    enabled: "{{ k0s_service_enabled }}"
+  tags: [k0s, k0s-configure]
+
+- name: "Start/stop systemd unit"
+  ansible.builtin.systemd:
+    name: "{{ k0s_service_name }}"
+    state: "{% if k0s_service_enabled %}started{% else %}stopped{% endif %}"
   tags: [k0s, k0s-configure]
