@@ -29,7 +29,7 @@
     - name: Check installed version
       ansible.builtin.shell:
         cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} --version | awk '{print $1}'"
-        shell: "/bin/bash"
+        executable: "/bin/bash"
       register: navidrome_installed_version
       changed_when: false
 
