@@ -35,7 +35,7 @@
   become: false
   tags: [k0s, kubeconf]
 
-- name: Set cluster in kubeconfig
+- name: Set cluster in kubeconfig  # noqa: no-changed-when
   ansible.builtin.command: >
     kubectl config set-cluster {{ item.name }}
     --server={{ item.server }}
@@ -49,7 +49,7 @@
   delegate_to: localhost
   tags: [k0s, kubeconf]
 
-- name: Set user with OIDC
+- name: Set user with OIDC  # noqa: no-changed-when
   ansible.builtin.command: >
     kubectl config set-credentials {{ item.name }}-oidc
     --exec-api-version=client.authentication.k8s.io/v1
@@ -67,7 +67,7 @@
   become: false
   tags: [k0s, kubeconf]
 
-- name: Set context
+- name: Set context  # noqa: no-changed-when
   ansible.builtin.command: >
     kubectl config set-context {{ item.name }}
     --cluster={{ item.name }}
