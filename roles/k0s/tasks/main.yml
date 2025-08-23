@@ -60,6 +60,6 @@
   ansible.builtin.include_tasks: kubeconf.yaml
   tags: always
 
-- name: "Configure OIDC"
-  ansible.builtin.include_tasks: oidc.yaml
+- name: "Configure cluster"
+  ansible.builtin.include_tasks: configure.yaml
   tags: always

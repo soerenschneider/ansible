@@ -21,3 +21,5 @@ k0s_config_file: "/etc/k0s.yaml"
 
 k0s_service_name: "k0s"
 k0s_service_enabled: true
+
+k0s_controllers_remove_noschedule: true
