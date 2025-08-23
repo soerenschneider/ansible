@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=k0sproject/k0s
-k0s_version: v1.33.3+k0s.0
+k0s_version: v1.33.4+k0s.0
 
 k0s_labels: []
 
