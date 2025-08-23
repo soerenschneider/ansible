@@ -10,7 +10,9 @@
   tags: [gocryptfs, gocryptfs-install, deps]
   block:
     - name: Check installed version
-      ansible.builtin.shell: set -o pipefail && /usr/local/bin/gocryptfs -version | awk '{print $2}'
+      ansible.builtin.shell:
+        cmd: "set -o pipefail && /usr/local/bin/gocryptfs -version | awk '{print $2}'"
+        executable: "/bin/bash"
       register: gocryptfs_gocryptfs_installed_version
       changed_when: false
 
