@@ -1,6 +1,6 @@
 ---
 - name: "Restart k0s"
   ansible.builtin.systemd:
-    name: "k0s"
+    name: "{{ k0s_service_name }}"
     daemon_reload: true
     state: "restarted"
