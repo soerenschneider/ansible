@@ -97,14 +97,14 @@
     - name: "Run role magnetotactic"
       ansible.builtin.include_role:
         name: magnetotactic
-      when: fileserver_mode == "active"
+      when: fileserver_mode | default('passive') == "active"
       tags: always
 
     - name: "Run role occult"
       ansible.builtin.include_role:
         name: occult
       vars:
-        occult_run_on_boot: "{{ fileserver_mode == 'active' }}"
+        occult_run_on_boot: "{{ fileserver_mode | default('passive') == 'active' }}"
       tags: always
 
     - name: "Run role syncthing"
@@ -119,7 +119,7 @@
     - name: "Run role fetcharr"
       ansible.builtin.include_role:
         name: fetcharr
-      when: fileserver_mode == "active"
+      when: fileserver_mode | default('passive') == "active"
       tags: always
 
     - name: "Add template file"
@@ -130,7 +130,7 @@
         group: root
         mode: "0640"
       tags: [fetcharr, fetcharr-configure]
-      when: fileserver_mode == "active"
+      when: fileserver_mode | default('passive') == "active"
 
     - name: "Run tasks media.yml"
       ansible.builtin.include_tasks: tasks/media.yml
