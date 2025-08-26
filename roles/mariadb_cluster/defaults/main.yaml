@@ -1,9 +1,9 @@
 ---
-# renovate: datasource=github-tags depName=mariadb
+# renovate: datasource=docker depName=mariadb
 mariadb_cluster_version: "11.8.2"
 mariadb_cluster_image: "mariadb:{{ mariadb_cluster_version }}"
 
-# renovate: datasource=github-tags depName=prom/mysqld-exporter
+# renovate: datasource=docker depName=prom/mysqld-exporter
 mariadb_cluster_mysqld_exporter_version: "v0.17.2"
 mariadb_cluster_mysqld_exporter_image: "prom/mysqld-exporter:{{ mariadb_cluster_mysqld_exporter_version }}"
 
