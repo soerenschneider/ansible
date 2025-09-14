@@ -2,13 +2,12 @@
 - name: Install certbot
   ansible.builtin.package:
     name: certbot
-  when: ansible_os_family == "Debian"
   tags: [certbot, certbot-install]
 
 - name: Install certbot route53 plugin
   ansible.builtin.package:
     name: python3-certbot-dns-route53
-  when: [ansible_os_family == "Debian", "certbot_dns_domains | default([]) | length > 0"]
+  when: ["certbot_dns_domains | default([]) | length > 0"]
   tags: [certbot, certbot-install]
 
 - name: Run certbot once (creates 'renewal-hooks' dir)
