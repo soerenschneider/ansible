@@ -1,0 +1,69 @@
+---
+- name: Safely reboot a vault cluster one by one
+  hosts: vault
+  serial: 1
+  tasks:
+    - name: Check if machine needs reboot
+      ansible.builtin.command: needrestart -b
+      become: true
+      changed_when: false
+      register: _needrestart_output
+
+    - name: Check if we are running an outdated kernel/svc
+      ansible.builtin.set_fact:
+        _needrestart_ksta: "{{ _needrestart_output.stdout | regex_search('NEEDRESTART-KSTA: ([0-9]+)', '\\1') | default(['0']) }}"
+        _needrestart_svc: "{{ 'NEEDRESTART-SVC:' in _needrestart_output.stdout }}"
+
+    - name: "Set variable"
+      ansible.builtin.set_fact:
+        _needrestart_kernel: "{{ _needrestart_ksta[0] | int > 1 }}"
+
+    - name: "Print needrestart debug information"
+      ansible.builtin.debug:
+        msg: "Outdated kernel: {{ _needrestart_kernel }} ({{ _needrestart_ksta }}), outdated svc(s): {{ _needrestart_svc }}"
+
+    - name: Read unseal key
+      ansible.builtin.command: pass vault/prd/unseal-key-1
+      become: false
+      delegate_to: localhost
+      register: _vault_unseal_key
+      changed_when: false
+      when: ["inventory_hostname == groups['vault'][0]"]
+
+    - name: Check if vault is unsealed
+      ansible.builtin.shell: set -o pipefail && vault status | grep ^Sealed | awk '{print $2}'
+      register: _vault_unseal_status
+      changed_when: false
+      environment:
+        VAULT_ADDR: https://{{ inventory_hostname }}:8200
+
+    - name: "Reboot node and setup vault"
+      when: _vault_unseal_status.stdout == "true" or _needrestart_kernel is true or _needrestart_svc is true
+      block:
+        - name: Reboot machine
+          become: true
+          ansible.builtin.reboot:
+            reboot_timeout: 300
+          when: _needrestart_kernel is true or _needrestart_svc is true
+
+        - name: Touch audit file
+          become: true
+          ansible.builtin.copy:
+            content: ""
+            dest: /var/log/vault-audit.log
+            owner: vault
+            group: vault
+            mode: "0640"
+            force: false
+          when: _needrestart_kernel is true or _needrestart_svc is true
+
+        - name: Unseal vault
+          ansible.builtin.expect:
+            ansible.builtin.command: vault operator unseal
+            responses:
+              ^Unseal Key.*: "{{ hostvars[groups['vault'][0]]['_vault_unseal_key'].stdout }}"
+            changed_when: true
+          environment:
+            VAULT_ADDR: https://{{ inventory_hostname }}:8200
+          retries: 3
+          delay: 5

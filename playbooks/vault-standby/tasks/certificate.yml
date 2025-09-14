@@ -1,0 +1,17 @@
+---
+- name: Copy cert hook
+  ansible.builtin.template:
+    src: vault-cert-hook.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/post/vault-cert-hook.sh
+    owner: root
+    group: root
+    mode: "0755"
+  register: _vault_cert_hook
+  tags: [vault, vault-cert]
+
+- name: Run added hook
+  ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/vault-cert-hook.sh
+  when: _vault_cert_hook is changed  # noqa: no-handler
+  register: _vault_cert_wrapper_service
+  changed_when: true
+  tags: [vault, vault-cert]

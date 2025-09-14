@@ -1,0 +1,63 @@
+---
+- name: Install haproxy
+  ansible.builtin.package:
+    name: haproxy
+  tags: haproxy
+
+- name: Including role
+  ansible.builtin.include_role:
+    name: haproxy
+  tags: always
+
+- name: Add configuration block
+  ansible.builtin.blockinfile:
+    path: /etc/haproxy/haproxy.cfg
+    block: |
+      listen stats
+        bind *:8405 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+        # only allow the following CNs
+        http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+        mode http
+        http-request use-service prometheus-exporter if { path /metrics }
+        no log
+        stats hide-version
+
+      # Vault has a http health endpoint on /v1/sys/health that returns different http codes
+      # depending on the status of the running vault instance.
+      #
+      # See: https://www.vaultproject.io/api/system/health.html#read-health-information
+      #
+      #    * 200 if initialized, unsealed, and active
+      #    * 429 if unsealed and standby
+      #    * 472 if data recovery mode replication secondary and active
+      #    * 473 if performance standby
+      #    * 501 if not initialized
+      #    * 503 if sealed
+      # Primary https listener
+      frontend vault_https
+        mode tcp
+        log global
+        timeout client 30000
+        bind *:443
+        description Vault over https
+        default_backend vault_https
+        option tcplog
+
+      backend vault_https
+        mode tcp
+        timeout check 5000
+        timeout server 30000
+        timeout connect 5000
+        option httpchk GET /v1/sys/health
+        http-check expect rstatus (200|429)
+      {% for node in groups['vault'] %}
+        server vault-{{ loop.index }} {{ node }}:8200 check check-ssl verify none send-proxy inter 5000
+      {% endfor %}
+
+      backend node_exporter
+        option httpchk
+        server node_exporter 127.0.0.1:9100 check inter 5m
+
+  notify: Restart haproxy
+  tags: [haproxy]

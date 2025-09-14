@@ -1,0 +1,21 @@
+---
+- name: Reset a Vault cluster
+  hosts: vault
+  become: true
+  vars_prompt:
+    - name: destroy_vault
+      prompt: Do you want to destroy the Vault cluster (yes/no)?
+      private: false
+  tasks:
+    - name: "Stop vault and delete storage dir"
+      when: destroy_vault | bool
+      block:
+        - name: Make sure vault is stopped
+          ansible.builtin.systemd:
+            name: vault
+            state: stopped
+
+        - name: Delete storage dir
+          ansible.builtin.file:
+            path: /etc/vault.d/storage
+            state: absent
