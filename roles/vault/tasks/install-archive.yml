@@ -94,6 +94,7 @@
   ansible.builtin.set_fact:
     vault_download_dir: "{{ vault_download_dir.path }}"
   changed_when: false
+  tags: [vault, vault-install, deps]
 
 - name: "Download artifacts"
   when: not vault_binary.stat.exists or vault_version[1:] != vault_installed_version
