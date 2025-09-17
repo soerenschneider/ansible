@@ -23,3 +23,5 @@ k0s_service_name: "k0s"
 k0s_service_enabled: true
 
 k0s_controllers_remove_noschedule: true
+
+k0s_gitops_repo: "https://github.com/soerenschneider/k8s-gitops.git"

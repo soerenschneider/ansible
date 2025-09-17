@@ -56,6 +56,15 @@
     state: "{% if k0s_service_enabled %}started{% else %}stopped{% endif %}"
   tags: [k0s, k0s-configure]
 
+- name: Wait for Kubernetes API server to become available
+  ansible.builtin.wait_for:
+    host: "127.0.0.1"
+    port: 6443
+    delay: 5      # seconds to wait before starting checks
+    timeout: 300  # maximum time to wait in seconds
+    state: started
+  tags: [k0s, k0s-configure, k0s-install, kubeconf]
+
 - name: "Generate kubeconf"
   ansible.builtin.include_tasks: kubeconf.yaml
   tags: always
