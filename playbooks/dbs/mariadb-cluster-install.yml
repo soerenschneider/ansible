@@ -60,6 +60,10 @@
           wsrep_node_incoming_address={{ inventory_hostname }}
           wsrep_node_address={{ inventory_hostname }}
           wsrep-node-name={{ inventory_hostname }}
+          {% if mariadb_preferred_donors | default([]) | length > 0 %}
+          # NOTE: the comma at the end is not a typo, see https://fromdual.com/define-preferred-sst-donor-for-galera-cluster
+          wsrep_sst_donor={{ mariadb_preferred_donors | join(',') }},
+          {% endif %}
           wsrep_provider_options=socket.ssl=yes;socket.ssl_ca=/certs/wsrep-ca.crt;socket.ssl_cert=/certs/wsrep.crt;socket.ssl_key=/certs/wsrep.key;;ist.recv_addr={{ inventory_hostname }}:4568;ist.recv_bind=0.0.0.0:4568;
           [sst]
           tca=/certs/sst-ca.crt
@@ -213,7 +217,7 @@
       register: _container_result
       tags: [docker, mariadb, mysql]
 
-    - name: Conditional fail if container already exists
+    - name: Fail if mariadb container already exists
       ansible.builtin.fail:
         msg: "mariadb container already exists"
       when: _container_result.exists
