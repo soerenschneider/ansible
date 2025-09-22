@@ -19,16 +19,9 @@
         file: settings-{{ fileserver_mode | default('passive') }}.yml
       tags: [always]
 
-    - name: "Run role dufs"
+    - name: "Run role garage"
       ansible.builtin.include_role:
-        name: dufs
-      vars:
-        dufs_identifier: media
-        dufs_bind: "0.0.0.0"
-        dufs_port: 5000
-        dufs_allow_search: true
-        dufs_path_prefix: "/media"
-        dufs_serve_path: "/srv/files/media"
+        name: "garage"
       tags: always
 
     - name: "Manage fileserver mode file"
@@ -81,6 +74,18 @@
       ansible.builtin.include_role:
         name: rclone
       when: fileserver_mode | default('passive') == "active"
+      tags: always
+
+    - name: "Run role dufs"
+      ansible.builtin.include_role:
+        name: dufs
+      vars:
+        dufs_identifier: media
+        dufs_bind: "0.0.0.0"
+        dufs_port: 5000
+        dufs_allow_search: true
+        dufs_path_prefix: "/media"
+        dufs_serve_path: "/srv/files/media"
       tags: always
 
     - name: "Run role gocryptfs"
