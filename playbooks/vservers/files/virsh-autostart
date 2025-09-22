@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 
+sleep 5
+
 virsh list --autostart --state-shutoff --name | xargs -r -n1 virsh start
