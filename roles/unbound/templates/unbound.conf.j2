@@ -1,5 +1,5 @@
 server:
-{% for network in networks[location].devices %}
+{% for network in networks[location].devices | default({}) %}
 {% if network.dns is defined and network.dns %}
     interface: {{ network.address | ipaddr('address') }}
 {% endif %}
@@ -11,7 +11,7 @@ server:
     access-control: ::0/0 refuse
     access-control: 127.0.0.1 allow
     access-control: ::1 allow
-{% for network in networks[location].devices %}
+{% for network in networks[location].devices  | default({}) %}
 {% if network.dns is defined and network.dns %}
     access-control: {{ network.address | ipaddr(0) }} allow
 {% endif %}
