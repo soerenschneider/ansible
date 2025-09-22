@@ -1,0 +1,3 @@
+CREATE USER 'sst_user'@'%' IDENTIFIED BY '{{ mariadb_cluster_replication_password }}';
+GRANT RELOAD, LOCK TABLES, PROCESS, REPLICATION CLIENT, REPLICATION SLAVE,
+      CREATE, INSERT, SELECT, SUPER, SHOW VIEW, EVENT, TRIGGER, FILE ON *.* TO 'sst_user'@'%';
