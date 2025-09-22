@@ -37,7 +37,3 @@
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
       tags: always
-
-    - name: "Run role tasks/mounts.yml"
-      ansible.builtin.include_tasks: tasks/mounts.yml
-      tags: always
