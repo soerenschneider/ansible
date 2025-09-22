@@ -56,7 +56,7 @@ table ip global {
         }
 
         ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
-        ip saddr 192.168.0.0/16 tcp dport { 9094 } accept
+        ip saddr 192.168.0.0/16 tcp dport { 9094, 9093 } accept
         ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
@@ -102,6 +102,11 @@ table ip global {
         iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65", "vlan67" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.0.0/16, 192.168.67.0/24, 192.168.2.0/24, 192.168.65.0/24, 192.168.73.0/24 } tcp dport 22 accept
         iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.65.0/24, 192.168.2.0/24, 192.168.73.0/24 } tcp dport 6443 accept
         iifname "wg0"    ip saddr $WG_ROADWARRIORS          oifname { "vlan65", "vlan67", "vlan68" } accept
+
+        # allow seedbox to talk to fetcharr
+        ip saddr 192.168.200.5    iifname $WG_IF oifname "vlan65" ip daddr $LOCAL_FILESERVER        tcp dport {{ fetcharr_webhook_port }} accept
+        # allow router.ez.soeren.cloud to talk to media
+        ip saddr 192.168.200.2    iifname $WG_IF oifname "vlan65" ip daddr $LOCAL_FILESERVER        tcp dport { 80 443 } accept
 
         # connections from the internal net to the internet or to other
         # internal nets are allowed
