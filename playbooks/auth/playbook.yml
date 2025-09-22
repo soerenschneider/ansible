@@ -10,9 +10,20 @@
         name: "platform"
       tags: always
 
-    - name: "Include role 'ansible_node'"
+    - name: Ensure passwordless sudo for sudo group in /etc/sudoers
+      lineinfile:
+        path: /etc/sudoers
+        regexp: '^%sudo\s+ALL=\(ALL:ALL\)\s+ALL'
+        line: '%sudo ALL=(ALL:ALL) NOPASSWD: ALL'
+        validate: '/usr/sbin/visudo -cf %s'
+        state: present
+        create: no
+        backup: yes
+      tags: sudo
+
+    - name: "Include role 'docker'"
       ansible.builtin.include_role:
-        name: "ansible_node"
+        name: "docker"
       tags: always
 
     - name: "Install dependencies to run playbook autonomously via ansible-pull"
@@ -37,4 +48,9 @@
     - name: "Include role 'keycloak'"
       ansible.builtin.include_role:
         name: "keycloak"
+      tags: always
+
+    - name: "Include role 'ansible_node'"
+      ansible.builtin.include_role:
+        name: "ansible_node"
       tags: always
