@@ -20,6 +20,14 @@
           stats hide-version
           stats realm Haproxy\ Statistics
 
+      frontend cadvisor_exporter
+          bind *:9080 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend cadvisor_exporter
+
       frontend mysqld_exporter
           bind *:9144 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
@@ -36,9 +44,13 @@
 
           default_backend node_exporter
 
+      backend cadvisor_exporter
+        option httpchk
+        server node_exporter 127.0.0.1:{{ docker_cadvisor_port }} check inter 30s
+
       backend mysqld_exporter
         option httpchk
-        server node_exporter 127.0.0.1:9104 check inter 5m
+        server node_exporter 127.0.0.1:9104 check inter 30s
 
       backend node_exporter
         option httpchk
