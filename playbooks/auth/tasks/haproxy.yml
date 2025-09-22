@@ -1,9 +1,4 @@
 ---
-- name: Install haproxy
-  ansible.builtin.package:
-    name: haproxy
-  tags: haproxy
-
 - name: Including role
   ansible.builtin.include_role:
     name: haproxy
@@ -13,108 +8,88 @@
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
     block: |
-      frontend metrics
-          bind *:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
-          mode http
-          http-request use-service prometheus-exporter if { path /metrics }
-          no log
-          stats hide-version
-
-      frontend https_front
-          bind *:443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
-          mode http
-          # only allow the following CNs
-          # http-request deny if !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
-
-          # ACL to detect Prometheus based on User-Agent
-          acl is_prometheus hdr_beg(User-Agent) "Blackbox Exporter/"
-          http-request return status 200 content-type "text/plain" lf-string "OK"  if is_prometheus
-
-          http-request redirect code 301 prefix / drop-query append-slash if { path /media }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /pub }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /minio-ui }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /syncthing }
-
-          acl media path_beg,url_dec -m beg /media/
-          acl videos path_beg,url_dec -m beg /videos/
-          acl pub path_beg,url_dec -m beg /pub/
-          acl is_soeren src 192.168.2.206 192.168.64.0/24 192.168.72.0/24 192.168.200.100/28
-          #http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
-          use_backend dufs_media if media is_soeren
-          use_backend nginx if media || pub || videos
-
-          acl minio-ui path_beg,url_dec -m beg /minio-ui/
-          use_backend minio-ui if minio-ui
-
-          acl syncthing path_beg,url_dec -m beg /syncthing/
-          http-request deny if syncthing !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
-          use_backend syncthing if syncthing
-
-          default_backend minio
-
-      frontend directory_exporter
-          bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+      listen stats
+          bind *:8405 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-          default_backend directory_exporter
+          http-request use-service prometheus-exporter if { path /metrics }
+
+          stats enable
+          stats hide-version
+          stats realm Haproxy\ Statistics
+
+      frontend cadvisor_exporter
+          bind *:9080 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend cadvisor_exporter
+
+      frontend mysqld_exporter
+          bind *:9144 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend mysqld_exporter
 
       frontend node_exporter
-          bind *:9443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
           default_backend node_exporter
 
-      backend nginx
-        option httpchk
+      frontend https_in
+        bind *:443 ssl crt {{ acmevault_pem_file }} alpn h2,http/1.1
+        mode http
         option forwardfor
-        http-check send meth GET uri /health
-        http-check expect status 200
-        server fileserver-dd 127.0.0.1:8080 check inter 30s
+        default_backend be_keycloak
 
-      backend minio
-        option httpchk
-        option forwardfor
-        option httpchk GET /minio/health/live HTTP/1.1\r\nHost:\ {{ minio_server_url | default(inventory_hostname) }}
+      backend be_keycloak
+        mode http
+        balance roundrobin
+
+        # Insert a cookie so sessions are sticky (useful if your Keycloak cluster isn't fully state-shared)
+        cookie KC insert indirect nocache maxidle 30m maxlife 4h
+
+        # servers (plain HTTP) - change IPs and ports to your Keycloak nodes
+        server kc1 127.0.0.1:8080 check
+
+        # Headers Keycloak expects:
         http-request set-header X-Forwarded-Port %[dst_port]
-        http-request add-header X-Forwarded-Proto https if { ssl_fc }
-        server minio 127.0.0.1:9000 ssl verify none check inter 30s
+        http-request set-header X-Forwarded-Proto https if { ssl_fc }
+        http-request set-header Host %[req.hdr(Host)]
 
-      backend minio-ui
+      backend cadvisor_exporter
         option httpchk
-        option forwardfor
-        http-check send meth GET  uri /minio/health/live
-        http-request set-header X-Forwarded-Port %[dst_port]
-        http-request add-header X-Forwarded-Proto https if { ssl_fc }
-        http-request set-path '%[path,regsub("^/minio-ui(/|$)","/")]'
-        server minio-ui 127.0.0.1:9009 ssl verify none check inter 30s
+        server node_exporter 127.0.0.1:{{ docker_cadvisor_port }} check inter 30s
 
-      backend syncthing
+      backend mysqld_exporter
         option httpchk
-        option forwardfor
-        http-request set-header X-Forwarded-Port %[dst_port]
-        http-request add-header X-Forwarded-Proto https if { ssl_fc }
-        # http-request set-path '%[path,regsub("^/syncthing/","/")]'
-        http-request set-path '%[path,regsub("^/syncthing(/|$)","/")]'
-        server syncthing 127.0.0.1:8384 check inter 30s
-
-      backend dufs_media
-        option httpchk
-        http-check send meth HEAD uri /media
-        server dufs 127.0.0.1:5000 check inter 1m
+        server node_exporter 127.0.0.1:9104 check inter 30s
 
       backend node_exporter
         option httpchk
         server node_exporter 127.0.0.1:9100 check inter 5m
 
-      backend directory_exporter
-        option httpchk
-        http-check send meth GET uri /health
-        http-check expect status 404
-        server node_exporter 127.0.0.1:2112 check inter 30s
+      listen galera
+        bind *:3307
+        balance source
+        mode tcp
+        option tcpka
+        option tcplog
+
+        server mariadb-{{ location | default('0') }} localhost:3306 check
+        {% for node in groups['dbs'] -%}
+        {%- if node != inventory_hostname -%}
+        server mariadb-{{ hostvars[node].location }}-{{ loop.index }} {{ node }}:3306 check backup
+        {% endif -%}
+        {% endfor -%}
+
   notify: Restart haproxy
   tags: [haproxy]
