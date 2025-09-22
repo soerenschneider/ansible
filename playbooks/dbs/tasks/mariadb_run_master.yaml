@@ -60,7 +60,6 @@
   until: _result.rc == 0
   retries: 100
   delay: 5
-  when: false
   no_log: true
   changed_when: false
   tags: [docker, mariadb, mysql]
