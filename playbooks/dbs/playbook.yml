@@ -3,6 +3,10 @@
   hosts: dbs
   become: true
   gather_facts: true
+  vars:
+    # renovate: datasource=github-tags depName=prom/mysqld-exporter
+    mysqld_exporter_version: "v0.17.2"
+    mysqld_exporter_image: "prom/mysqld-exporter:{{ mysqld_exporter_version }}"
   tasks:
     - name: "Run role platform"
       ansible.builtin.include_role:
@@ -14,11 +18,6 @@
         name: keepalived
       tags: always
 
-    - name: "Install docker support"
-      ansible.builtin.package:
-        name: python3-docker
-      tags: docker
-
     - name: "Run role docker"
       ansible.builtin.include_role:
         name: docker
@@ -29,6 +28,11 @@
         name: restic
       tags: always
       when: restic_backups | default([]) | length > 0
+
+    - name: "Run role mariadb_cluster"
+      ansible.builtin.include_role:
+        name: mariadb_cluster
+      tags: always
 
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
