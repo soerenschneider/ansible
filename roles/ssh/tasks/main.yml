@@ -20,3 +20,7 @@
   ansible.builtin.include_tasks: 2fa-{{ ansible_system | lower }}.yml
   when: ssh_2fa_enabled | bool
   tags: always
+
+- name: "Flush handlers"
+  ansible.builtin.meta: flush_handlers
+  tags: [ssh]
