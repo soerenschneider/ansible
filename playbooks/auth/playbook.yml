@@ -12,13 +12,13 @@
 
     - name: Ensure passwordless sudo for sudo group in /etc/sudoers
       lineinfile:
-        path: /etc/sudoers
+        path: "/etc/sudoers"
         regexp: '^%sudo\s+ALL=\(ALL:ALL\)\s+ALL'
         line: '%sudo ALL=(ALL:ALL) NOPASSWD: ALL'
         validate: '/usr/sbin/visudo -cf %s'
-        state: present
-        create: no
-        backup: yes
+        state: "present"
+        create: false
+        backup: true
       tags: sudo
 
     - name: "Include role 'docker'"
