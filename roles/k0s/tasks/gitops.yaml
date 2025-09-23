@@ -3,8 +3,8 @@
   ansible.builtin.git:
     repo: "{{ k0s_gitops_repo }}"
     dest: "/opt/gitops"
-    version: main
-    update: yes
+    version: "main"
+    update: true
   tags: [k0s, k0s-gitops]
 
 - name: "Apply bootstrap manifests"
