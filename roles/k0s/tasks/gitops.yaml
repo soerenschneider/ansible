@@ -9,4 +9,5 @@
 
 - name: "Apply bootstrap manifests"
   ansible.builtin.command: "k0s apply -k /opt/gitops/clusters/argo/{{ inventory_hostname }}"
+  changed_when: false
   tags: [k0s, k0s-gitops]
