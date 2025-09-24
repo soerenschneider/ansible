@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=docker depName=mariadb
-mariadb_cluster_version: "11.8.2"
+mariadb_cluster_version: "12.0.2"
 mariadb_cluster_image: "mariadb:{{ mariadb_cluster_version }}"
 
 # renovate: datasource=docker depName=prom/mysqld-exporter
