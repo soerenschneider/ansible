@@ -62,7 +62,7 @@
         --exec-arg=get-token
         --exec-arg=--oidc-issuer-url={{ k0s_oidc_issuer_url }}
         --exec-arg=--oidc-client-id={{ k0s_oidc_client_id }}
-        --exec-interactive-mode=Always
+        --exec-interactive-mode=Never
       loop: "{{ k0s_all_clusters }}"
       loop_control:
         label: "{{ item.name }}"
