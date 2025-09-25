@@ -14,7 +14,7 @@ vault_tls_key: ""
 vault_tls_crt: ""
 vault_ansible_group_name: vault
 # renovate: datasource=github-releases depName=hashicorp/vault
-vault_version: v1.20.3
+vault_version: v1.20.4
 
 vault_configure_server: true
 
