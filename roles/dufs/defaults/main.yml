@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=sigoden/dufs versioning=semver-coerced
-dufs_version: v0.44.0
+dufs_version: v0.45.0
 
 dufs_group: dufs
 dufs_user: dufs
