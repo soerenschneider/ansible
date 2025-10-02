@@ -1,4 +1,4 @@
-FROM ghcr.io/getsops/sops:v3.10.2-alpine AS sops
+FROM ghcr.io/getsops/sops:v3.11.0-alpine AS sops
 
 FROM python:3.13.7-alpine3.21
 
