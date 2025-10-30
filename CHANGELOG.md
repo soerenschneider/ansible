@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.1.0](https://github.com/soerenschneider/ansible/compare/v1.0.2...v1.1.0) (2025-10-30)
+
+
+### Features
+
+* increase security by conditionally rotating key every n month ([61204b1](https://github.com/soerenschneider/ansible/commit/61204b1180e28c9dcb2c5fb0c815aef94de4095c))
+* increase security by restricting ssh keypair to individual ip address ([84aa8d3](https://github.com/soerenschneider/ansible/commit/84aa8d30ce477ef198896c73dd79cf33b9aec7ec))
+
+
+### Bug Fixes
+
+* add missing tag ([3e0f6ae](https://github.com/soerenschneider/ansible/commit/3e0f6ae5395a65bf08f88a1399e9bff1105c6048))
+* **deps:** update actions/checkout action to v4.3.0 ([#141](https://github.com/soerenschneider/ansible/issues/141)) ([b942b90](https://github.com/soerenschneider/ansible/commit/b942b907f644a05f1c61b79bbe25829ab8d675df))
+* **deps:** update actions/checkout action to v5 ([9a944d7](https://github.com/soerenschneider/ansible/commit/9a944d7d7c24a55c5426325bffd3312ed8f6d73d))
+* **deps:** update actions/checkout action to v5 ([61fc71b](https://github.com/soerenschneider/ansible/commit/61fc71b0818a79d3de10dc6149e8c982cbdce76e))
+* **deps:** update ansible/ansible-lint action to v25.8.1 ([#146](https://github.com/soerenschneider/ansible/issues/146)) ([9e223d2](https://github.com/soerenschneider/ansible/commit/9e223d226e366fe5446bb4cd2c1df7908a995dc3))
+* **deps:** update ansible/ansible-lint action to v25.8.2 ([a45ff83](https://github.com/soerenschneider/ansible/commit/a45ff83bf58b7245f92bf042054762d5b34a6d10))
+* **deps:** update ansible/ansible-lint action to v25.8.2 ([9e8fb0d](https://github.com/soerenschneider/ansible/commit/9e8fb0d260191063f62c667defe332101b9fd429))
+* **deps:** update dependency ansible to v11.9.0 ([#144](https://github.com/soerenschneider/ansible/issues/144)) ([368cd09](https://github.com/soerenschneider/ansible/commit/368cd09b7e0e92d64b20f3346061841377d75237))
+* **deps:** update dependency community.general to v11.2.0 ([#142](https://github.com/soerenschneider/ansible/issues/142)) ([82d9e71](https://github.com/soerenschneider/ansible/commit/82d9e71ff47107df922f7d155b76506e87431fcb))
+* **deps:** update dependency community.general to v11.2.1 ([ddadc45](https://github.com/soerenschneider/ansible/commit/ddadc45b8e593967f6e842b6eb66f8f5d2263a45))
+* **deps:** update dependency community.general to v11.2.1 ([c53c608](https://github.com/soerenschneider/ansible/commit/c53c6080c0ece24d80568020d7d79c70371d1302))
+* **deps:** update dependency hashicorp/vault to v1.20.2 ([#137](https://github.com/soerenschneider/ansible/issues/137)) ([5ed9535](https://github.com/soerenschneider/ansible/commit/5ed9535e5f2c7e7f03466d032798e07357a46d13))
+* **deps:** update dependency k0sproject/k0s to v1.33.4+k0s.0 ([6885e7e](https://github.com/soerenschneider/ansible/commit/6885e7e8e9225e4639e40ae0285fbff3fd3e17dd))
+* **deps:** update dependency k0sproject/k0s to v1.33.4+k0s.0 ([8c1f4e7](https://github.com/soerenschneider/ansible/commit/8c1f4e7a9427df9587c2bbc245d870cfb8d4b923))
+* **deps:** update dependency rfjakob/gocryptfs to v2.6.1 ([#140](https://github.com/soerenschneider/ansible/issues/140)) ([7bcb9ff](https://github.com/soerenschneider/ansible/commit/7bcb9ffa1257fa88412b02f4cbc5d351bfc1c020))
+* **deps:** update dependency sigoden/dufs to v0.44.0 ([#147](https://github.com/soerenschneider/ansible/issues/147)) ([5707e12](https://github.com/soerenschneider/ansible/commit/5707e1208d8d43945cc85b0f9da1cdf1162aed37))
+* **deps:** update dependency vectordotdev/vector to v0.49.0 ([#145](https://github.com/soerenschneider/ansible/issues/145)) ([dc3ba2f](https://github.com/soerenschneider/ansible/commit/dc3ba2fd6ee3d8c11b0aa7ff294b6abde1af2228))
+* **deps:** update docker/login-action action to v3.5.0 ([#135](https://github.com/soerenschneider/ansible/issues/135)) ([758489d](https://github.com/soerenschneider/ansible/commit/758489dd082b1e97019e7682f0b44907e665c7a8))
+* **deps:** update docker/metadata-action action to v5.8.0 ([#133](https://github.com/soerenschneider/ansible/issues/133)) ([041f9b0](https://github.com/soerenschneider/ansible/commit/041f9b05dbfb444c0b69bebf873da65f41f44c43))
+* **deps:** update python docker tag to v3.13.6 ([#139](https://github.com/soerenschneider/ansible/issues/139)) ([445a75d](https://github.com/soerenschneider/ansible/commit/445a75da1d41494726e6b8835d4a13bc7b93212e))
+* **deps:** update python docker tag to v3.13.7 ([acd2211](https://github.com/soerenschneider/ansible/commit/acd2211fd12022cfcbf9997d0f65acb966693002))
+* **deps:** update python docker tag to v3.13.7 ([4c14a91](https://github.com/soerenschneider/ansible/commit/4c14a91ca593697922a874936ce6c921b7e1881a))
+* **deps:** update quay.io/keycloak/keycloak docker tag to v26.3.3 ([8780bf1](https://github.com/soerenschneider/ansible/commit/8780bf12a55eeb08b9c7122bec0fd325f755cbf2))
+* **deps:** update quay.io/keycloak/keycloak docker tag to v26.3.3 ([474e403](https://github.com/soerenschneider/ansible/commit/474e4038fcf4b5cb5a8ee90db4ef32f496ba6eb6))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.3.3 ([ef32b85](https://github.com/soerenschneider/ansible/commit/ef32b85a9ebcd667fe79027d9b388d9277a55a32))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.3.3 ([6abd93f](https://github.com/soerenschneider/ansible/commit/6abd93f17a8ab77771f19d52bb0077b461fc7b7d))
+* fix syntax ([4ec4cd4](https://github.com/soerenschneider/ansible/commit/4ec4cd4212529373c4c8181bdc0e83f100e7e287))
+* fix task ([c2cbe39](https://github.com/soerenschneider/ansible/commit/c2cbe39686552e1e641aa008b9c0a10246fcd8a4))
+* only end role, not play ([cad185e](https://github.com/soerenschneider/ansible/commit/cad185e32244f4f958476d45c2011dd5614450bb))
+* set correct datasource ([01021d0](https://github.com/soerenschneider/ansible/commit/01021d0ffcfe792cf61559d6427f410eb722f1ea))
+
 ## [1.0.2](https://github.com/soerenschneider/ansible/compare/v1.0.1...v1.0.2) (2025-08-06)
 
 
