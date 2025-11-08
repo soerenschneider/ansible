@@ -4,7 +4,7 @@
   become: true
   gather_facts: true
   vars:
-    # renovate: datasource=github-tags depName=prom/mysqld-exporter
+    # renovate: datasource=docker depName=prom/mysqld-exporter
     mysqld_exporter_version: "v0.17.2"
     mysqld_exporter_image: "prom/mysqld-exporter:{{ mysqld_exporter_version }}"
   tasks:
