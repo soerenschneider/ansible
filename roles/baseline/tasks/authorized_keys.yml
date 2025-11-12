@@ -14,7 +14,13 @@
 
 - name: Collect regular keys
   ansible.builtin.set_fact:
-    baseline_soft_keys: "{{ authorized_keys_soft | map(attribute='pub') | join('\n') }}"
+    baseline_soft_keys: >-
+      [{% for k in authorized_keys_soft %}
+        {
+          "key": "{{ k.pub }}",
+          "key_options": "{% if k.opts is defined %}{{ k.opts }}{% else %}{{ ssh_authorized_keys_soft_opts_from }}{% endif %}"
+        }{{ "," if not loop.last else "" }}
+      {% endfor %}]
   tags: [base, authorized_keys, ssh]
 
 - name: Add current user to authorized_keys_users
@@ -33,11 +39,13 @@
 
 - name: Add confined soft keys
   ansible.posix.authorized_key:
-    key: "{{ baseline_soft_keys }}"
-    exclusive: false
-    key_options: "{{ baseline_soft_keys_options | default('') }}"
-    user: "{{ item }}"
-  with_items: "{{ baseline_authorized_keys_users }}"
+    user: "{{ item.0 }}"
+    key: "{{ item.1.key }}"
+    key_options: "{{ item.1.key_options | default(omit) }}"
+    state: present
+  loop: "{{ baseline_authorized_keys_users | product(baseline_soft_keys) | list }}"
+  loop_control:
+    label: "{{ item.0 }} - {{ item.1.key.split()[2] | default('key') }}"
   tags: [base, authorized_keys, ssh]
 
 - name: Add custom ssh keys
