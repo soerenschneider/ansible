@@ -8,19 +8,21 @@
 
 - name: Build list of internal networks
   ansible.builtin.set_fact:
-    baseline_soft_keys_options: from="{{ ssh_authorized_keys_soft_opts_from | join(',') }}"
-  when: ["ssh_authorized_keys_soft_opts_from | default([]) | length > 0", baseline_is_internal_system is defined, baseline_is_internal_system is true]
+    baseline_soft_keys_options: '{{ baseline_ssh_authorized_keys_soft_opts_from }}'
+  when: ["baseline_ssh_authorized_keys_soft_opts_from | default([]) | length > 0", baseline_is_internal_system is defined, baseline_is_internal_system | bool]
   tags: [base, authorized_keys, ssh]
 
 - name: Collect regular keys
   ansible.builtin.set_fact:
-    baseline_soft_keys: >-
-      [{% for k in authorized_keys_soft %}
-        {
-          "key": "{{ k.pub }}",
-          "key_options": "{% if k.opts is defined %}{{ k.opts }}{% else %}{{ ssh_authorized_keys_soft_opts_from }}{% endif %}"
-        }{{ "," if not loop.last else "" }}
-      {% endfor %}]
+    baseline_soft_keys: |
+      {% set result = [] %}
+      {% for k in baseline_authorized_keys_soft %}
+      {%   set _ = result.append({
+            'pub': k.pub,
+            'key_options': k.opts | default(baseline_ssh_authorized_keys_soft_opts_from)
+          }) %}
+      {% endfor %}
+      {{ result }}
   tags: [base, authorized_keys, ssh]
 
 - name: Add current user to authorized_keys_users
@@ -28,25 +30,27 @@
     baseline_authorized_keys_users: "{{ authorized_keys_users | default([]) + ([ansible_user] if ansible_user is defined else []) | unique }}"
   tags: [base, authorized_keys, ssh]
 
-- name: Add hardware keys exclusively without any restrictions
-  ansible.posix.authorized_key:
-    key: "{{ authorized_keys_hw }}"
-    exclusive: true
-    key_options: ""
-    user: "{{ item }}"
-  with_items: "{{ baseline_authorized_keys_users }}"
+- name: Build complete authorized keys list
+  set_fact:
+    complete_keys_per_user: |
+      {% for pubkey in baseline_authorized_keys_hw %}
+      {{ pubkey.key_options | default('') }} {{ pubkey.pub }}
+      {% endfor %}
+      {% for soft_key in baseline_soft_keys %}
+      {{ soft_key.key_options | default('') }} {{ soft_key.pub }}
+      {% endfor %}
   tags: [base, authorized_keys, ssh]
 
-- name: Add confined soft keys
+- name: Manage all SSH authorized keys exclusively
   ansible.posix.authorized_key:
-    user: "{{ item.0 }}"
-    key: "{{ item.1.key }}"
-    key_options: "{{ item.1.key_options | default(omit) }}"
+    user: "{{ item }}"
+    key: "{{ complete_keys_per_user }}"
+    exclusive: true
     state: present
-  loop: "{{ baseline_authorized_keys_users | product(baseline_soft_keys) | list }}"
-  loop_control:
-    label: "{{ item.0 }} - {{ item.1.key.split()[2] | default('key') }}"
+  loop: "{{ baseline_authorized_keys_users }}"
   tags: [base, authorized_keys, ssh]
+
+
 
 - name: Add custom ssh keys
   ansible.posix.authorized_key:
