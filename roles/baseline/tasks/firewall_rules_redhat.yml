@@ -1,7 +1,7 @@
 ---
 - name: "Collect and set firewall rules variable"
   ansible.builtin.set_fact:
-    firewall_rules: "{{ [{'from': ['any'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"  # noqa: var-naming[no-role-prefix]
+    firewall_rules: "{{ [{'from': ['all'], 'ports': [22], 'proto': 'tcp'}] + firewall_rules | default([]) }}"  # noqa: var-naming[no-role-prefix]
   tags: [firewall]
 
 - name: "Set firewall rules"
@@ -10,27 +10,92 @@
   block:
     - name: Collect TCP rules
       ansible.builtin.set_fact:
-        fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
+        fw_tcp_rules: "{{ fw_tcp_rules | default([]) + [ item.ports | product(item.from | default(['all'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
       loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'tcp') | list }}"
 
     - name: Collect UDP rules
       ansible.builtin.set_fact:
-        fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['any'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
+        fw_udp_rules: "{{ fw_udp_rules | default([]) + [ item.ports | product(item.from | default(['all'])) | list ] }}"  # noqa: var-naming[no-role-prefix]
       loop: "{{ firewall_rules | selectattr('proto', 'equalto', 'udp') | list }}"
 
-    - name: Allow TCP rules
+    - name: Ensure firewalld is installed
+      ansible.builtin.package:
+        name: firewalld
+        state: present
+
+    - name: Ensure firewalld is running
+      ansible.builtin.service:
+        name: firewalld
+        state: started
+        enabled: yes
+
+    - name: Remove all existing rich rules from public zone
+      ansible.builtin.shell: |
+        for rule in $(firewall-cmd --list-rich-rules); do
+          firewall-cmd --permanent --remove-rich-rule="$rule"
+        done
+      register: remove_rich_rules
+      changed_when: remove_rich_rules.stdout != ""
+      failed_when: false
+
+    - name: Remove all existing port rules from public zone
+      ansible.builtin.shell: |
+        for port in $(firewall-cmd --list-ports); do
+          firewall-cmd --permanent --remove-port="$port"
+        done
+      register: remove_ports
+      changed_when: remove_ports.stdout != ""
+      failed_when: false
+
+    # TCP rules with specific sources (using rich rules)
+    - name: Allow TCP ports with source restrictions
+      ansible.posix.firewalld:
+        rich_rule: "rule family=ipv4 source address={{ item.1 }} port port={{ item.0 }} protocol=tcp accept"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
+      when:
+        - fw_tcp_rules is defined
+        - item.1 != 'all'
+
+    # TCP rules open to everyone
+    - name: Allow TCP ports for all sources
       ansible.posix.firewalld:
         port: "{{ item.0 }}/tcp"
+        permanent: yes
         state: enabled
-        immediate: true
-        permanent: true
+        immediate: yes
       loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
-      tags: [firewall]
+      when:
+        - fw_tcp_rules is defined
+        - item.1 == 'all'
 
-    - name: Allow UDP rules
+    # UDP rules with specific sources (using rich rules)
+    - name: Allow UDP ports with source restrictions
+      ansible.posix.firewalld:
+        rich_rule: "rule family=ipv4 source address={{ item.1 }} port port={{ item.0 }} protocol=udp accept"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop: "{{ fw_udp_rules | flatten(levels=1) }}"
+      when:
+        - fw_udp_rules is defined
+        - item.1 != 'all'
+
+    # UDP rules open to everyone
+    - name: Allow UDP ports for all sources
       ansible.posix.firewalld:
         port: "{{ item.0 }}/udp"
-        immediate: true
+        permanent: yes
         state: enabled
-        permanent: true
-      loop: "{{ fw_udp_rules | default([]) | flatten(levels=1) }}"
+        immediate: yes
+      loop: "{{ fw_udp_rules | flatten(levels=1) }}"
+      when:
+        - fw_udp_rules is defined
+        - item.1 == 'all'
+
+
+    - name: Reload firewalld to apply removals
+      ansible.builtin.command: firewall-cmd --reload
+      when: remove_rich_rules.changed or remove_ports.changed
