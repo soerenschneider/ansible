@@ -8,7 +8,8 @@ ssh_2fa_user_group: ssh2fa
 ssh_otp_only: {}
 ssh_otp_only_group: ssh_otp_only
 
-ssh_user_ca_key_file: /etc/ssh/ca_user_key.pub
+ssh_user_ca_key_file: "/etc/ssh/ca_user_key.pub"
+ssh_user_ca_data: ""  # empty by default
 
 ssh_update_listener_wg_down_ips:
   - "0.0.0.0"

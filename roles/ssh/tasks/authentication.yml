@@ -105,13 +105,25 @@
   tags: [ssh, base]
   notify: Restart_sshd
   block:
-    - name: Add user CA key
+    - name: "Dynamically fetch SSH user CA key"
       ansible.builtin.get_url:
         url: "{{ ssh_user_ca_key_url }}"
         dest: "{{ ssh_user_ca_key_file }}"
-        owner: root
-        group: root
+        owner: "root"
+        group: "root"
         mode: "0644"
+      when:
+        - ssh_user_ca_key_url | default("") | length > 0
+        - ssh_user_ca_data | length == 0
+
+    - name: "Copy SSH user CA key"
+      ansible.builtin.copy:
+        content: "{{ ssh_user_ca_data }}"
+        dest: "{{ ssh_user_ca_key_file }}"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+      when: ssh_user_ca_data | length > 0
 
     - name: Enable user CA key
       ansible.builtin.lineinfile:
