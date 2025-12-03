@@ -1,39 +1,12 @@
 ---
-- name: Get the IP address Ansible connected to
-  ansible.builtin.shell: |
-    who am i | awk '{print $NF}' | tr -d '()'
-  register: connection_check
-  changed_when: false
-  failed_when: false
-  tags: [base, authorized_keys, ssh]
-
-- name: Check if we are on an internal system
-  ansible.builtin.set_fact:
-    baseline_is_internal_system: >-
-      {{
-        connection_check.stdout.startswith('192.168.') or
-        connection_check.stdout.startswith('10.') or
-        (connection_check.stdout.startswith('172.') and
-         connection_check.stdout.split('.')[1] | int >= 16 and
-         connection_check.stdout.split('.')[1] | int <= 31)
-      }}
-  when: connection_check.stdout is defined and connection_check.stdout != ''
-  tags: [base, authorized_keys, ssh]
-
-- name: Build list of internal networks
-  ansible.builtin.set_fact:
-    baseline_soft_keys_options: '{{ baseline_ssh_authorized_keys_soft_opts_from }}'
-  when: ["baseline_ssh_authorized_keys_soft_opts_from | default([]) | length > 0", baseline_is_internal_system is defined, baseline_is_internal_system | bool]
-  tags: [base, authorized_keys, ssh]
-
-- name: Collect regular keys
+- name: Collect pubs keys for authorized_keys file
   ansible.builtin.set_fact:
     baseline_soft_keys: |
       {% set result = [] %}
       {% for k in baseline_authorized_keys_soft %}
       {%   set _ = result.append({
             'pub': k.pub,
-            'key_options': k.opts | default(baseline_ssh_authorized_keys_soft_opts_from)
+            'key_options': (k.opts | default('') + ',' + (k.from | default(baseline_ssh_authorized_keys_soft_from_default))) if baseline_ssh_authorized_keys_soft_confine else (k.opts | default(''))
           }) %}
       {% endfor %}
       {{ result }}
@@ -46,7 +19,7 @@
 
 - name: Build complete authorized keys list
   set_fact:
-    complete_keys_per_user: |
+    baseline_ssh_authorized_keys: |
       {% for pubkey in baseline_authorized_keys_hw %}
       {{ pubkey.key_options | default('') }} {{ pubkey.pub }}
       {% endfor %}
@@ -58,7 +31,7 @@
 - name: Manage all SSH authorized keys exclusively
   ansible.posix.authorized_key:
     user: "{{ item }}"
-    key: "{{ complete_keys_per_user }}"
+    key: "{{ baseline_ssh_authorized_keys }}"
     exclusive: true
     state: present
   loop: "{{ baseline_authorized_keys_users }}"
