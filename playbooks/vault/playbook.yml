@@ -2,6 +2,8 @@
 - name: Setup vault cluster
   hosts: vault
   become: true
+  vars:
+    openbao_dir: "/etc/openbao.d"
   tasks:
     - name: "Run role platform"
       ansible.builtin.debug:
@@ -39,11 +41,21 @@
       ansible.builtin.include_tasks: tasks/haproxy.yml
       tags: always
 
-    - name: "Run tasks certificate.yml"
-      ansible.builtin.include_tasks: tasks/certificate.yml
+    - name: "Run role openbao"
+      ansible.builtin.include_role:
+        name: "openbao"
       tags: always
 
-    - name: "Run role vault"
-      ansible.builtin.include_role:
-        name: vault
-      tags: always
+    - name: Copy cert hook
+      ansible.builtin.template:
+        src: "openbao-cert-hook.sh.j2"
+        dest: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"
+        owner: "root"
+        group: "root"
+        mode: "0755"
+      notify: "Run letsencrypt hook for openbao"
+      tags: [openbao, openbao-cert]
+
+  handlers:
+    - name: "Run letsencrypt hook for openbao"
+      ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"
