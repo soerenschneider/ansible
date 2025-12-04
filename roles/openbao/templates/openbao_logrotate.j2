@@ -1,0 +1,14 @@
+{{ openbao_audit_log }} {
+  rotate 30
+  daily
+  notifempty
+  missingok
+  compress
+  delaycompress
+  postrotate
+    /usr/bin/systemctl reload openbao 2> /dev/null || true
+  endscript
+  extension log
+  dateext
+  dateformat %Y-%m-%d.
+}

@@ -1,0 +1,12 @@
+[Unit]
+Description=Make sure openbao audit file exists and is write
+Before=openbao.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/touch {{ openbao_audit_log }}
+ExecStart=/bin/chmod 640 {{ openbao_audit_log }}
+ExecStart=/bin/chown {{ openbao_user }}:{{ openbao_group}} {{ openbao_audit_log }}
+
+[Install]
+WantedBy=multi-user.target

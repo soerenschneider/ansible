@@ -1,0 +1,59 @@
+---
+- name: "Import OpenBao GPG key"
+  become: false
+  tags: [openbao, openbao-install, deps]
+  block:
+    - name: "Check if key is already in keyring"
+      ansible.builtin.command: "gpg2 --list-keys {{ openbao_gpg_pubkey_id }}"
+      changed_when: false
+  rescue:
+    - name: "Copy GPG pub key"
+      become: false
+      ansible.builtin.copy:
+        content: "{{ openbao_gpg_pubkey }}"
+        dest: "/tmp/openbao-signing-key.pub"
+        mode: "0644"
+
+    - name: "Import GPG public key"
+      become: false
+      ansible.builtin.command: "gpg2 --import /tmp/openbao-signing-key.pub"
+      changed_when: false
+
+    - name: "Clean up key"
+      ansible.builtin.file:
+        state: "absent"
+        path: "/tmp/openbao-signing-key.pub"
+
+- name: "Run tasks configure.yaml"
+  ansible.builtin.include_tasks: "configure.yaml"
+  tags: [openbao, openbao-configure]
+
+- name: "Run tasks install-github.yml"
+  ansible.builtin.include_tasks: "install-github.yaml"
+  vars:
+    binary_name: "bao"
+    github_repo: "openbao/openbao"
+    service_name: "openbao"
+  tags: [openbao, openbao-install]
+
+- name: "Run tasks install-plugin.yml"
+  ansible.builtin.include_tasks: "install-plugin.yaml"
+  vars:
+    binary_name: "openbao-plugin-{{ openbao_plugin_secret_aws_version }}"
+    openbao_plugin_github_repo: "openbao/openbao-plugins"
+    openbao_plugin_release: "{{ openbao_plugin_secret_aws_version }}"
+  tags: [openbao, openbao-install, openbao-plugins]
+
+- name: Create systemd unit
+  ansible.builtin.template:
+    src: "openbao.service.j2"
+    dest: "/etc/systemd/system/openbao.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: "Restart openbao"
+  tags: [openbao, openbao-configure]
+
+- name: "Run tasks init.yaml"
+  ansible.builtin.include_tasks: "init.yaml"
+  tags: [openbao, openbao-configure, openbao-init]

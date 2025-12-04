@@ -1,0 +1,134 @@
+---
+- name: "Set variables"
+  ansible.builtin.set_fact:
+    openbao_plugin_local_binary: ""
+    openbao_plugin_installed_version: ""
+    openbao_plugin_desired_version: "{{ openbao_plugin_version | default('') }}"
+    openbao_plugin_download_archive: ""
+    openbao_plugin_download_signature: ""
+    openbao_plugin_stopped_service: ""
+    openbao_plugin_github_release: ""
+    openbao_plugin_go_os: ""
+    openbao_plugin_go_arch: ""
+    openbao_plugin_checksum_gpg_file: ""
+    openbao_plugin_checksum_file: ""
+    openbao_plugin_full_filename: ""
+    openbao_plugin_release_checksum: ""
+    openbao_plugin_github_repo: "openbao/openbao-plugins"
+    openbao_plugin_asset_prefix: "openbao-plugin-secrets-aws_{{ ansible_system | lower }}_{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+
+  tags: [openbao, openbao-install, openbao-plugins]
+
+- name: Extract version from openbao_plugin_release
+  set_fact:
+    openbao_plugin_version: "{{ openbao_plugin_release | regex_search('v[0-9]+\\.[0-9]+\\.[0-9]+') }}"
+    openbao_plugin_name_without_version: "{{ openbao_plugin_release | regex_replace('-v[0-9]+\\.[0-9]+\\.[0-9]+$', '') | regex_replace('(^-|-$)', '') }}"
+  tags: [openbao, openbao-install, openbao-plugins]
+
+- name: Extract version from openbao_plugin_release
+  set_fact:
+    openbao_plugin_base_name: "openbao-plugin-{{ openbao_plugin_name_without_version }}"
+  tags: [openbao, openbao-install, openbao-plugins]
+
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: "{{ openbao_plugin_dir }}/{{ binary_name }}-{{ openbao_plugin_version }}"
+  register: openbao_plugin_local_binary
+  tags: [openbao, openbao-install, openbao-plugins]
+
+- name: "Download artifacts"
+  when: not openbao_plugin_local_binary.stat.exists
+  tags: [openbao, openbao-install, openbao-plugins]
+  block:
+    - name: "Generate temp dir"
+      become: false
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ binary_name }}"
+      register: openbao_plugin_download_dir
+
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        openbao_plugin_go_os: "{{ ansible_system | lower }}"
+        openbao_plugin_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        openbao_plugin_download_dir: "{{ openbao_plugin_download_dir.path }}"
+      changed_when: false
+
+    - name: Set filenames
+      ansible.builtin.set_fact:
+        openbao_plugin_checksum_gpg_file: "checksums-{{ openbao_plugin_go_os }}.txt.gpgsig"
+        openbao_plugin_checksum_file: "checksums-{{ openbao_plugin_go_os }}.txt"
+        openbao_plugin_archive: "{{ binary_name }}_{{ openbao_plugin_desired_version[1:] }}_{{ openbao_plugin_go_os | capitalize }}_{{ openbao_plugin_go_arch }}.tar.gz"
+      changed_when: false
+
+    - name: Create download directory
+      become: false
+      ansible.builtin.file:
+        path: "{{ openbao_plugin_download_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: Get latest release information from GitHub API
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ openbao_plugin_github_repo }}/releases/tags/{{ openbao_plugin_release }}"
+        method: "GET"
+        return_content: true
+      register: release_info
+
+    - name: Filter assets matching the prefix
+      ansible.builtin.set_fact:
+        openbao_plugin_matching_assets: "{{ release_info.json.assets | selectattr('name', 'match', '^' + openbao_plugin_asset_prefix) | list }}"
+
+    - name: Find .tar.gz item
+      ansible.builtin.set_fact:
+        openbao_plugin_archive_file: "{{ item.name }}"
+        openbao_plugin_plugin_file: "{{ item.name | regex_replace('\\.tar\\.gz$', '') }}"
+      loop: "{{ openbao_plugin_matching_assets }}"
+      when: item.name is match('.*\\.tar\\.gz$')
+
+    - name: Find signature file
+      ansible.builtin.set_fact:
+        openbao_plugin_signature_file: "{{ item.name }}"
+      loop: "{{ openbao_plugin_matching_assets }}"
+      when: item.name is match('.*\\.tar\\.gz\\.sig$')
+
+    - name: Download matching assets
+      become: false
+      ansible.builtin.get_url:
+        url: "{{ item.browser_download_url }}"
+        dest: "{{ openbao_plugin_download_dir }}/{{ item.name }}"
+        mode: '0644'
+        timeout: 60
+      loop: "{{ openbao_plugin_matching_assets }}"
+      when: openbao_plugin_matching_assets | length > 0
+
+    - name: Verify checksum integrity
+      become: false
+      ansible.builtin.command: "gpg2 --verify {{ openbao_plugin_download_dir }}/{{ openbao_plugin_signature_file }} {{ openbao_plugin_download_dir }}/{{ openbao_plugin_archive_file }}"
+      changed_when: false
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: "{{ openbao_plugin_download_dir }}/{{ openbao_plugin_archive_file }}"
+        dest: "{{ openbao_plugin_download_dir }}"
+        creates: "{{ openbao_plugin_download_dir }}/{{ binary_name }}"
+        remote_src: true
+      check_mode: false
+
+    - name: Copy openbao binary
+      ansible.builtin.copy:
+        src: "{{ openbao_plugin_download_dir }}/{{ openbao_plugin_plugin_file }}"
+        dest: "{{ openbao_plugin_dir }}/{{ binary_name }}"
+        remote_src: true
+        mode: "0755"
+        owner: "root"
+        group: "root"
+      notify: Restart openbao
+  always:
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: ["{{ openbao_plugin_download_dir }}"]
+      failed_when: false

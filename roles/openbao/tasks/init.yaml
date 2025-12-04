@@ -1,0 +1,53 @@
+---
+- name: "Check whether node needs initialization"
+  ansible.builtin.find:
+    paths: "{{ openbao_storage_dir }}"
+    recurse: true
+  register: "openbao_storage_files"
+  notify: "Restart openbao"
+  changed_when: openbao_storage_files.matched == 0
+  tags: [openbao, openbao-configure]
+
+- name: "Init openbao"
+  when: openbao_storage_files.matched == 0
+  tags: [openbao, openbao-configure]
+  block:
+    - name: "Add gpg keys"
+      ansible.builtin.copy:
+        content: "{{ item.value }}"
+        dest: "{{ openbao_dir }}/{{ item.key }}"
+        owner: "{{ openbao_user }}"
+        group: "{{ openbao_group }}"
+        mode: "0640"
+      run_once: true
+      with_items: "{{ openbao_gpg_keys | dict2items }}"
+
+    - name: "Run openbao operator init"
+      ansible.builtin.command: "bao operator init -n=1 -t=1 {% if openbao_gpg_keys | length > 0 %}-pgp-keys={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif%}{% endfor %} -root-token-pgp-key={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif%}{% endfor %}{% endif %}"
+      become: true
+      become_user: "{{ openbao_user }}"
+      environment:
+        VAULT_ADDR: "{{ openbao_address }}"
+      delegate_to: "{{ openbao_cluster_first_node }}"
+      run_once: true
+      changed_when: false
+      register: openbao_init
+
+    - name: "Copy openbao init log"
+      ansible.builtin.copy:
+        content: "{{ openbao_init.stdout }}"
+        dest: "~/openbao-init.txt"
+        mode: "0600"
+      delegate_to: "{{ openbao_cluster_first_node }}"
+      run_once: true
+      when: openbao_gpg_keys | length > 0
+
+    - name: "Download openbao init log"
+      ansible.builtin.copy:
+        content: "{{ openbao_init.stdout }}"
+        dest: "/tmp/openbao-init.txt"
+        mode: "0600"
+      when: openbao_gpg_keys | length > 0
+      delegate_to: localhost
+      run_once: true
+      become: false

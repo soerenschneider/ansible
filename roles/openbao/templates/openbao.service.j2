@@ -1,0 +1,36 @@
+[Unit]
+Description="OpenBao"
+Documentation=https://openbao.org/docs
+Requires=network-online.target
+After=network-online.target
+ConditionFileNotEmpty=/etc/openbao.d/openbao.hcl
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+User={{ openbao_user }}
+Group={{ openbao_group }}
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+SecureBits=keep-caps
+AmbientCapabilities=CAP_IPC_LOCK
+Capabilities=CAP_IPC_LOCK+ep
+CapabilityBoundingSet=CAP_SYSLOG CAP_IPC_LOCK
+NoNewPrivileges=yes
+MemorySwapMax=0
+ExecStart=/usr/local/bin/bao server -config=/etc/openbao.d/openbao.hcl
+ExecReload=/bin/kill --signal HUP $MAINPID
+KillMode=process
+KillSignal=SIGINT
+
+# restart forever
+Restart=on-failure
+RestartSec=60
+
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+[Install]
+WantedBy=multi-user.target

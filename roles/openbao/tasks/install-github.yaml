@@ -1,0 +1,158 @@
+---
+- name: "Set variables"
+  ansible.builtin.set_fact:
+    openbao_local_binary: ""
+    openbao_installed_version: ""
+    openbao_desired_version: "{{ openbao_version | default('') }}"
+    openbao_download_archive: ""
+    openbao_download_signature: ""
+    openbao_stopped_service: ""
+    openbao_github_release: ""
+    openbao_go_os: ""
+    openbao_go_arch: ""
+    openbao_checksum_gpg_file: ""
+    openbao_checksum_file: ""
+    openbao_full_filename: ""
+    openbao_release_checksum: ""
+  tags: [openbao, openbao-install]
+
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: "/usr/local/bin/{{ binary_name }}"
+  register: openbao_local_binary
+  tags: [openbao, openbao-install]
+
+- name: Check installed version
+  when: openbao_local_binary.stat.exists
+  tags: [openbao, openbao-install]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell:
+        cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} -version 2>&1 | awk '{print $2}'"
+        executable: /bin/bash
+      register: openbao_installed_version
+      changed_when: false
+
+    - name: Register local version
+      ansible.builtin.set_fact:
+        openbao_installed_version: "{{ openbao_installed_version.stdout }}"
+      changed_when: false
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ openbao_installed_version }}"
+      changed_when: false
+
+- name: Fetch latest release information from github
+  when: openbao_desired_version is not defined or not openbao_desired_version
+  tags: [openbao, openbao-install]
+  block:
+    - name: Print debug information
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/{{ github_repo }}/releases/latest
+        return_content: true
+      register: openbao_github_release
+      retries: 3
+      delay: 5
+
+    - name: Set github release
+      ansible.builtin.set_fact:
+        openbao_desired_version: "{{ openbao_github_release.json.tag_name }}"
+      changed_when: false
+
+    - name: Print latest GitHub version
+      ansible.builtin.debug:
+        msg: "Latest GitHub version: {{ openbao_desired_version }}"
+      changed_when: false
+
+- name: "Download artifacts"
+  when: not openbao_local_binary.stat.exists or openbao_desired_version != openbao_installed_version
+  tags: [openbao, openbao-install]
+  block:
+    - name: Generate temp dir
+      become: false
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ binary_name }}"
+      register: openbao_download_dir
+
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        openbao_go_os: "{{ ansible_system | lower }}"
+        openbao_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        openbao_download_dir: "{{ openbao_download_dir.path }}"
+      changed_when: false
+
+    - name: Set filenames
+      ansible.builtin.set_fact:
+        openbao_checksum_gpg_file: "checksums-{{ openbao_go_os }}.txt.gpgsig"
+        openbao_checksum_file: "checksums-{{ openbao_go_os }}.txt"
+        openbao_archive: "{{ binary_name }}_{{ openbao_desired_version[1:] }}_{{ openbao_go_os | capitalize }}_{{ openbao_go_arch }}.tar.gz"
+      changed_when: false
+
+- name: "Download artifacts"
+  when: not openbao_local_binary.stat.exists or openbao_desired_version != openbao_installed_version
+  tags: [openbao, openbao-install, deps]
+  block:
+    - name: Create download directory
+      become: false
+      ansible.builtin.file:
+        path: "{{ openbao_download_dir }}"
+        state: directory
+        mode: "0700"
+
+    - name: "Download archive files"
+      become: false
+      ansible.builtin.get_url:
+        url: "https://github.com/{{ github_repo }}/releases/download/{{ openbao_desired_version }}/{{ item.file }}"
+        dest: "{{ item.dest }}"
+        mode: "0640"
+        timeout: 60
+      register: openbao_download_openbao
+      retries: 5
+      delay: 2
+      with_items:
+        - file: "{{ openbao_archive }}"
+          dest: "{{ openbao_download_dir }}/{{ openbao_archive }}"
+        - file: "{{ openbao_checksum_file }}"
+          dest: "{{ openbao_download_dir }}/{{ openbao_checksum_file }}"
+        - file: "{{ openbao_checksum_gpg_file }}"
+          dest: "{{ openbao_download_dir }}/{{ openbao_checksum_gpg_file }}"
+
+    - name: Verify checksum integrity
+      become: false
+      ansible.builtin.command: "gpg2 --verify {{ openbao_download_dir }}/{{ openbao_checksum_gpg_file }} {{ openbao_download_dir }}/{{ openbao_checksum_file }}"
+      changed_when: false
+
+    - name: Verify archive
+      become: false
+      ansible.builtin.command: "sha256sum --ignore-missing -c {{ openbao_download_dir }}/{{ openbao_checksum_file }}"
+      changed_when: false
+      args:
+        chdir: "{{ openbao_download_dir }}"
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: "{{ openbao_download_dir }}/{{ openbao_archive }}"
+        dest: "{{ openbao_download_dir }}"
+        creates: "{{ openbao_download_dir }}/openbao"
+        remote_src: true
+      check_mode: false
+
+    - name: Copy openbao binary
+      ansible.builtin.copy:
+        src: "{{ openbao_download_dir }}/{{ binary_name }}"
+        dest: "/usr/local/bin/{{ binary_name }}"
+        remote_src: true
+        mode: "0755"
+        owner: "root"
+        group: "root"
+      notify: Restart openbao
+  always:
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: ["{{ openbao_plugin_download_dir }}"]
+      failed_when: false

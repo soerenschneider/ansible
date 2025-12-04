@@ -1,0 +1,132 @@
+---
+- name: Set openbao address
+  ansible.builtin.lineinfile:
+    path: /etc/environment
+    line: 'VAULT_ADDR={{ openbao_addr | default("127.0.0.1:8200") }}'
+  tags: [openbao, openbao-configure]
+
+- name: Add group openbao
+  ansible.builtin.user:
+    name: "{{ openbao_group }}"
+    system: true
+  tags: [openbao, openbao-configure]
+
+- name: Add user openbao
+  ansible.builtin.user:
+    name: "{{ openbao_user }}"
+    system: true
+    shell: "/bin/false"
+    group: "{{ openbao_group }}"
+    groups: "{{ openbao_user_additional_groups | default([]) }}"
+  tags: [openbao, openbao-configure]
+
+- name: Create openbao audit log file
+  ansible.builtin.copy:
+    content: ""
+    dest: "{{ openbao_audit_log }}"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0600"
+    force: false
+  tags: [openbao, openbao-configure]
+
+- name: Delete openbao dir
+  ansible.builtin.file:
+    state: absent
+    path: "{{ openbao_dir }}"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0700"
+  when: [openbao_wipe_everything is defined, openbao_wipe_everything]
+  tags: [openbao, openbao-configure]
+
+- name: Create openbao dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ item }}"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0700"
+  with_items:
+    - "{{ openbao_dir }}"
+    - "{{ openbao_plugin_dir }}"
+  tags: [openbao, openbao-configure]
+
+- name: Set permissions for TLS keypair
+  ansible.builtin.file:
+    path: "{{ item }}"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0600"
+  with_items: ["{{ openbao_tls.cert_file }}", "{{ openbao_tls.key_file }}"]
+  when: [openbao_tls_key.stat is defined, openbao_tls_cert.stat is defined]
+  ignore_errors: true
+  register: openbao_ignore_errors_register
+  tags: [openbao, openbao-configure]
+
+- name: Create config
+  ansible.builtin.template:
+    src: openbao-config.hcl.j2
+    dest: "{{ openbao_dir }}/openbao.hcl"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0640"
+  notify: Restart openbao
+  tags: [openbao, openbao-configure]
+
+- name: Create openbao storage dir
+  ansible.builtin.file:
+    state: directory
+    path: "{{ openbao_storage_dir }}"
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0700"
+  tags: [openbao, openbao-configure]
+
+- name: Add logrotate config for openbao
+  ansible.builtin.template:
+    src: openbao_logrotate.j2
+    dest: /etc/logrotate.d/openbao_logrotate
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [openbao, openbao-configure]
+
+- name: Create systemd config
+  ansible.builtin.template:
+    src: openbao.service.j2
+    dest: /etc/systemd/system/openbao.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart openbao
+  tags: [openbao, openbao-configure]
+
+- name: Enable openbao service
+  ansible.builtin.systemd:
+    name: openbao.service
+    enabled: true
+  tags: [openbao, openbao-configure]
+
+- name: "Configure openbao audit log"
+  when: openbao_audit_log | default("") | length > 0
+  tags: [openbao, openbao-configure]
+  block:
+    - name: Create systemd unit for openbao audit file
+      ansible.builtin.template:
+        src: openbao-audit-file.service.j2
+        dest: /etc/systemd/system/openbao-audit-file.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable and start openbao audit file service
+      ansible.builtin.systemd:
+        name: openbao-audit-file.service
+        state: started
+        daemon_reload: true
+        enabled: true
+
+- name: Flush handlers
+  ansible.builtin.meta: flush_handlers
+  tags: [openbao, openbao-configure]
