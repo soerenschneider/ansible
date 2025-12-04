@@ -20,13 +20,13 @@
   tags: [openbao, openbao-install, openbao-plugins]
 
 - name: Extract version from openbao_plugin_release
-  set_fact:
+  ansible.builtin.set_fact:
     openbao_plugin_version: "{{ openbao_plugin_release | regex_search('v[0-9]+\\.[0-9]+\\.[0-9]+') }}"
     openbao_plugin_name_without_version: "{{ openbao_plugin_release | regex_replace('-v[0-9]+\\.[0-9]+\\.[0-9]+$', '') | regex_replace('(^-|-$)', '') }}"
   tags: [openbao, openbao-install, openbao-plugins]
 
 - name: Extract version from openbao_plugin_release
-  set_fact:
+  ansible.builtin.set_fact:
     openbao_plugin_base_name: "openbao-plugin-{{ openbao_plugin_name_without_version }}"
   tags: [openbao, openbao-install, openbao-plugins]
 

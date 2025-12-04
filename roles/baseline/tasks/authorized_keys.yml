@@ -37,8 +37,6 @@
   loop: "{{ baseline_authorized_keys_users }}"
   tags: [base, authorized_keys, ssh]
 
-
-
 - name: Add custom ssh keys
   ansible.posix.authorized_key:
     key: "{{ item.pub }}"

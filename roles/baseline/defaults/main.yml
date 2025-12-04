@@ -14,7 +14,7 @@ baseline_wol_device: "{{ ansible_default_ipv4.interface }}"
 
 baseline_enable_firewall: true
 
-baseline_ssh_authorized_keys_soft_confine: True
+baseline_ssh_authorized_keys_soft_confine: true
 baseline_ssh_authorized_keys_soft_from_default: from="192.168.0.0/16,10.0.0.0/8"
 
 # authorized_keys, not stored on hardware tokens such as yubikey. these keys will get confined by 'from' on internal systems:

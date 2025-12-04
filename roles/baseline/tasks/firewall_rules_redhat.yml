@@ -27,15 +27,15 @@
       ansible.builtin.service:
         name: firewalld
         state: started
-        enabled: yes
+        enabled: true
 
     - name: Remove all existing rich rules from public zone
       ansible.builtin.shell: |
         for rule in $(firewall-cmd --list-rich-rules); do
           firewall-cmd --permanent --remove-rich-rule="$rule"
         done
-      register: remove_rich_rules
-      changed_when: remove_rich_rules.stdout != ""
+      register: baseline_remove_rich_rules
+      changed_when: baseline_remove_rich_rules.stdout != ""
       failed_when: false
 
     - name: Remove all existing port rules from public zone
@@ -51,9 +51,9 @@
     - name: Allow TCP ports with source restrictions
       ansible.posix.firewalld:
         rich_rule: "rule family=ipv4 source address={{ item.1 }} port port={{ item.0 }} protocol=tcp accept"
-        permanent: yes
+        permanent: true
         state: enabled
-        immediate: yes
+        immediate: true
       loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
       when:
         - fw_tcp_rules is defined
@@ -63,9 +63,9 @@
     - name: Allow TCP ports for all sources
       ansible.posix.firewalld:
         port: "{{ item.0 }}/tcp"
-        permanent: yes
+        permanent: true
         state: enabled
-        immediate: yes
+        immediate: true
       loop: "{{ fw_tcp_rules | flatten(levels=1) }}"
       when:
         - fw_tcp_rules is defined
@@ -75,9 +75,9 @@
     - name: Allow UDP ports with source restrictions
       ansible.posix.firewalld:
         rich_rule: "rule family=ipv4 source address={{ item.1 }} port port={{ item.0 }} protocol=udp accept"
-        permanent: yes
+        permanent: true
         state: enabled
-        immediate: yes
+        immediate: true
       loop: "{{ fw_udp_rules | flatten(levels=1) }}"
       when:
         - fw_udp_rules is defined
@@ -87,9 +87,9 @@
     - name: Allow UDP ports for all sources
       ansible.posix.firewalld:
         port: "{{ item.0 }}/udp"
-        permanent: yes
+        permanent: true
         state: enabled
-        immediate: yes
+        immediate: true
       loop: "{{ fw_udp_rules | flatten(levels=1) }}"
       when:
         - fw_udp_rules is defined
@@ -98,4 +98,4 @@
 
     - name: Reload firewalld to apply removals
       ansible.builtin.command: firewall-cmd --reload
-      when: remove_rich_rules.changed or remove_ports.changed
+      when: baseline_remove_rich_rules.changed or remove_ports.changed
