@@ -59,4 +59,5 @@
 
   handlers:
     - name: "Run letsencrypt hook for openbao"
+      changed_when: false
       ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"
