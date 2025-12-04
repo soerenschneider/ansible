@@ -23,7 +23,7 @@
       with_items: "{{ openbao_gpg_keys | dict2items }}"
 
     - name: "Run openbao operator init"
-      ansible.builtin.command: "bao operator init -n=1 -t=1 {% if openbao_gpg_keys | length > 0 %}-pgp-keys={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif%}{% endfor %} -root-token-pgp-key={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif%}{% endfor %}{% endif %}"
+      ansible.builtin.command: "bao operator init -n=1 -t=1 {% if openbao_gpg_keys | length > 0 %}-pgp-keys={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif %}{% endfor %} -root-token-pgp-key={% for item in openbao_gpg_keys | dict2items %}{{ openbao_dir }}/{{ item.key }}{%- if not loop.last %},{% endif %}{% endfor %}{% endif %}"
       become: true
       become_user: "{{ openbao_user }}"
       environment:
