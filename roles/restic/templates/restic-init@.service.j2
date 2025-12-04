@@ -1,7 +1,0 @@
-[Unit]
-Description=Init Restic repository
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/restic-upsert
-EnvironmentFile=/etc/restic-%I.conf

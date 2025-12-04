@@ -19,7 +19,7 @@
     owner: root
     group: root
     mode: "0600"
-  with_items: "{{ restic_backups | dict2items }}"
+  with_items: "{{ restic_backups | default({}) | dict2items }}"
   no_log: true
   tags: [restic, backup]
 
@@ -97,14 +97,5 @@
     enabled: "{{ item.value.enabled | bool }}"
     state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
   with_items: "{{ restic_backups | dict2items }}"
-  no_log: true
-  tags: [restic, backup]
-
-- name: Init restic repository
-  ansible.builtin.systemd:
-    name: restic-init@{{ item.key }}
-    state: "{% if item.value.enabled | bool %}started{% else %}stopped{% endif %}"
-  with_items: "{{ restic_backups | dict2items }}"
-  when: restic_init_restic is changed  # noqa: no-handler
   no_log: true
   tags: [restic, backup]
