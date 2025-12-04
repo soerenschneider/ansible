@@ -18,7 +18,7 @@
   tags: [base, authorized_keys, ssh]
 
 - name: Build complete authorized keys list
-  set_fact:
+  ansible.builtin.set_fact:
     baseline_ssh_authorized_keys: |
       {% for pubkey in baseline_authorized_keys_hw %}
       {{ pubkey.key_options | default('') }} {{ pubkey.pub }}

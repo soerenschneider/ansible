@@ -73,11 +73,11 @@
         url: "https://api.github.com/repos/{{ openbao_plugin_github_repo }}/releases/tags/{{ openbao_plugin_release }}"
         method: "GET"
         return_content: true
-      register: release_info
+      register: openbao_release_info
 
     - name: Filter assets matching the prefix
       ansible.builtin.set_fact:
-        openbao_plugin_matching_assets: "{{ release_info.json.assets | selectattr('name', 'match', '^' + openbao_plugin_asset_prefix) | list }}"
+        openbao_plugin_matching_assets: "{{ openbao_release_info.json.assets | selectattr('name', 'match', '^' + openbao_plugin_asset_prefix) | list }}"
 
     - name: Find .tar.gz item
       ansible.builtin.set_fact:

@@ -43,8 +43,8 @@
         for port in $(firewall-cmd --list-ports); do
           firewall-cmd --permanent --remove-port="$port"
         done
-      register: remove_ports
-      changed_when: remove_ports.stdout != ""
+      register: baseline_remove_ports
+      changed_when: baseline_remove_ports.stdout != ""
       failed_when: false
 
     # TCP rules with specific sources (using rich rules)
@@ -95,7 +95,7 @@
         - fw_udp_rules is defined
         - item.1 == 'all'
 
-
     - name: Reload firewalld to apply removals
       ansible.builtin.command: firewall-cmd --reload
-      when: baseline_remove_rich_rules.changed or remove_ports.changed
+      changed_when: false
+      when: baseline_remove_rich_rules.changed or baseline_remove_ports.changed
