@@ -30,6 +30,13 @@
             "#\\srenovate:\\sdatasource=(?<datasource>docker)( versioning=(?<versioning>.*?))?\\s.+_image: \"(?<depName>.*?):(?<currentValue>.*)\"",
             "(?i)#\\s+renovate:\\s+datasource=(?<datasource>.*?) depName=(?<depName>.*?)(\\s+versioning=(?<versioning>.*?))?\\s+.*_version[=:]\\s*(?<currentValue>.*)"
         ]
+    },
+    {
+      "fileMatch": [".*y[a]?ml$"],
+      "matchStrings": [
+        "(?i)#\\s+renovate:\\s+datasource=(?<datasource>.*?) depName=(?<depName>.*?)\\s+openbao_plugin_secret_aws_version:\\s*[\"']?(?<currentValue>.*?)[\"']?\\s*$"
+      ],
+      "extractVersionTemplate": "^secrets-aws-(?<version>.*)$"
     }
   ]
 }
