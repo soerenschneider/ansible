@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+LIVE_DIR=/etc/letsencrypt/live/
+OPENBAO_DIR={{ openbao_dir }}
+WHITELIST="{{ openbao_cert_whitelist | default('')}}"
+RESTART="false"
+
+if [ ! -d ${LIVE_DIR} ]; then
+    echo "dir doesn't exist"
+    exit 1
+fi
+
+for dir in "${LIVE_DIR}"/*/; do
+    dir=${dir%*/}
+    host="$(basename ${dir})"
+
+    if [ -n "${WHITELIST}" ] && [ "${WHITELIST}" != "${host}" ]; then
+	    echo "${host} does not match ${WHITELIST}, continuing"
+	    continue
+    fi
+
+    if [[ ! -f "${OPENBAO_DIR}/${host}.cer" ]] || ! diff "${dir}/fullchain.pem" "${OPENBAO_DIR}/${host}.cer" > /dev/null; then
+      cp "${dir}/fullchain.pem" "${OPENBAO_DIR}/${host}.cer"
+      cp "${dir}/privkey.pem" "${OPENBAO_DIR}/${host}.key"
+      chown "{{ openbao_user | default('openbao') }}:{{ openbao_group | default('openbao') }}" "${OPENBAO_DIR}/${host}.cer"
+      chown "{{ openbao_user | default('openbao') }}:{{ openbao_group | default('openbao') }}" "${OPENBAO_DIR}/${host}.key"
+      RESTART="true"
+    fi
+done
+
+if [[ "${RESTART}" = "true" ]]; then
+  echo "Restarting openbao"
+  systemctl restart openbao
+fi
