@@ -1,6 +1,6 @@
 FROM ghcr.io/getsops/sops:v3.11.0-alpine AS sops
 
-FROM python:3.14.0-alpine3.21
+FROM python:3.14.1-alpine3.21
 
 COPY --from=sops /usr/local/bin/sops /usr/bin/sops
 
