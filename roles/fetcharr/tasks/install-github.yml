@@ -94,7 +94,7 @@
       ansible.builtin.set_fact:
         fetcharr_release_checksum: "{{ item.split(' ')[0] }}"
       when: [fetcharr_full_filename in item, (not fetcharr_local_binary.stat.exists or fetcharr_installed_version != fetcharr_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + fetcharr_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + fetcharr_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
