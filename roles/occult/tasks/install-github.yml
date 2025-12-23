@@ -49,7 +49,7 @@
   block:
     - name: Print debug information
       ansible.builtin.uri:
-        url: https://api.github.com/repos/{{ github_repo }}/releases/latest
+        url: "https://api.github.com/repos/{{ github_repo }}/releases/latest"
         return_content: true
       register: occult_github_release
       retries: 3
@@ -96,12 +96,12 @@
       ansible.builtin.set_fact:
         occult_release_checksum: "{{ item.split(' ')[0] }}"
       when: [occult_full_filename in item, (not occult_local_binary.stat.exists or occult_installed_version != occult_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + occult_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + occult_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
       ansible.builtin.get_url:
-        url: https://github.com/{{ github_repo }}/releases/download/{{ occult_desired_version }}/{{ occult_full_filename }}
+        url: "https://github.com/{{ github_repo }}/releases/download/{{ occult_desired_version }}/{{ occult_full_filename }}"
         dest: "{{ occult_download_dir }}/{{ occult_full_filename }}"
         checksum: sha256:{{ occult_release_checksum }}
         mode: "0640"

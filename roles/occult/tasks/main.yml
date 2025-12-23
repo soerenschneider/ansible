@@ -2,9 +2,9 @@
 - name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
-    binary_name: occult
-    github_repo: soerenschneider/occult
-    service_name: occult
+    binary_name: "occult"
+    github_repo: "soerenschneider/occult"
+    service_name: "occult"
   tags: [occult, occult-install, deps]
 
 - name: Configure occult
@@ -14,7 +14,7 @@
     owner: "{{ occult_user }}"
     group: "{{ occult_group }}"
     mode: "0600"
-  when: occult_config is defined and occult_config
+  when: occult_config is defined and occult_config | length > 0
   register: _occult_config
   tags: [occult, occult-configure]
 
