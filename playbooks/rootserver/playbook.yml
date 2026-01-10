@@ -4,23 +4,61 @@
   become: true
   gather_facts: true
   tasks:
+      # Run this task first as it only creates users/groups and is needed later
     - name: "Run tasks music.yaml"
       ansible.builtin.include_tasks: tasks/music.yaml
       tags: always
+
+    - name: "Run role wireguard"
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always
+
+    - name: "Allow incoming traffic from wireguard wg0 (Debian)"
+      community.general.ufw:
+        rule: allow
+        interface: wg0
+        direction: in
+      when: ansible_os_family | lower == "debian"
+      tags: firewall
+
+    - name: "Allow incoming traffic from wireguard wg0 (RedHat)"
+      ansible.posix.firewalld:
+        zone: trusted
+        interface: wg0
+        permanent: true
+        state: enabled
+        immediate: true
+      when: ansible_os_family | lower == "redhat"
+      tags: firewall
+
+    - name: "Allow WireGuard port (RedHat)"
+      ansible.posix.firewalld:
+        port: "{{ item }}"
+        zone: public
+        permanent: true
+        state: enabled
+        immediate: true
+      when: ansible_os_family | lower == "redhat"
+      loop:
+        - "12686/udp"
+        - "51820/udp"
+      tags: firewall
 
     - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
 
+    - name: "Run role tunnelguard"
+      when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
+      ansible.builtin.include_role:
+        name: tunnelguard
+      tags: [tunnelguard, wireguard, vpn]
+
     - name: "Run role ssh_aegis"
       ansible.builtin.include_role:
         name: ssh_aegis
-      tags: always
-
-    - name: "Run role wireguard"
-      ansible.builtin.include_role:
-        name: wireguard
       tags: always
 
     - name: "Run role unbound"
@@ -30,6 +68,10 @@
 
     - name: "Run tasks unbound.yaml"
       ansible.builtin.include_tasks: tasks/unbound.yaml
+      tags: always
+
+    - name: "Run tasks haproxy"
+      ansible.builtin.include_tasks: tasks/haproxy.yaml
       tags: always
 
     - name: "Run role certbot"
@@ -46,12 +88,10 @@
       ansible.builtin.include_tasks: tasks/ip-plz.yaml
       tags: always
 
-    - name: "Allow incoming traffic from wireguard wg0"
-      community.general.ufw:
-        rule: allow
-        interface: wg0
-        direction: in
-      tags: firewall
+    - name: "Run role navidrome"
+      ansible.builtin.include_role:
+        name: navidrome
+      tags: always
 
     - name: "Enable routing"
       ansible.posix.sysctl:
@@ -69,7 +109,6 @@
         owner: root
         group: root
         mode: "0755"
-      when: false
       tags: [resolved, systemd-resolved]
 
     - name: "Create drop-in config for resolved"
@@ -79,9 +118,9 @@
         owner: root
         group: root
         mode: "0755"
-      when: false
       notify: _restart resolved
       tags: [resolved]
+
   handlers:
     - name: _restart resolved
       ansible.builtin.systemd:

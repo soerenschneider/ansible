@@ -64,11 +64,3 @@
         daemon_reload: true
         enabled: "{% if wg_enable_default | default(True) %}true{% else %}false{% endif %}"
       with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
-
-- name: "Install tunnelguard"
-  when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
-  tags: [tunnelguard, wireguard, vpn]
-  block:
-    - name: "Run role tunnelguard"
-      ansible.builtin.include_role:
-        name: tunnelguard
