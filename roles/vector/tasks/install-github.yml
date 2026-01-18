@@ -94,7 +94,7 @@
       ansible.builtin.set_fact:
         vector_release_checksum: "{{ item.split(' ')[0] }}"
       when: [vector_full_filename in item, (not vector_local_binary.stat.exists or vector_installed_version != vector_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + vector_desired_version + '/' + binary_name + '-' + vector_desired_version[1:] +'-SHA256SUMS', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + vector_desired_version + '/' + binary_name + '-' + vector_desired_version[1:] + '-SHA256SUMS', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
