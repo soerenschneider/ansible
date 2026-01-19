@@ -4,6 +4,12 @@
     name: haproxy
   tags: always
 
+- name: "Run certbook post issue hook manually"
+  ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/hook-start-haproxy.sh"
+  failed_when: false
+  changed_when: false
+  tags: haproxy
+
 - name: Add configuration block
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
