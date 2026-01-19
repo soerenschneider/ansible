@@ -94,7 +94,7 @@
       ansible.builtin.set_fact:
         ip_plz_release_checksum: "{{ item.split(' ')[0] }}"
       when: [ip_plz_full_filename in item, (not ip_plz_local_binary.stat.exists or ip_plz_installed_version != ip_plz_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + ip_plz_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + ip_plz_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
