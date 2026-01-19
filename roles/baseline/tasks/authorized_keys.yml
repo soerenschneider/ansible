@@ -44,5 +44,5 @@
     key_options: "{{ item.options | default(omit) }}"
     user: "{{ item.user }}"
   when: item.pub is defined and item.user is defined
-  with_items: "{{ additional_authorized_keys }}"
+  with_items: "{{ baseline_additional_authorized_keys }}"
   tags: [base, authorized_keys, ssh]
