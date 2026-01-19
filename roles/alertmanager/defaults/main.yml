@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=prometheus/alertmanager
-alertmanager_version: v0.29.0
+alertmanager_version: v0.30.1
 
 alertmanager_user: alertmanager
 alertmanager_group: alertmanager
