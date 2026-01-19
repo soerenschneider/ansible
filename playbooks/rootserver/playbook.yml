@@ -4,8 +4,7 @@
   become: true
   gather_facts: true
   tasks:
-      # Run this task first as it only creates users/groups and is needed later
-    - name: "Run tasks music.yaml"
+    - name: "Run tasks music.yaml"  # Run this task first as it only creates users/groups and is needed later
       ansible.builtin.include_tasks: tasks/music.yaml
       tags: always
 

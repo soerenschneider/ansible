@@ -52,14 +52,14 @@
       ansible.builtin.set_fact:
         alertmanager_checksum: "{{ item.split(' ')[0] }}"
       with_items:
-        - "{{ lookup('url', 'https://github.com/prometheus/alertmanager/releases/download/v' + alertmanager_version + '/sha256sums.txt', wantlist=True) | list }}"
+        - "{{ lookup('url', 'https://github.com/prometheus/alertmanager/releases/download/' + alertmanager_version + '/sha256sums.txt', wantlist=True) | list }}"
       when: "((alertmanager_go_os) + '-' + (alertmanager_go_arch) + '.tar.gz') in item and (not alertmanager_binary.stat.exists or alertmanager_alertmanager_installed_version != alertmanager_version)"
 
     - name: Download alertmanager archive
       become: false
       ansible.builtin.get_url:
-        url: "https://github.com/prometheus/alertmanager/releases/download/v{{ alertmanager_version }}/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
-        dest: "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
+        url: "https://github.com/prometheus/alertmanager/releases/download/{{ alertmanager_version }}/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
+        dest: "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
         mode: "0640"
         checksum: "sha256:{{ alertmanager_checksum }}"
       register: alertmanager_download_archive
@@ -70,15 +70,15 @@
     - name: Unpack binaries from archive
       become: false
       ansible.builtin.unarchive:
-        src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
+        src: "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
         dest: "/tmp"
-        creates: "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}/alertmanager"
+        creates: "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}/alertmanager"
         remote_src: true
       check_mode: false
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}/{{ item }}"
+        src: "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}/{{ item }}"
         dest: "/usr/local/bin/{{ item }}"
         remote_src: true
         mode: "0755"
@@ -86,12 +86,12 @@
         group: "root"
       with_items:
         - alertmanager
-      notify: [restart alertmanager]
+      notify: [Restart alertmanager]
 
     - name: Delete downloaded files
       ansible.builtin.file:
         state: "absent"
         path: "{{ item }}"
       with_items:
-        - "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}"
-        - "/tmp/alertmanager-{{ alertmanager_version }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
+        - "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}"
+        - "/tmp/alertmanager-{{ alertmanager_version[1:] }}.{{ alertmanager_go_os }}-{{ alertmanager_go_arch }}.tar.gz"
