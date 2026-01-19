@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# Logging function
+log() {
+    logger -t firewall "$1"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+}
+
+INET_IFACE="{{ ansible_default_ipv4.interface | default('eth0') }}"
+WG_IFACE="wg0"
+
+# Flush existing rules
+iptables -F
+iptables -X
+iptables -Z
+
+iptables -P INPUT DROP
+iptables -P FORWARD DROP
+iptables -P OUTPUT DROP
+
+iptables -A INPUT -i lo -j ACCEPT
+iptables -A OUTPUT -o lo -j ACCEPT
+
+# Drop invalid packets early
+iptables -A INPUT -m conntrack --ctstate INVALID -j DROP
+iptables -A FORWARD -m conntrack --ctstate INVALID -j DROP
+iptables -A OUTPUT -m conntrack --ctstate INVALID -j DROP
+
+# Allow established and related connections
+iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+iptables -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
+
+# Drop fragmented packets
+iptables -A INPUT -f -j DROP
+
+# Drop XMAS packets
+iptables -A INPUT -p tcp --tcp-flags ALL ALL -j DROP
+iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+
+# Drop NULL packets
+iptables -A INPUT -p tcp --tcp-flags ALL NONE -j DROP
+
+# Drop packets with invalid TCP flags
+iptables -A INPUT -p tcp --tcp-flags FIN,SYN FIN,SYN -j DROP
+iptables -A INPUT -p tcp --tcp-flags SYN,RST SYN,RST -j DROP
+
+# Prevent IP Spoofing on Internet interface
+iptables -A INPUT -i "${INET_IFACE}" -s 0.0.0.0/8 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 10.0.0.0/8 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 127.0.0.0/8 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 169.254.0.0/16 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 172.16.0.0/12 -j DROP  # Added missing RFC1918 range
+iptables -A INPUT -i "${INET_IFACE}" -s 192.168.0.0/16 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 224.0.0.0/4 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 240.0.0.0/4 -j DROP
+iptables -A INPUT -i "${INET_IFACE}" -s 255.255.255.255/32 -j DROP  # Broadcast
+
+# 1. Allow wireguard, ssh, http and tranmission (for letsencrypt challenges) from everywhere.
+#    We don't want to rely on (potentially) inaccurate and/or outdated geo ip information and trust the strong auth of wireguard and SSH.
+# 2. SSH is only exposed on the public internet when wg tunnel is down (ssh-aegis) and is not allowing PasswordAuthentication
+# 3. Allow SSH from WG interface
+iptables -A INPUT -i "${INET_IFACE}" -p udp -m multiport --dports 12686,{{ transmission_peer_port | default(51413) }},51820 -j ACCEPT
+iptables -A INPUT -i "${INET_IFACE}" -p tcp -m multiport --dports 22,80,{{ transmission_peer_port | default(51413) }} -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -p tcp --dport 22 -j ACCEPT
+
+# Allow outgoing UDP connections for wireguard and DNS
+iptables -A OUTPUT -o "${INET_IFACE}" -p udp -m multiport --dports 53,12686,51820 -j ACCEPT
+iptables -A OUTPUT -o "${WG_IFACE}" -j ACCEPT
+
+# Geo IP based logic starts here
+# Load xt_geoip module if not already loaded
+if [ ! -f /sys/module/xt_geoip/refcnt ]; then
+    log "Loading xt_geoip module..."
+    if ! modprobe xt_geoip 2>/dev/null; then
+        log "ERROR: Failed to load xt_geoip module. GeoIP filtering will not work!"
+        log "Please install xtables-addons and ensure the module is available."
+    fi
+fi
+
+# GeoIP rules (apply if module is now loaded)
+if [ -f /sys/module/xt_geoip/refcnt ]; then
+    log "Applying GeoIP-based firewall rules..."
+    # Only serve ip-plz for German IPs
+    iptables -A INPUT -i "${INET_IFACE}" -p tcp --dport 8443 -m geoip --src-cc DE -j ACCEPT
+    iptables -A INPUT -i "${INET_IFACE}" -m geoip --src-cc DE,CH -j REJECT --reject-with icmp-host-prohibited
+    # Allow outgoing TCP connections to Germany and Switzerland only for ssh, DNS and http(s), restrict otherwise
+    iptables -A OUTPUT -o "${INET_IFACE}" -p tcp -m multiport --dports 22,53,80,443 -m geoip --dst-cc DE,CH -j ACCEPT
+    iptables -A OUTPUT -o "${INET_IFACE}" -p udp -m multiport --dports 53,80,443 -m geoip --dst-cc DE,CH -j ACCEPT
+    iptables -A OUTPUT -o "${INET_IFACE}" -m geoip ! --dst-cc DE,CH -j ACCEPT
+else
+    log "WARNING: xt_geoip module not available, GeoIP rules skipped"
+    log "Server will be less restrictive without geographic filtering!"
+fi
+
+iptables -A OUTPUT -o "${INET_IFACE}" -p tcp --dport 6881:6889 -j ACCEPT  # BitTorrent
+iptables -A OUTPUT -o "${INET_IFACE}" -p udp --dport 6881:6889 -j ACCEPT  # DHT
+iptables -A OUTPUT -o "${INET_IFACE}" -j REJECT --reject-with icmp-host-prohibited
+
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.2.0/24 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.64.0/24 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.65.0/24 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.100/27 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.200/32 -p tcp --dport 443 -j ACCEPT
+
+{% for port, source in fw_tcp_rules | flatten(levels=1) if source and source != 'any' %}
+iptables -A INPUT -i "${WG_IFACE}" -s "{{ source }}" -p tcp --dport "{{ port }}" -j ACCEPT
+{% endfor %}
