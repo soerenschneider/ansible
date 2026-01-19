@@ -14,8 +14,7 @@
   tags: [media, music]
 
 - name: Add SSH keys
-  when: fileserver_mode == 'active'
-  tags: [media, remote_move]
+  tags: [media, remote_move, fetcharr]
   become_user: "{{ nas_media_user }}"
   become: true
   block:
@@ -43,17 +42,6 @@
         group: "{{ nas_media_user }}"
         mode: "0600"
 
-    - name: Add ssh config entry for remotemove host
-      ansible.builtin.copy:
-        content: |
-          Host {{ fetcharr_remote_host }}
-            Port 2222
-        dest: "/home/{{ nas_media_user }}/.ssh/config"
-        owner: "{{ nas_media_user }}"
-        group: "{{ nas_media_user }}"
-        mode: "0600"
-      when: false
-
 - name: Add remote host public key to known_hosts
   ansible.builtin.known_hosts:
     name: "{{ fetcharr_remote_host }}"
@@ -64,4 +52,4 @@
   when: fileserver_mode == 'active'
   become_user: "{{ nas_media_user }}"
   become: false
-  tags: [media, remote_move]
+  tags: [media, remote_move, fetcharr]

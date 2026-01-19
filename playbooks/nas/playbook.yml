@@ -139,7 +139,6 @@
 
     - name: "Run tasks media.yml"
       ansible.builtin.include_tasks: tasks/media.yml
-      when: false
       tags: always
 
     - name: "Run tasks verify_flacs.yml"
