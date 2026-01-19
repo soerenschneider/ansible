@@ -26,7 +26,6 @@
         dest: "/tmp/xtables-addons-{{ xt_geoip_version }}.tar.zst"
         mode: '0644'
         timeout: 60
-      register: xtables_download
 
     - name: Extract xtables-addons
       ansible.builtin.unarchive:
