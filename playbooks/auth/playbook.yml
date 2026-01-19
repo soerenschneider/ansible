@@ -54,3 +54,8 @@
       ansible.builtin.include_role:
         name: "ansible_node"
       tags: always
+
+    - name: "Include role 'restic'"
+      ansible.builtin.include_role:
+        name: "restic"
+      tags: always
