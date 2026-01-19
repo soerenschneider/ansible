@@ -10,6 +10,11 @@
         name: platform
       tags: [always]
 
+    - name: "Run role wireguard"
+      ansible.builtin.include_role:
+        name: wireguard
+      tags: always
+
     - name: "Run tasks geo-firewall.yaml"
       ansible.builtin.include_tasks: tasks/geo-firewall.yaml
       tags: always
@@ -47,11 +52,6 @@
 
     - name: "Run tasks haproxy.yml"
       ansible.builtin.include_tasks: tasks/haproxy.yml
-      tags: always
-
-    - name: "Run role wireguard"
-      ansible.builtin.include_role:
-        name: wireguard
       tags: always
 
     - name: "Run role ip_plz"
