@@ -18,14 +18,6 @@
   when: [node_exporter_textfile_is_ramdisk | bool, ansible_system == "OpenBSD"]
   tags: [monitoring, node_exporter, node_exporter-configure]
 
-- name: Check for prometheus SELinux module
-  ansible.builtin.command: semodule -l | grep prometheus
-  register: node_exporter_semodule_exists
-  when: ansible_selinux
-  changed_when: false
-  failed_when: false
-  tags: [monitoring, node_exporter, node_exporter-configure]
-
 - name: Create tmpfs mountpoint for textfile dir and mount it (Linux)
   ansible.posix.mount:
     path: "{{ node_exporter_textfile_dir }}"
