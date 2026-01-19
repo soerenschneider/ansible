@@ -1,0 +1,23 @@
+[Unit]
+Description=Weekly GeoIP database update timer
+Documentation=https://github.com/jengelh/xtables-addons
+Requires=geoip-update.service
+
+[Timer]
+# Run every Sunday at 3:00 AM
+OnCalendar=Sun *-*-* 03:00:00
+
+# Run 5 minutes after boot if we missed the scheduled time
+OnBootSec=5min
+
+# Add random delay of 0-30 minutes to avoid thundering herd
+RandomizedDelaySec=30min
+
+# Ensure timer persists across reboots
+Persistent=true
+
+# Run immediately if last execution was missed
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

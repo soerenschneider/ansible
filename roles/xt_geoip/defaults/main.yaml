@@ -1,0 +1,5 @@
+---
+xt_geoip_log_path: "/var/log/geoip-update.log"
+xt_geoip_version: "3.30"
+xt_geoip_download_url: "https://inai.de/files/xtables-addons/xtables-addons-{{ xt_geoip_version }}.tar.zst"
+xt_geoip_src_dir: "/usr/src/xtables-addons-{{ xt_geoip_version }}"

@@ -1,0 +1,111 @@
+---
+- name: "Install packages"
+  ansible.builtin.package:
+    name:
+      - xtables-addons-common
+      - xtables-addons-dkms
+      - libnet-cidr-lite-perl
+      - libtext-csv-xs-perl
+      - libxtables-dev
+      - pkg-config
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: Check if xtables-addons is already installed
+  ansible.builtin.stat:
+    path: "{{ xt_geoip_src_dir }}"
+  register: xt_geoip_xtables_addons_installed
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: Download and extract xtables-addons
+  when: not xt_geoip_xtables_addons_installed.stat.exists
+  tags: ["xt_geoip", "firewall", "iptables"]
+  block:
+    - name: Download xtables-addons
+      ansible.builtin.get_url:
+        url: "{{ xt_geoip_download_url }}"
+        dest: "/tmp/xtables-addons-{{ xt_geoip_version }}.tar.zst"
+        mode: '0644'
+        timeout: 60
+      register: xtables_download
+
+    - name: Extract xtables-addons
+      ansible.builtin.unarchive:
+        src: "/tmp/xtables-addons-{{ xt_geoip_version }}.tar.zst"
+        dest: "/usr/src"
+        remote_src: true
+        creates: "{{ xt_geoip_src_dir }}"
+
+- name: "Create GeoIP database directory"
+  ansible.builtin.file:
+    path: "/usr/share/xt_geoip"
+    state: "directory"
+    mode: '0755'
+  register: xt_geoip_xtables_installed
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Check if geoip folder is populated"
+  ansible.builtin.find:
+    paths: "/usr/share/xt_geoip"
+    patterns: '*.iv4'
+    file_type: "file"
+  register: xt_geoip_xtables_populated
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Write geoip update script"
+  ansible.builtin.template:
+    src: "templates/geoip-update.sh.j2"
+    dest: "/usr/bin/geoip-update.sh"
+    owner: "root"
+    group: "root"
+    mode: "0750"
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Run geoip update script once"
+  ansible.builtin.command:
+    "/usr/bin/geoip-update.sh"
+  when: xt_geoip_xtables_populated.matched == 0
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Create GeoIP update systemd service unit"
+  ansible.builtin.template:
+    src: "templates/geoip-update.service.j2"
+    dest: "/etc/systemd/system/geoip-update.service"
+    mode: '0644'
+    owner: "root"
+    group: "root"
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Create GeoIP update systemd timer unit"
+  ansible.builtin.template:
+    src: "templates/geoip-update.timer.j2"
+    dest: "/etc/systemd/system/geoip-update.timer"
+    mode: '0644'
+    owner: "root"
+    group: "root"
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Create log rotation config for GeoIP updates"
+  ansible.builtin.copy:
+    dest: "/etc/logrotate.d/geoip-update"
+    mode: '0644'
+    owner: "root"
+    group: "root"
+    content: |
+      {{ xt_geoip_log_path }} {
+          weekly
+          rotate 2
+          compress
+          delaycompress
+          missingok
+          notifempty
+          create 0640 root adm
+      }
+  tags: ["xt_geoip", "firewall", "iptables"]
+
+- name: "Enable and start GeoIP update timer"
+  ansible.builtin.systemd:
+    name: geoip-update.timer
+    enabled: true
+    state: started
+    daemon_reload: true
+  tags: ["xt_geoip", "firewall", "iptables"]

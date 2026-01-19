@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+
+set -eu
+
+XTABLES_DIR="{{ xt_geoip_src_dir }}"
+GEOIP_DIR="/usr/share/xt_geoip"
+PROM_FILE="/var/lib/node_exporter/xt_update_geoip.prom"
+PROM_DIR="$(dirname "${PROM_FILE}")"
+TEMP_PROM_FILE="${PROM_FILE}.$$"
+
+# Logging function
+log() {
+    logger -t geoip-update "$1"
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1" >&2
+}
+
+# Function to write Prometheus metrics
+write_metrics() {
+    local success=$1
+    local duration=$2
+    local error_msg="${3:-}"
+    local timestamp=$(date +%s)
+    local csv_count="${4:-0}"
+    local db_size="${5:-0}"
+
+    cat > "${TEMP_PROM_FILE}" << EOF
+# HELP xt_geoip_update_success Whether the last GeoIP update was successful (1 = success, 0 = failure)
+# TYPE xt_geoip_update_success gauge
+xt_geoip_update_success ${success}
+
+# HELP xt_geoip_update_timestamp_seconds Unix timestamp of the last GeoIP update attempt
+# TYPE xt_geoip_update_timestamp_seconds gauge
+xt_geoip_update_timestamp_seconds ${timestamp}
+
+# HELP xt_geoip_update_duration_seconds Duration of the last GeoIP update in seconds
+# TYPE xt_geoip_update_duration_seconds gauge
+xt_geoip_update_duration_seconds ${duration}
+
+# HELP xt_geoip_csv_files_processed Number of CSV files processed in the last update
+# TYPE xt_geoip_csv_files_processed gauge
+xt_geoip_csv_files_processed ${csv_count}
+
+# HELP xt_geoip_database_size_bytes Total size of GeoIP database files in bytes
+# TYPE xt_geoip_database_size_bytes gauge
+xt_geoip_database_size_bytes ${db_size}
+EOF
+
+    if [ -n "${error_msg}" ]; then
+        cat >> "${TEMP_PROM_FILE}" << EOF
+
+# HELP xt_geoip_update_error_info Information about the last error (1 indicates error present)
+# TYPE xt_geoip_update_error_info gauge
+xt_geoip_update_error_info{error="${error_msg}"} 1
+EOF
+    fi
+
+    # Atomic move to prevent partial reads
+    mv "${TEMP_PROM_FILE}" "${PROM_FILE}"
+    chmod 644 "${PROM_FILE}"
+}
+
+# Function to get database size
+get_db_size() {
+    if [ -d "${GEOIP_DIR}" ]; then
+        du -sb "${GEOIP_DIR}" 2>/dev/null | awk '{print $1}' || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+# Cleanup function
+cleanup() {
+    local exit_code=$?
+    local duration=$(($(date +%s) - START_TIME))
+
+    if [ ${exit_code} -ne 0 ]; then
+        log "ERROR: GeoIP update failed with exit code ${exit_code}"
+        write_metrics 0 ${duration} "Update failed with exit code ${exit_code}" 0 0
+    fi
+
+    # Clean up CSV files regardless of success/failure
+    if [ -d "${XTABLES_DIR}/geoip" ]; then
+        cd "${XTABLES_DIR}/geoip"
+        rm -f *.csv 2>/dev/null || true
+    fi
+
+    # Clean up temp prometheus file if it exists
+    rm -f "${TEMP_PROM_FILE}" 2>/dev/null || true
+
+    exit ${exit_code}
+}
+
+# Set up trap for cleanup
+trap cleanup EXIT INT TERM
+
+# Record start time
+START_TIME=$(date +%s)
+
+log "Starting GeoIP database update"
+
+# Verify directories exist
+if [ ! -d "${XTABLES_DIR}/geoip" ]; then
+    log "ERROR: xtables-addons directory not found: ${XTABLES_DIR}/geoip"
+    write_metrics 0 0 "xtables-addons directory not found" 0 0
+    exit 1
+fi
+
+if [ ! -d "${GEOIP_DIR}" ]; then
+    log "Creating GeoIP directory: ${GEOIP_DIR}"
+    mkdir -p "${GEOIP_DIR}"
+fi
+
+# Ensure Prometheus metrics directory exists
+if [ ! -d "${PROM_DIR}" ]; then
+    log "Creating Prometheus metrics directory: ${PROM_DIR}"
+    mkdir -p "${PROM_DIR}"
+fi
+
+# Change to geoip directory
+cd "${XTABLES_DIR}/geoip"
+
+# Download GeoIP data
+log "Downloading GeoIP data..."
+if ! ./xt_geoip_dl; then
+    log "ERROR: Failed to download GeoIP data"
+    write_metrics 0 $(($(date +%s) - START_TIME)) "Failed to download GeoIP data" 0 0
+    exit 1
+fi
+
+# Count CSV files
+CSV_COUNT=$(ls -1 *.csv 2>/dev/null | wc -l)
+log "Downloaded ${CSV_COUNT} CSV files"
+
+if [ ${CSV_COUNT} -eq 0 ]; then
+    log "ERROR: No CSV files found after download"
+    write_metrics 0 $(($(date +%s) - START_TIME)) "No CSV files downloaded" 0 0
+    exit 1
+fi
+
+# Build GeoIP database
+log "Building GeoIP database..."
+if ! ./xt_geoip_build -D "${GEOIP_DIR}" *.csv; then
+    log "ERROR: Failed to build GeoIP database"
+    write_metrics 0 $(($(date +%s) - START_TIME)) "Failed to build GeoIP database" ${CSV_COUNT} 0
+    exit 1
+fi
+
+# Verify database was created
+if [ ! -f "${GEOIP_DIR}/DE.iv4" ] && [ ! -f "${GEOIP_DIR}/DE.iv6" ]; then
+    log "ERROR: GeoIP database files not created"
+    write_metrics 0 $(($(date +%s) - START_TIME)) "Database files not created" ${CSV_COUNT} 0
+    exit 1
+fi
+
+# Get database size
+DB_SIZE=$(get_db_size)
+
+# Calculate duration
+DURATION=$(($(date +%s) - START_TIME))
+
+# Write success metrics
+log "GeoIP database update completed successfully in ${DURATION} seconds"
+log "Database size: ${DB_SIZE} bytes ($(numfmt --to=iec-i --suffix=B ${DB_SIZE} 2>/dev/null || echo "${DB_SIZE} bytes"))"
+write_metrics 1 ${DURATION} "" ${CSV_COUNT} ${DB_SIZE}
+
+# Clean up CSV files (will also happen in trap, but doing it here for clarity)
+rm -f "./*.csv"
+
+log "Update complete"
+exit 0

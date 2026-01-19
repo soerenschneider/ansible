@@ -1,0 +1,32 @@
+[Unit]
+Description=Update xtables GeoIP database
+Documentation=https://github.com/jengelh/xtables-addons
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/geoip-update.sh
+
+# Security hardening
+PrivateTmp=true
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ node_exporter_textfile_dir }} /usr/share/xt_geoip {{ xt_geoip_src_dir }}/geoip
+
+# Logging
+StandardOutput=append:{{ xt_geoip_log_path }}
+StandardError=append:{{ xt_geoip_log_path }}
+SyslogIdentifier=geoip-update
+
+# Resource limits
+CPUQuota=75%
+MemoryMax=512M
+TasksMax=10
+
+# Timeout after 30 minutes
+TimeoutStartSec=1800
+
+[Install]
+WantedBy=multi-user.target
