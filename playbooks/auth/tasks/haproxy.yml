@@ -20,37 +20,45 @@
           stats hide-version
           stats realm Haproxy\ Statistics
 
-      frontend cadvisor_exporter
+      frontend prom_cadvisor_exporter
           bind *:9080 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-          default_backend cadvisor_exporter
+          default_backend prom_cadvisor_exporter
 
-      frontend mysqld_exporter
+      frontend prom_mysqld_exporter
           bind *:9144 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-          default_backend mysqld_exporter
+          default_backend prom_mysqld_exporter
 
-      frontend node_exporter
+      frontend prom_node_exporter
           bind *:9443 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-          default_backend node_exporter
+          default_backend prom_node_exporter
+
+      frontend prom_sc_agent
+          bind *:9823 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_sc_agent
 
       frontend https_in
         bind *:443 ssl crt {{ acmevault_pem_file }} alpn h2,http/1.1
         mode http
         option forwardfor
-        default_backend be_keycloak
+        default_backend keycloak
 
-      backend be_keycloak
+      backend keycloak
         mode http
         balance roundrobin
 
@@ -65,17 +73,21 @@
         http-request set-header X-Forwarded-Proto https if { ssl_fc }
         http-request set-header Host %[req.hdr(Host)]
 
-      backend cadvisor_exporter
+      backend prom_cadvisor_exporter
         option httpchk
         server node_exporter 127.0.0.1:{{ docker_cadvisor_port }} check inter 30s
 
-      backend mysqld_exporter
+      backend prom_mysqld_exporter
         option httpchk
         server node_exporter 127.0.0.1:9104 check inter 30s
 
-      backend node_exporter
+      backend prom_node_exporter
         option httpchk
         server node_exporter 127.0.0.1:9100 check inter 5m
+
+      backend prom_sc_agent
+        option httpchk
+        server node_exporter 127.0.0.1:{{ sc_agent_metrics_port }} check inter 5m
 
       listen galera
         bind *:3307
