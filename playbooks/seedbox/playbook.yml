@@ -24,16 +24,9 @@
         name: certbot
       tags: always
 
-    - name: "Run role lootorganizer"
-      ansible.builtin.include_role:
-        name: lootorganizer
+    - name: "Run tasks lootorganizer"
+      ansible.builtin.include_tasks: tasks/lootorganizer.yaml
       tags: always
-
-    - name: "Add group loot"
-      ansible.builtin.group:
-        name: loot
-        state: present
-      tags: [transmission, torrent, script]
 
     - name: "Add scripts for transmission"
       ansible.builtin.template:

@@ -1,0 +1,18 @@
+---
+- name: "Add group loot"
+  ansible.builtin.group:
+    name: "loot"
+    state: "present"
+  tags: [transmission, torrent, script]
+
+- name: "Add user to group loot"
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: "loot"
+    append: true
+  tags: [transmission, torrent, script]
+
+- name: "Run role lootorganizer"
+  ansible.builtin.include_role:
+    name: lootorganizer
+  tags: always
