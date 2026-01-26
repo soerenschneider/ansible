@@ -1,0 +1,57 @@
+---
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ garage_group }}"
+    system: true
+  tags: [garage, garage-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ garage_user }}"
+    shell: /bin/false
+    system: true
+    groups: "{{ garage_group }}"
+  tags: [garage, garage-install]
+
+- name: Add dir
+  ansible.builtin.file:
+    state: directory
+    path: /etc/garage
+    owner: "{{ garage_user }}"
+    group: "{{ garage_group }}"
+    mode: "0750"
+  tags: [garage, garage-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: garage
+    service_name: garage
+    version_wanted: "{{ garage_version }}"
+  tags: [garage, garage-install, deps]
+
+- name: Add config file
+  ansible.builtin.template:
+    src: "garage.toml.j2"
+    dest: "{{ garage_config_file }}"
+    owner: "{{ garage_user }}"
+    group: "{{ garage_group }}"
+    mode: "0640"
+  notify: Restart garage
+  tags: [garage, garage-install, garage-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: garage.service.j2
+    dest: /etc/systemd/system/garage.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart garage
+  tags: [garage, garage-install, garage-configure]
+
+- name: Enable/disable garage
+  ansible.builtin.service:
+    name: "{{ garage_service_name }}"
+    enabled: true
+  tags: [garage, garage-install, garage-configure]

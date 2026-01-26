@@ -1,0 +1,110 @@
+---
+- name: "Set variables"
+  ansible.builtin.set_fact:
+    garage_local_binary: ""
+    garage_installed_version: ""
+    garage_desired_version: "{{ garage_version | default('') }}"
+    garage_download_archive: ""
+    garage_download_signature: ""
+    garage_stopped_service: ""
+    garage_github_release: ""
+    garage_go_os: ""
+    garage_go_arch: ""
+    garage_checksum_signature_file: ""
+    garage_checksum_file: ""
+    garage_full_filename: ""
+    garage_release_checksum: ""
+  tags: [garage, garage-install, deps]
+
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/{{ binary_name }}
+  register: garage_local_binary
+  tags: [garage, garage-install, deps]
+
+- name: Check installed version
+  when: garage_local_binary.stat.exists
+  tags: [garage, garage-install, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell: "set -o pipefail && /usr/local/bin/{{ binary_name }} --version | awk '{print $2}'"
+      register: garage_installed_version
+      changed_when: false
+
+    - name: Register local version
+      ansible.builtin.set_fact:
+        garage_installed_version: "{{ garage_installed_version.stdout }}"
+      changed_when: false
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ garage_installed_version }}"
+      changed_when: false
+
+- name: "Download artifacts"
+  when: not garage_local_binary.stat.exists or garage_desired_version != garage_installed_version
+  tags: [garage, garage-install, deps]
+  block:
+    - name: Generate temp dir
+      become: false
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ binary_name }}"
+      register: garage_download_dir
+
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        garage_go_os: "{{ ansible_system | lower }}"
+        garage_go_arch: "{{ 'x86_64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
+        garage_download_dir: "{{ garage_download_dir.path }}"
+        garage_extraction_dir: "{{ garage_download_dir.path }}/{{ binary_name }}"
+      changed_when: false
+
+    - name: Set filenames
+      ansible.builtin.set_fact:
+        garage_checksum_file: "{{ garage_download_dir }}/{{ binary_name }}-checksums.sha256"
+        garage_full_filename: "{{ binary_name }}-{{ garage_go_os }}-{{ garage_go_arch }}"
+        garage_binary_url: "https://garagehq.deuxfleurs.fr/_releases/{{ garage_desired_version }}/{{ garage_go_arch }}-unknown-linux-musl/garage"
+      changed_when: false
+
+    - name: Download binary
+      become: false
+      ansible.builtin.get_url:
+        url: "{{ garage_binary_url }}"
+        dest: "{{ garage_download_dir }}/{{ garage_full_filename }}"
+        mode: "0640"
+      register: garage_download_archive
+      until: garage_download_archive is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Stop service
+      ansible.builtin.service:
+        name: "{{ garage_service_name }}"
+        state: stopped
+      failed_when: false
+      register: garage_stopped_service
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: "{{ garage_download_dir }}/{{ garage_full_filename }}"
+        dest: /usr/local/bin/{{ item }}
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+      with_items: ["{{ binary_name }}"]
+
+  always:
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: ["{{ garage_download_dir }}"]
+      failed_when: false
+
+    - name: Restart service
+      ansible.builtin.systemd:
+        name: "{{ garage_service_name }}"
+        state: restarted
+      when: garage_stopped_service is defined and garage_stopped_service is changed

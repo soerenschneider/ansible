@@ -1,0 +1,14 @@
+---
+# renovate: datasource=git-tags depName=Deuxfleurs/garage registryUrl=https://git.deuxfleurs.fr
+garage_version: v2.0.0
+
+garage_user: garage
+garage_group: garage
+garage_service_name: garage
+
+garage_metadata_dir: /var/lib/garage/metadata
+garage_data_dir: /var/lib/garage/data
+garage_db_engine: "sqlite"
+garage_replication_factor: 1
+
+garage_config_file: "/etc/garage.toml"

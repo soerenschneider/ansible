@@ -1,0 +1,6 @@
+---
+- name: Restart garage
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ garage_service_name }}"
+    state: restarted

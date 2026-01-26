@@ -1,0 +1,30 @@
+# {{ ansible_managed }}
+[Unit]
+Description=ip-plz
+After=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/garage server
+ReadOnlyPaths={{ garage_config_file }}
+ReadWritePaths={{ garage_metadata_dir }} {{ garage_data_dir }}
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=true
+NoNewPrivileges=true
+User={{garage_user }}
+Group={{ garage_group }}
+LimitCPU=25%
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FSETID CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SETPCAP
+
+SyslogIdentifier=ip-plz
+
+# restart forever
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target
