@@ -1,4 +1,29 @@
 ---
+- name: "Kubernetes sysctl tuning"
+  ansible.posix.sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: "present"
+    reload: true
+  loop:
+    - name: fs.inotify.max_user_watches
+      value: "1048576"
+    - name: fs.inotify.max_user_instances
+      value: "8192"
+    - name: fs.inotify.max_queued_events
+      value: "32768"
+    - name: net.ipv4.ip_forward
+      value: "1"
+    - name: net.bridge.bridge-nf-call-iptables
+      value: "1"
+    - name: net.bridge.bridge-nf-call-ip6tables
+      value: "1"
+    - name: net.core.somaxconn
+      value: "32768"
+    - name: fs.file-max
+      value: "2097152"
+  tags: [k0s, k0s-configure, k8s, kubernetes, sysctl]
+
 - name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
