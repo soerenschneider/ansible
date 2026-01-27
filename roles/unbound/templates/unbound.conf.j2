@@ -22,6 +22,8 @@ server:
 
     hide-identity: yes
     hide-version: yes
+    use-caps-for-id: yes
+    aggressive-nsec: yes
     qname-minimisation: yes
     rrset-roundrobin: {% if unbound_enable_roundrobin | default(False) %}yes{% else %}no{% endif %}
 
