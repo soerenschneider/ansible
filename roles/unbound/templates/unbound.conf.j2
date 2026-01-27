@@ -70,22 +70,9 @@ include: {{ unbound_config_dir }}/{% if ansible_os_family | lower == 'debian' %}
 {% if unbound_nameservers is defined and unbound_nameservers | length > 0 %}
 forward-zone:
     name: "."
+    forward-tls-upstream: {% if unbound_forward_tls_upstream %}yes{% else %}no{% endif %}
+
     {% for nameserver in unbound_nameservers %}
     forward-addr: {{ nameserver }}
     {% endfor %}
-{% endif %}
-
-{% if ansible_system == 'OpenBSD' %}
-remote-control:
-    control-enable: yes
-    control-use-cert: no
-    control-interface: /var/run/unbound.sock
-remote-control:
-    control-enable: yes
-    control-interface: 127.0.0.1
-    control-port: 8953
-    server-key-file: "/etc/unbound/unbound_server.key"
-    server-cert-file: "/etc/unbound/unbound_server.pem"
-    control-key-file: "/etc/unbound/unbound_control.key"
-    control-cert-file: "/etc/unbound/unbound_control.pem"
 {% endif %}
