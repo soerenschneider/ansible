@@ -20,3 +20,5 @@ unbound_config_file: "{{ unbound_config_dir }}/unbound.conf"
 unbound_config_group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}root{% endif %}"
 unbound_nameservers: [8.8.8.8]
 unbound_restart_delay_s: 20
+
+unbound_forward_tls_upstream: true
