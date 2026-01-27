@@ -27,6 +27,12 @@ server:
     qname-minimisation: yes
     rrset-roundrobin: {% if unbound_enable_roundrobin | default(False) %}yes{% else %}no{% endif %}
 
+{% if ansible_os_family == "RedHat" %}
+    tls-cert-bundle: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+{% else %}
+    tls-cert-bundle: /etc/ssl/certs/ca-certificates.crt
+{% endif %}
+
     # performance
     outgoing-range: 4096
     num-queries-per-thread: 2048
@@ -46,7 +52,7 @@ server:
     auto-trust-anchor-file: "{{ unbound_root_key_file }}"
 {% endif %}
     val-log-level: 2
-    aggressive-nsec: yes
+
 
 {% for network_domain in network_domains %}
     local-zone: "{{ location }}.{{ network_domain }}." transparent
