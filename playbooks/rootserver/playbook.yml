@@ -49,6 +49,11 @@
         name: platform
       tags: always
 
+    - name: "Run role alertmanager"
+      ansible.builtin.include_role:
+        name: alertmanager
+      tags: always
+
     - name: "Run role tunnelguard"
       when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
       ansible.builtin.include_role:
