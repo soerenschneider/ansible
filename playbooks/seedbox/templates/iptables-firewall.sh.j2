@@ -99,6 +99,7 @@ iptables -A OUTPUT -o "${INET_IFACE}" -p tcp --dport 6881:6889 -j ACCEPT  # BitT
 iptables -A OUTPUT -o "${INET_IFACE}" -p udp --dport 6881:6889 -j ACCEPT  # DHT
 iptables -A OUTPUT -o "${INET_IFACE}" -j REJECT --reject-with icmp-host-prohibited
 
+iptables -A INPUT -i "${WG_IFACE}" -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.2.0/24 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.64.0/24 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.65.0/24 -p tcp --dport 443 -j ACCEPT
