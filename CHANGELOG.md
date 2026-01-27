@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.1.1](https://github.com/soerenschneider/ansible/compare/v1.1.0...v1.1.1) (2026-01-27)
+
+
+### Bug Fixes
+
+* **deps:** update dependency ansible to v12.3.0 ([#243](https://github.com/soerenschneider/ansible/issues/243)) ([558d924](https://github.com/soerenschneider/ansible/commit/558d92469f4ada774a585d7130d11781c485a9fe))
+* **deps:** update dependency ansible to v13 ([15a3bc7](https://github.com/soerenschneider/ansible/commit/15a3bc79ac78b5f81cbfc0332ec088fc20a9ba52))
+* **deps:** update dependency ansible to v13 ([fab2eb4](https://github.com/soerenschneider/ansible/commit/fab2eb4efd589ad93362706127552a0e38744611))
+* **deps:** update dependency community.general to v12.3.0 ([68981b7](https://github.com/soerenschneider/ansible/commit/68981b732b4f400e655ce70fd3b7241bb7ae7a77))
+* **deps:** update dependency community.general to v12.3.0 ([cf54818](https://github.com/soerenschneider/ansible/commit/cf548188b6e5c6972a03c2390acf589214cb3ef5))
+
 ## [1.1.0](https://github.com/soerenschneider/ansible/compare/v1.0.2...v1.1.0) (2026-01-19)
 
 
