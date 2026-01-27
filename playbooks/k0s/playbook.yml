@@ -10,10 +10,6 @@
         name: platform
       tags: always
 
-    - name: "Run tasks limits.yaml"
-      ansible.builtin.include_tasks: tasks/limits.yaml
-      tags: always
-
     - name: "Run role k0s"
       ansible.builtin.include_role:
         name: k0s
