@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.2](https://github.com/soerenschneider/ansible/compare/v1.1.1...v1.1.2) (2026-01-29)
+
+
+### Bug Fixes
+
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.5.2 ([#247](https://github.com/soerenschneider/ansible/issues/247)) ([6ccd36c](https://github.com/soerenschneider/ansible/commit/6ccd36c12062526ac8989efb21ea7df33fab386d))
+
 ## [1.1.1](https://github.com/soerenschneider/ansible/compare/v1.1.0...v1.1.1) (2026-01-27)
 
 
