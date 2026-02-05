@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=openbao/openbao
-openbao_version: v2.4.4
+openbao_version: v2.5.0
 
 # renovate: datasource=github-releases depName=openbao/openbao-plugins
 openbao_plugin_secret_aws_version: "secrets-aws-v0.2.0"
