@@ -15,20 +15,16 @@
     path: /etc/haproxy/haproxy.cfg
     block: |
       listen stats
-          bind *:9000 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:8405 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
-          # deny request if not the correct domain name
-          http-request deny unless { hdr(host) {{ inventory_hostname }}:9000 }
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
-          # make sure cn starts with 'sauron'
-          acl is_prom ssl_c_s_dn(cn) -m beg sauron
-          http-request use-service prometheus-exporter if is_prom
+
+          http-request use-service prometheus-exporter if { path /metrics }
 
           stats enable
           stats hide-version
           stats realm Haproxy\ Statistics
-          stats uri /stats if
 
       frontend https_front_int
           bind *:443 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
@@ -40,7 +36,23 @@
 
           default_backend transmission
 
-      frontend node_exporter
+      frontend prom_unbound_exporter
+          bind *:9167 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_unbound_exporter
+
+      frontend prom_sc_agent
+          bind *:9823 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_sc_agent
+
+      frontend prom_node_exporter
           bind *:9443 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
           mode http
           # deny request if not the correct domain name
@@ -48,16 +60,26 @@
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-          use_backend node_exporter
+          use_backend prom_node_exporter
 
       backend transmission
+          option tcp-check
           option forwardfor
           http-request set-header X-Forwarded-Port %[dst_port]
           http-request add-header X-Forwarded-Proto https if { ssl_fc }
           server transmission 192.168.200.5:9091
 
-      backend node_exporter
-          option httpchk
-          server node_exporter 127.0.0.1:9100 check inter 5m
+      backend prom_unbound_exporter
+          option tcp-check
+          server node_exporter 127.0.0.1:{{ unbound_exporter_port }} check inter 30s
+
+      backend prom_node_exporter
+          option tcp-check
+          server node_exporter 127.0.0.1:9100 check inter 30s
+
+      backend prom_sc_agent
+        option tcp-check
+        server node_exporter 127.0.0.1:{{ sc_agent_metrics_port }} check inter 30s
+
   notify: Restart haproxy
   tags: [haproxy]
