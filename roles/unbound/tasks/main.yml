@@ -10,3 +10,7 @@
 - name: "Run tasks blackhole.yml"
   ansible.builtin.include_tasks: blackhole.yml
   tags: always
+
+- name: "Run tasks exporter.yaml"
+  ansible.builtin.include_tasks: "exporter.yaml"
+  tags: always

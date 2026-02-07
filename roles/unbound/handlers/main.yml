@@ -1,5 +1,10 @@
 ---
-- name: Restart unbound
+- name: "Restart unbound"
   ansible.builtin.service:
-    name: unbound
-    state: restarted
+    name: "unbound"
+    state: "restarted"
+
+- name: "Restart unbound_exporter"
+  ansible.builtin.service:
+    name: "unbound_exporter"
+    state: "restarted"
