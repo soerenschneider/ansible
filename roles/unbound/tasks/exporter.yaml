@@ -1,0 +1,29 @@
+---
+- name: "Create unbound_exporter systemd unit"
+  ansible.builtin.template:
+    src: "templates/unbound_exporter.service.j2"
+    dest: "/etc/systemd/system/unbound_exporter.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: "unbound_exporter_systemd_unit"
+  notify: "Restart unbound_exporter"
+  tags: [unbound, unbound-exporter, dns-config, dns]
+
+- name: "Enable and start unbound_exporter"
+  ansible.builtin.systemd:
+    name: "unbound_exporter"
+    state: "started"
+    enabled: true
+    daemon_reload: "{% if unbound_exporter_systemd_unit is changed %}true{% else %}false{% endif %}"
+  when: unbound_exporter_enabled
+  tags: [unbound, unbound-exporter, dns-config, dns]
+
+- name: "Disable and stop unbound_exporter"
+  ansible.builtin.systemd:
+    name: "unbound_exporter"
+    state: "stopped"
+    enabled: false
+    daemon_reload: "{% if unbound_exporter_systemd_unit is changed %}true{% else %}false{% endif %}"
+  when: not unbound_exporter_enabled
+  tags: [unbound, unbound-exporter, dns-config, dns]

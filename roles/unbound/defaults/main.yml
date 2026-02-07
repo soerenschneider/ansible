@@ -7,7 +7,7 @@ unbound_adblocker_update_cron_hour: 4
 unbound_adblocker_update_cron_minute: 0
 unbound_adblocker_update_cron_weekday: 0
 
-unbound_root_key_file: "{% if ansible_os_family | lower == 'debian' %}/var/lib/unbound/anchor.key{% else %}/etc/unbound/root.key{% endif %}"
+unbound_root_key_file: "{% if ansible_os_family == 'Debian' %}/var/lib/unbound/anchor.key{% else %}/etc/unbound/root.key{% endif %}"
 
 unbound_blackhole_file: "{{ unbound_config_conf_d_dir }}/blackhole.db"
 unbound_blackhole_domains: []
@@ -21,4 +21,14 @@ unbound_config_group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}roo
 unbound_nameservers: [8.8.8.8]
 unbound_restart_delay_s: 20
 
+unbound_listen_ipv6: true
+
 unbound_forward_tls_upstream: true
+
+unbound_remote_control_socket_path: "{% if ansible_os_family == 'Debian' %}/run/unbound.ctl{% else %}/var/run/unbound/unbound.ctl{% endif %}"
+
+unbound_exporter_enabled: true
+unbound_exporter_user: "unbound"
+unbound_exporter_group: "unbound"
+unbound_exporter_port: 9167
+unbound_exporter_listen_address: "127.0.0.1:{{ unbound_exporter_port }}"
