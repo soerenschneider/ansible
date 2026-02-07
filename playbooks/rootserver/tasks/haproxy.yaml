@@ -19,16 +19,69 @@
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
     block: >
-      frontend media
-        bind 127.0.0.1:80
-        mode http
-        default_backend media
+      listen stats
+          bind *:8405 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
-      backend media
-        option httpchk HEAD /media/
+          http-request use-service prometheus-exporter if { path /metrics }
 
-        server nas-pt nas.pt.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }}
-        server nas-dd nas.dd.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 20
-        server nas-ez nas.ez.{{ primary_network_domain }}:443 check inter 60s ssl ca-file {{ ca_cert_file }} backup weight 10
+          stats enable
+          stats hide-version
+          stats realm Haproxy\ Statistics
+
+      frontend https_front_int
+          bind *:443 interface wg0 ssl crt /etc/haproxy/{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
+          mode http
+          # deny request if not the correct domain name
+          http-request deny unless { hdr(host) {{ inventory_hostname }} }
+          # use transmission backend directly if ssl is verified
+          # use_backend transmission if !{ ssl_c_used 1 } || !{ ssl_c_verify 0 } || !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+
+          http-request redirect code 301 prefix / drop-query append-slash if { path /music }
+          use_backend navidrome if navidrome
+
+      frontend prom_unbound_exporter
+          bind *:9167 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_unbound_exporter
+
+      frontend prom_node_exporter
+          bind *:9443 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_node_exporter
+
+      frontend prom_sc_agent
+          bind *:9823 interface wg0 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+          mode http
+          # only allow the following CNs
+          http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
+
+          default_backend prom_sc_agent
+
+      backend navidrome
+        option httpchk
+        http-check send meth GET uri /ping
+        server navidrome 127.0.0.1:4533 check inter 30s
+
+      backend prom_unbound_exporter
+        option tcp-check
+        server node_exporter 127.0.0.1:{{ unbound_exporter_port }} check inter 30s
+
+      backend prom_node_exporter
+        option tcp-check
+        server node_exporter 127.0.0.1:9100 check inter 30s
+
+      backend prom_sc_agent
+        option tcp-check
+        server node_exporter 127.0.0.1:{{ sc_agent_metrics_port }} check inter 30s
+
   notify: Restart haproxy
   tags: haproxy
