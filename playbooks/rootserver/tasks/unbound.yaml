@@ -12,7 +12,7 @@
   ansible.builtin.copy:
     content: |
       [Unit]
-            # restart forever
+      # restart forever
       StartLimitIntervalSec=0
       After=wg-quick@wg0.service
       Requires=sys-devices-virtual-net-wg0.device
