@@ -3,7 +3,11 @@
   hosts: dns
   become: true
   tasks:
-    - name: Include role unbound
+    - name: "Include role unbound"
       ansible.builtin.include_role:
-        name: unbound
+        name: "unbound"
+      tags: always
+
+    - name: "Run tasks disable-systemd-resolved"
+      ansible.builtin.include_tasks: "tasks/disable-systemd-resolved.yaml"
       tags: always

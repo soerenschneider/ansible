@@ -1,0 +1,32 @@
+---
+- name: "Disable and stop systemd-resolved"
+  ansible.builtin.systemd:
+    name: "systemd-resolved"
+    enabled: false
+    state: "stopped"
+    masked: true
+  failed_when: false
+  tags: [systemd, resolved]
+
+- name: "Check /etc/resolv.conf status"
+  ansible.builtin.stat:
+    path: "/etc/resolv.conf"
+  register: "resolv_conf_stat"
+  tags: [systemd, resolved]
+
+- name: "Remove /etc/resolv.conf if it is a symlink"
+  ansible.builtin.file:
+    path: "/etc/resolv.conf"
+    state: "absent"
+  when: "resolv_conf_stat.stat.islnk is defined and resolv_conf_stat.stat.islnk"
+  tags: [systemd, resolved]
+
+- name: "Create /etc/resolv.conf with local resolver"
+  ansible.builtin.copy:
+    dest: "/etc/resolv.conf"
+    content: |
+      nameserver 127.0.0.1
+    owner: "root"
+    group: "root"
+    mode: '0644'
+  tags: [systemd, resolved]
