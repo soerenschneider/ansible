@@ -53,3 +53,13 @@
   vars:
     cns: "{{ haproxy_allowed_scraper_cns | default([]) }}"
   tags: haproxy
+
+- name: Set haproxy_connect_any SELinux boolean
+  ansible.posix.seboolean:
+    name: haproxy_connect_any
+    state: true
+    persistent: true
+  when:
+    - ansible_facts.selinux is defined
+    - ansible_facts.selinux.status == "enabled"
+  tags: haproxy
