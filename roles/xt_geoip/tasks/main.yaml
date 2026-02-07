@@ -10,6 +10,15 @@
       - pkg-config
   tags: ["xt_geoip", "firewall", "iptables"]
 
+- name: Install the correct linux-headers package for this architecture
+  ansible.builtin.package:
+    name: "linux-headers-{{ 'amd64' if ansible_architecture == 'x86_64' else
+                            'arm64' if ansible_architecture == 'aarch64' else
+                            'armhf' if ansible_architecture == 'armv7l' else
+                            ansible_architecture }}"
+    when: ansible_os_family == 'Debian'
+    state: present
+
 - name: Check if xtables-addons is already installed
   ansible.builtin.stat:
     path: "{{ xt_geoip_src_dir }}"
