@@ -95,7 +95,7 @@
       ansible.builtin.set_fact:
         navidrome_release_checksum: "{{ item.split(' ')[0] }}"
       when: [navidrome_full_filename in item, (not navidrome_local_binary.stat.exists or navidrome_installed_version != navidrome_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + navidrome_desired_version + '/navidrome_checksums.txt', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + navidrome_desired_version + '/navidrome_checksums.txt', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
@@ -168,4 +168,4 @@
       ansible.builtin.systemd:
         name: "{{ service_name }}"
         state: restarted
-      when: navidrome_stopped_service is defined and navidrome_stopped_service is changed
+      when: navidrome_stopped_service is defined and navidrome_stopped_service.changed

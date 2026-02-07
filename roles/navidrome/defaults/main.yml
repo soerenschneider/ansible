@@ -2,15 +2,15 @@
 # renovate: datasource=github-releases depName=navidrome/navidrome
 navidrome_version: v0.59.0
 
-navidrome_user: navidrome
-navidrome_group: navidrome
-navidrome_service_name: navidrome
+navidrome_user: "navidrome"
+navidrome_group: "navidrome"
+navidrome_service_name: "navidrome"
 
 navidrome_data_dir: "/var/lib/navidrome"
 navidrome_music_dir: "/srv/files/media/music-opus"
-navidrome_metrics_addr: 127.0.0.1:9166
-navidrome_base_url: /music
-navidrome_addr: 0.0.0.0
+navidrome_metrics_addr: "127.0.0.1:9166"
+navidrome_base_url: "/music"
+navidrome_addr: "127.0.0.1" # supposed to be exposed via reverse proxy
 
 navidrome_env:
   ND_LOGLEVEL: "info"
