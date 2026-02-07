@@ -1,0 +1,92 @@
+---
+- name: Install nginx
+  ansible.builtin.package:
+    name:
+      - nginx
+      - libnginx-mod-http-dav-ext
+  tags: [webserver, nginx]
+
+- name: Delete default config
+  ansible.builtin.file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  tags: [webserver, nginx]
+
+- name: Add webserver config
+  ansible.builtin.blockinfile:
+    create: true
+    path: /etc/nginx/sites-enabled/webserver
+    mode: "0640"
+    block: |
+      server {
+          charset       utf-8;
+          server_tokens off;
+          root          /var/www/html;
+
+          listen                        8080;
+          server_name                   {{ inventory_hostname }};
+          client_header_buffer_size     1k;
+          large_client_header_buffers   2 1k;
+
+          location /media/ {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
+            root                    {{ srv_dir }};
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+
+          location /pub {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
+            root                    /mnt/wdred;
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+
+          location /videos {
+            if ($request_method = HEAD) {
+                access_log off;
+                return 200;
+            }
+            root                    /mnt/wdred;
+            dav_methods             PUT DELETE MKCOL COPY MOVE;
+            dav_ext_methods         PROPFIND OPTIONS;
+            limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
+            client_body_buffer_size 1k;
+            client_max_body_size    1k;
+            autoindex               on;
+            sendfile                on;
+            sendfile_max_chunk      1m;
+            tcp_nopush              on;
+            keepalive_timeout       65;
+          }
+
+          location = /health {
+            access_log              off;
+            add_header              'Content-Type' 'application/json';
+            return                  200 '{"status":"OK"}';
+          }
+      }
+  notify: Restart webserver
+  tags: [webserver, nginx]

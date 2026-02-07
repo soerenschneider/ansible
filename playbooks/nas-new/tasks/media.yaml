@@ -1,0 +1,41 @@
+---
+- name: Add SSH keys
+  tags: [media, remote_move, fetcharr]
+  become_user: "{{ nas_media_user }}"
+  become: true
+  block:
+    - name: Make sure ssh dir exists
+      ansible.builtin.file:
+        path: ~/.ssh
+        state: directory
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0700"
+
+    - name: Set public key
+      ansible.builtin.copy:
+        dest: ~/.ssh/id_ed25519.pub
+        content: "{{ custom_ssh_keys.fetcharr }}\n"
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0644"
+
+    - name: Set private key
+      ansible.builtin.copy:
+        dest: ~/.ssh/id_ed25519
+        content: "{{ fetcharr_credentials_priv }}\n"
+        owner: "{{ nas_media_user }}"
+        group: "{{ nas_media_user }}"
+        mode: "0600"
+
+- name: Add remote host public key to known_hosts
+  ansible.builtin.known_hosts:
+    name: "{{ fetcharr_remote_host }}"
+    hash_host: false
+    key: "{{ item.key }}"
+    state: present
+  with_items: "{{ ssh_known_hosts | selectattr('name', 'in', [fetcharr_remote_host]) | list }}"
+  when: fileserver_mode == 'active'
+  become_user: "{{ nas_media_user }}"
+  become: false
+  tags: [media, remote_move, fetcharr]

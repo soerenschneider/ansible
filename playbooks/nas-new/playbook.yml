@@ -1,0 +1,100 @@
+---
+- name: Setup Fileserver
+  hosts: nas
+  become: true
+  gather_facts: true
+  tasks:
+    - name: "Run role platform"
+      ansible.builtin.include_role:
+        name: platform
+      tags: always
+
+    - name: "Run tasks storage.yml"
+      ansible.builtin.include_tasks: "tasks/storage.yaml"
+      tags: always
+
+    - name: "Run tasks media.yml"
+      ansible.builtin.include_tasks: "tasks/media.yaml"
+      tags: always
+
+    - name: "Run tasks webserver.yml"
+      ansible.builtin.include_tasks: "tasks/webserver.yaml"
+      tags: always
+
+    - name: "Run role samba"
+      ansible.builtin.include_role:
+        name: samba
+      tags: always
+
+    - name: "Run role flac_converter"
+      ansible.builtin.include_role:
+        name: flac_converter
+      tags: always
+
+    - name: "Run role mpd"
+      ansible.builtin.include_role:
+        name: mpd
+      vars:
+        mpd_output_device: "null"
+      tags: always
+
+    - name: "Run role restic"
+      ansible.builtin.include_role:
+        name: restic
+      when: restic_backups | default([]) | length > 0
+      tags: always
+
+    - name: "Run role magnetotactic"
+      ansible.builtin.include_role:
+        name: magnetotactic
+      tags: always
+
+    - name: "Run role occult"
+      ansible.builtin.include_role:
+        name: occult
+      tags: always
+
+    - name: "Run role syncthing"
+      ansible.builtin.include_role:
+        name: syncthing
+      tags: always
+
+    - name: "Run role fetcharr"
+      ansible.builtin.include_role:
+        name: fetcharr
+      tags: always
+
+    - name: "Add template file"
+      ansible.builtin.copy:
+        content: "{{ fetcharr_webhook_template }}"
+        dest: "{{ fetcharr_webhook_template_file }}"
+        owner: "{{ fetcharr_user }}"
+        group: root
+        mode: "0640"
+      tags: [fetcharr, fetcharr-configure]
+      when: fileserver_mode | default('passive') == "active"
+
+    - name: "Run tasks haproxy.yml"
+      ansible.builtin.include_tasks: tasks/haproxy.yaml
+      tags: always
+  handlers:
+    - name: "Mount_all_disks"
+      ansible.builtin.command: mount -a  # noqa: command-instead-of-module
+      changed_when: true
+
+    - name: "Restart webserver"
+      ansible.builtin.systemd:
+        state: "restarted"
+        name: "nginx"
+
+    - name: "Restart haproxy"
+      ansible.builtin.systemd:
+        state: "restarted"
+        name: "haproxy"
+      failed_when: false
+
+    - name: "Restart samba"
+      ansible.builtin.systemd:
+        state: "restarted"
+        name: "{{ item }}"
+      with_items: [smb, nmb]
