@@ -4,11 +4,11 @@ keycloak_certs_dir: /var/lib/keycloak/certs
 keycloak_container_name: keycloak
 
 # renovate: datasource=docker depName=quay.io/keycloak/keycloak
-keycloak_version: 26.5.1
+keycloak_version: 26.5.2
 keycloak_image: "quay.io/keycloak/keycloak:{{ keycloak_version }}"
 
 # renovate: datasource=docker depName=quay.io/phasetwo/keycloak-crdb
-keycloak_cockroach_version: 26.5.1
+keycloak_cockroach_version: 26.5.2
 
 keycloak_db_name: "mysql"
 keycloak_db_host: ""
