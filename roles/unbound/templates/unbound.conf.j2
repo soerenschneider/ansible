@@ -5,12 +5,15 @@ server:
 {% endif %}
 {% endfor %}
     interface: 127.0.0.1
-    interface: ::1
-
     access-control: 0.0.0.0/0 refuse
-    access-control: ::0/0 refuse
     access-control: 127.0.0.1 allow
+
+{% if unbound_listen_ipv6 %}
+    interface: ::1
+    access-control: ::0/0 refuse
     access-control: ::1 allow
+{% endif %}
+
 {% for network in networks[location].devices  | default({}) %}
 {% if network.dns is defined and network.dns %}
     access-control: {{ network.address | ipaddr(0) }} allow
@@ -27,10 +30,12 @@ server:
     qname-minimisation: yes
     rrset-roundrobin: {% if unbound_enable_roundrobin | default(False) %}yes{% else %}no{% endif %}
 
+{% if unbound_forward_tls_upstream %}
 {% if ansible_os_family == "RedHat" %}
     tls-cert-bundle: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
 {% else %}
     tls-cert-bundle: /etc/ssl/certs/ca-certificates.crt
+{% endif %}
 {% endif %}
 
     # performance
@@ -45,6 +50,11 @@ server:
     infra-cache-slabs: 1
     key-cache-slabs: 1
 
+{% if unbound_exporter_enabled %}
+    extended-statistics: yes
+    statistics-cumulative: no
+{% endif %}
+
     # TODO: maybe look at this to enhance security
     chroot: ""
 
@@ -52,7 +62,6 @@ server:
     auto-trust-anchor-file: "{{ unbound_root_key_file }}"
 {% endif %}
     val-log-level: 2
-
 
 {% for network_domain in network_domains %}
     local-zone: "{{ location }}.{{ network_domain }}." transparent
@@ -75,4 +84,10 @@ forward-zone:
     {% for nameserver in unbound_nameservers %}
     forward-addr: {{ nameserver }}
     {% endfor %}
+{% endif %}
+
+{% if unbound_exporter_enabled %}
+remote-control:
+    control-enable: yes
+    control-interface: {{ unbound_remote_control_socket_path }}
 {% endif %}
