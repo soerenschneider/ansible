@@ -19,6 +19,22 @@
       ansible.builtin.include_tasks: tasks/geo-firewall.yaml
       tags: always
 
+    - name: "Disable IPv6 via sysctl"
+      ansible.builtin.sysctl:
+        name: "{{ item.name }}"
+        value: "{{ item.value }}"
+        sysctl_set: true
+        state: "present"
+        reload: true
+      loop:
+        - name: 'net.ipv6.conf.all.disable_ipv6'
+          value: 1
+        - name: 'net.ipv6.conf.default.disable_ipv6'
+          value: 1
+        - name: 'net.ipv6.conf.lo.disable_ipv6'
+          value: 1
+      tags: sysctl
+
     - name: "Run role certbot"
       ansible.builtin.include_role:
         name: certbot
@@ -41,6 +57,11 @@
     - name: "Run role transmission"
       ansible.builtin.include_role:
         name: transmission
+      tags: always
+
+    - name: "Run role unbound"
+      ansible.builtin.include_role:
+        name: unbound
       tags: always
 
     - name: "Run tasks haproxy.yml"
