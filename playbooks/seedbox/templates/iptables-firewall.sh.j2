@@ -2,14 +2,28 @@
 
 set -euo pipefail
 
+NODE_EXPORTER_TEXTFILE_DIR="{{ node_exporter_textfile_dir }}"
+NODE_EXPORTER_METRIC_FILE="${NODE_EXPORTER_TEXTFILE_DIR}/xt_geoip_module.prom"
+
+INET_IFACE="{{ ansible_default_ipv4.interface | default('eth0') }}"
+WG_IFACE="wg0"
+
 # Logging function
 log() {
     logger -t firewall "$1"
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
 }
 
-INET_IFACE="{{ ansible_default_ipv4.interface | default('eth0') }}"
-WG_IFACE="wg0"
+
+function write_metrics() {
+    if [[ -d "${NODE_EXPORTER_TEXTFILE_DIR}" ]]; then
+      echo "# HELP xt_geoip_kernel_module_loaded_bool Boolean showing whether xt_geoip kernel module is loaded or not" >  "${NODE_EXPORTER_METRIC_FILE}.tmp"
+      echo "# TYPE xt_geoip_kernel_module_loaded_bool gauge" >> "${NODE_EXPORTER_METRIC_FILE}.tmp"
+      echo "xt_geoip_kernel_module_loaded_bool $1" >> "${NODE_EXPORTER_METRIC_FILE}.tmp"
+
+      mv "${NODE_EXPORTER_METRIC_FILE}.tmp" "${NODE_EXPORTER_METRIC_FILE}"
+    fi
+}
 
 # Flush existing rules
 iptables -F
@@ -85,14 +99,21 @@ if [ -f /sys/module/xt_geoip/refcnt ]; then
     log "Applying GeoIP-based firewall rules..."
     # Only serve ip-plz for German IPs
     iptables -A INPUT -i "${INET_IFACE}" -p tcp --dport 8443 -m geoip --src-cc DE -j ACCEPT
-    iptables -A INPUT -i "${INET_IFACE}" -m geoip --src-cc DE,CH -j REJECT --reject-with icmp-host-prohibited
+    #iptables -A INPUT -i "${INET_IFACE}" -m geoip --src-cc DE,CH -j REJECT --reject-with icmp-host-prohibited
     # Allow outgoing TCP connections to Germany and Switzerland only for ssh, DNS and http(s), restrict otherwise
-    iptables -A OUTPUT -o "${INET_IFACE}" -p tcp -m multiport --dports 22,53,80,443 -m geoip --dst-cc DE,CH -j ACCEPT
-    iptables -A OUTPUT -o "${INET_IFACE}" -p udp -m multiport --dports 53,80,443 -m geoip --dst-cc DE,CH -j ACCEPT
+    iptables -A OUTPUT -o "${INET_IFACE}" -p tcp -m multiport --dports 22,53,80,443,853 -m geoip --dst-cc DE,CH -j ACCEPT
+    iptables -A OUTPUT -o "${INET_IFACE}" -p udp -m multiport --dports 53,80,443        -m geoip --dst-cc DE,CH -j ACCEPT
     iptables -A OUTPUT -o "${INET_IFACE}" -m geoip ! --dst-cc DE,CH -j ACCEPT
+
+    write_metrics 1
 else
     log "WARNING: xt_geoip module not available, GeoIP rules skipped"
     log "Server will be less restrictive without geographic filtering!"
+
+    iptables -A OUTPUT -o "${INET_IFACE}" -p tcp -m multiport --dports 22,53,80,443,853  -j ACCEPT
+    iptables -A OUTPUT -o "${INET_IFACE}" -p udp -m multiport --dports 53,80,443         -j ACCEPT
+
+    write_metrics 0
 fi
 
 iptables -A OUTPUT -o "${INET_IFACE}" -p tcp --dport 6881:6889 -j ACCEPT  # BitTorrent
@@ -105,6 +126,7 @@ iptables -A INPUT -i "${WG_IFACE}" -s 192.168.64.0/24 -p tcp --dport 443 -j ACCE
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.65.0/24 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.100/27 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.200/32 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -p tcp -m multiport --dports 8405,9167,9443,9823 -j ACCEPT
 
 {% for port, source in fw_tcp_rules | flatten(levels=1) if source and source != 'any' %}
 iptables -A INPUT -i "${WG_IFACE}" -s "{{ source }}" -p tcp --dport "{{ port }}" -j ACCEPT
