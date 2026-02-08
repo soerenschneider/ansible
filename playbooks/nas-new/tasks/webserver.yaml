@@ -33,7 +33,7 @@
                 access_log off;
                 return 200;
             }
-            root                    {{ srv_dir }};
+            root                    {{ nas_storage_disk_mountpoint }};
             dav_methods             PUT DELETE MKCOL COPY MOVE;
             dav_ext_methods         PROPFIND OPTIONS;
             limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
@@ -51,7 +51,7 @@
                 access_log off;
                 return 200;
             }
-            root                    /mnt/wdred;
+            root                    {{ nas_storage_disk_mountpoint }};
             dav_methods             PUT DELETE MKCOL COPY MOVE;
             dav_ext_methods         PROPFIND OPTIONS;
             limit_except            GET HEAD OPTIONS PROPFIND { deny all; }
@@ -69,7 +69,7 @@
                 access_log off;
                 return 200;
             }
-            root                    /mnt/wdred;
+            root                    {{ nas_storage_disk_mountpoint }};
             dav_methods             PUT DELETE MKCOL COPY MOVE;
             dav_ext_methods         PROPFIND OPTIONS;
             limit_except            GET HEAD OPTIONS PROPFIND { deny all; }

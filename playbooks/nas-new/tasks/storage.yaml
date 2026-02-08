@@ -17,7 +17,7 @@
 
 - name: Create mountpoint target path
   ansible.builtin.file:
-    path: "{{ storage_disk_mountpoint }}"
+    path: "{{ nas_storage_disk_mountpoint }}"
     state: "directory"
     owner: "root"
     group: "root"
