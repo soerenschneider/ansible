@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.2.0](https://github.com/soerenschneider/ansible/compare/v1.1.1...v1.2.0) (2026-02-08)
+
+
+### Features
+
+* add unbound_exporter ([9b7346c](https://github.com/soerenschneider/ansible/commit/9b7346cf7a378289507ab9c102967d8aa817b630))
+* add unbound_exporter ([daada0a](https://github.com/soerenschneider/ansible/commit/daada0af2b47ad238a9e8bfafb50d27dd1ec4935))
+
+
+### Bug Fixes
+
+* **deps:** update dependency ansible to v13.3.0 ([#252](https://github.com/soerenschneider/ansible/issues/252)) ([d388e77](https://github.com/soerenschneider/ansible/commit/d388e77d8a9d087b73be139ba74d9d033043d151))
+* **deps:** update dependency navidrome/navidrome to v0.60.0 ([#254](https://github.com/soerenschneider/ansible/issues/254)) ([b039764](https://github.com/soerenschneider/ansible/commit/b039764f5a85836f38ae91e9122276599b62f983))
+* **deps:** update dependency openbao/openbao to v2.5.0 ([#255](https://github.com/soerenschneider/ansible/issues/255)) ([c818ee8](https://github.com/soerenschneider/ansible/commit/c818ee89f8cfc77e50ff276c5c6ae662392c369a))
+* **deps:** update dependency prometheus/alertmanager to v0.31.0 ([#253](https://github.com/soerenschneider/ansible/issues/253)) ([bd6f252](https://github.com/soerenschneider/ansible/commit/bd6f252fa10b2076bd9f62ffa8255247cab8f165))
+* **deps:** update dependency vectordotdev/vector to v0.53.0 ([#250](https://github.com/soerenschneider/ansible/issues/250)) ([0e0b1e9](https://github.com/soerenschneider/ansible/commit/0e0b1e9f859e036b8949116bd447336fd96d3340))
+* **deps:** update docker/login-action action to v3.7.0 ([#251](https://github.com/soerenschneider/ansible/issues/251)) ([0ce96f7](https://github.com/soerenschneider/ansible/commit/0ce96f779c67263fe108f7384f62a2afb68314c1))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.5.2 ([#247](https://github.com/soerenschneider/ansible/issues/247)) ([6ccd36c](https://github.com/soerenschneider/ansible/commit/6ccd36c12062526ac8989efb21ea7df33fab386d))
+* fix fqdn ([a612806](https://github.com/soerenschneider/ansible/commit/a6128062616915cecfc8e1b43c43eac7c8307b3f))
+* fix variable names ([0e81368](https://github.com/soerenschneider/ansible/commit/0e813683807840a0bc4750d9475fba5959be921e))
+* install missing headers ([3725ac1](https://github.com/soerenschneider/ansible/commit/3725ac1cb49d77c7afa711113b2556d6021361bc))
+
 ## [1.1.1](https://github.com/soerenschneider/ansible/compare/v1.1.0...v1.1.1) (2026-01-27)
 
 
