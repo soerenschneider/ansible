@@ -1,6 +1,6 @@
 ---
 # renovate: datasource=github-releases depName=navidrome/navidrome
-navidrome_version: v0.60.2
+navidrome_version: v0.60.3
 
 navidrome_user: "navidrome"
 navidrome_group: "navidrome"
