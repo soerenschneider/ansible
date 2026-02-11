@@ -1,26 +1,13 @@
 server:
-{% for network in networks[location].devices | default({}) %}
-{% if network.dns is defined and network.dns %}
-    interface: {{ network.address | ipaddr('address') }}
-{% endif %}
+{% for interface in unbound_interfaces %}
+    interface: {{ interface }}
 {% endfor %}
-    interface: 127.0.0.1
-    access-control: 0.0.0.0/0 refuse
-    access-control: 127.0.0.1 allow
 
-{% if unbound_listen_ipv6 %}
-    interface: ::1
-    access-control: ::0/0 refuse
-    access-control: ::1 allow
-{% endif %}
-
-{% for network in networks[location].devices  | default({}) %}
-{% if network.dns is defined and network.dns %}
-    access-control: {{ network.address | ipaddr(0) }} allow
-{% endif %}
+{% for ctrl in unbound_access_control.refuse %}
+    access-control: {{ ctrl }} refuse
 {% endfor %}
-{% for source in unbound_additional_allowed_sources %}
-    access-control: {{ source }} allow
+{% for ctrl in unbound_access_control.allow %}
+    access-control: {{ ctrl }} allow
 {% endfor %}
 
     hide-identity: yes

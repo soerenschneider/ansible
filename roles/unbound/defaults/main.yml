@@ -21,11 +21,21 @@ unbound_config_group: "{% if ansible_system == 'OpenBSD' %}_unbound{% else %}roo
 unbound_nameservers: [8.8.8.8]
 unbound_restart_delay_s: 20
 
-unbound_listen_ipv6: true
-
 unbound_forward_tls_upstream: true
 
 unbound_remote_control_socket_path: "{% if ansible_os_family == 'Debian' %}/run/unbound.ctl{% else %}/var/run/unbound/unbound.ctl{% endif %}"
+
+unbound_interfaces:
+  - 127.0.0.1
+  - ::1
+
+unbound_access_control:
+  refuse:
+    - 0.0.0.0/0
+    - ::0/0
+  allow:
+    - 127.0.0.1
+    - ::1
 
 unbound_exporter_enabled: true
 unbound_exporter_user: "unbound"
