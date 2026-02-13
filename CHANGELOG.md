@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.2.0](https://github.com/soerenschneider/ansible/compare/v1.1.1...v1.2.0) (2026-02-13)
+
+
+### Features
+
+* add unbound_exporter ([9b7346c](https://github.com/soerenschneider/ansible/commit/9b7346cf7a378289507ab9c102967d8aa817b630))
+* add unbound_exporter ([daada0a](https://github.com/soerenschneider/ansible/commit/daada0af2b47ad238a9e8bfafb50d27dd1ec4935))
+
+
+### Bug Fixes
+
+* **deps:** update dependency ansible to v13.3.0 ([#252](https://github.com/soerenschneider/ansible/issues/252)) ([d388e77](https://github.com/soerenschneider/ansible/commit/d388e77d8a9d087b73be139ba74d9d033043d151))
+* **deps:** update dependency community.crypto to v3.1.1 ([#262](https://github.com/soerenschneider/ansible/issues/262)) ([76eb2f8](https://github.com/soerenschneider/ansible/commit/76eb2f89961811aeeb49818d4d72f2a5af20a501))
+* **deps:** update dependency community.docker to v5.0.6 ([#263](https://github.com/soerenschneider/ansible/issues/263)) ([edb20b7](https://github.com/soerenschneider/ansible/commit/edb20b715734d6e86d8461435c48e72656790763))
+* **deps:** update dependency navidrome/navidrome to v0.60.0 ([#254](https://github.com/soerenschneider/ansible/issues/254)) ([b039764](https://github.com/soerenschneider/ansible/commit/b039764f5a85836f38ae91e9122276599b62f983))
+* **deps:** update dependency navidrome/navidrome to v0.60.2 ([#256](https://github.com/soerenschneider/ansible/issues/256)) ([f76ff13](https://github.com/soerenschneider/ansible/commit/f76ff131a806e463f85548838a7d6aceff4cab11))
+* **deps:** update dependency navidrome/navidrome to v0.60.3 ([#257](https://github.com/soerenschneider/ansible/issues/257)) ([aa04c68](https://github.com/soerenschneider/ansible/commit/aa04c68347d43ee38925f878cb0e2985a534b9c9))
+* **deps:** update dependency openbao/openbao to v2.5.0 ([#255](https://github.com/soerenschneider/ansible/issues/255)) ([c818ee8](https://github.com/soerenschneider/ansible/commit/c818ee89f8cfc77e50ff276c5c6ae662392c369a))
+* **deps:** update dependency prometheus/alertmanager to v0.31.0 ([#253](https://github.com/soerenschneider/ansible/issues/253)) ([bd6f252](https://github.com/soerenschneider/ansible/commit/bd6f252fa10b2076bd9f62ffa8255247cab8f165))
+* **deps:** update dependency prometheus/alertmanager to v0.31.1 ([#260](https://github.com/soerenschneider/ansible/issues/260)) ([cc94a65](https://github.com/soerenschneider/ansible/commit/cc94a6560e48e167b5fe38e5bc16f0ab3ec45bcb))
+* **deps:** update dependency vectordotdev/vector to v0.53.0 ([#250](https://github.com/soerenschneider/ansible/issues/250)) ([0e0b1e9](https://github.com/soerenschneider/ansible/commit/0e0b1e9f859e036b8949116bd447336fd96d3340))
+* **deps:** update docker/login-action action to v3.7.0 ([#251](https://github.com/soerenschneider/ansible/issues/251)) ([0ce96f7](https://github.com/soerenschneider/ansible/commit/0ce96f779c67263fe108f7384f62a2afb68314c1))
+* **deps:** update quay.io/keycloak/keycloak docker tag to v26.5.3 ([#258](https://github.com/soerenschneider/ansible/issues/258)) ([ffdab46](https://github.com/soerenschneider/ansible/commit/ffdab4687b868bd9b1093f3846e2cc2b84b94880))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.5.2 ([#247](https://github.com/soerenschneider/ansible/issues/247)) ([6ccd36c](https://github.com/soerenschneider/ansible/commit/6ccd36c12062526ac8989efb21ea7df33fab386d))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.5.3 ([#259](https://github.com/soerenschneider/ansible/issues/259)) ([88c5c7c](https://github.com/soerenschneider/ansible/commit/88c5c7c139006b6c612fc01b5b9f6ece7809b2f0))
+* fix fqdn ([a612806](https://github.com/soerenschneider/ansible/commit/a6128062616915cecfc8e1b43c43eac7c8307b3f))
+* fix variable names ([0e81368](https://github.com/soerenschneider/ansible/commit/0e813683807840a0bc4750d9475fba5959be921e))
+* install missing headers ([3725ac1](https://github.com/soerenschneider/ansible/commit/3725ac1cb49d77c7afa711113b2556d6021361bc))
+
 ## [1.1.1](https://github.com/soerenschneider/ansible/compare/v1.1.0...v1.1.1) (2026-01-27)
 
 
