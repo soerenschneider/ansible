@@ -87,30 +87,50 @@
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        minio_checksum_signature_file: "{{ minio_download_dir }}/{{ binary_name }}-checksums.sha256.sig"
-        minio_checksum_file: "{{ minio_download_dir }}/{{ binary_name }}-checksums.sha256"
-        minio_full_filename: "{{ binary_name }}.{{ minio_desired_version }}"
-        minio_url: https://dl.min.io/server/minio/release/{{ minio_go_os }}-{{ minio_go_arch }}/minio.{{ minio_desired_version }}
+        minio_full_filename: >-
+          {{
+            'minio_' +
+            (
+              minio_desired_version
+              | regex_replace('^RELEASE\.', '')
+              | regex_replace('[-T:Z]', '')
+            )
+            + '.0.0_' + minio_go_os + '_' + minio_go_arch + '.tar.gz'
+          }}
+        minio_url: ""
       changed_when: false
 
-    - name: Get checksum for archive
-      ansible.builtin.set_fact:
-        minio_release_checksum: "{{ item.split(' ')[0] }}"
-      when: [minio_full_filename in item, (not minio_local_binary.stat.exists or minio_installed_version != minio_desired_version)]
-      with_items: ["{{ lookup('url', minio_url + '.sha256sum', wantlist=True) | list }}"]
-    - name: Print debug information
-      ansible.builtin.debug:
-        var: minio_release_checksum
-      tags: minio
+    - name: Query GitHub API for release metadata
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ github_repo }}/releases/tags/{{ minio_desired_version }}"
+        return_content: yes
+      register: minio_release_data
 
-    - name: Download binary
+    - name: Extract asset info for this architecture
+      ansible.builtin.set_fact:
+        minio_selected_asset: >-
+          {{
+            (minio_release_data.json.assets
+            | selectattr('name','equalto', minio_full_filename)
+            | list)[0]
+          }}
+
+    - name: Ensure asset was found
+      ansible.builtin.fail:
+        msg: "Asset {{ minio_full_filename }} not found in release"
+      when: minio_selected_asset is not defined
+
+    - name: "Print URL and digest"
+      ansible.builtin.debug:
+        msg: "Downloading {{ minio_selected_asset.browser_download_url }} with {{ minio_selected_asset.digest | trim | to_json }}"
+
+    - name: Download minio with verified checksum
       become: false
       ansible.builtin.get_url:
-        # checkov:skip=CKV2_ANSIBLE_2:false positive
+        url: "{{ minio_selected_asset.browser_download_url }}"
         dest: "{{ minio_download_dir }}/{{ minio_full_filename }}"
-        checksum: sha256:{{ minio_release_checksum }}
-        url: "{{ minio_url }}"
-        mode: "0640"
+        mode: "0644"
+        checksum: "{{ minio_selected_asset.digest | trim }}"
       register: minio_download_archive
       until: minio_download_archive is succeeded
       retries: 5
@@ -121,29 +141,31 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
+      notify: "Restart minio"
       register: minio_stopped_service
+
+    - name: Unpack binaries from archive
+      become: false
+      ansible.builtin.unarchive:
+        src: "{{ minio_download_dir }}/{{ minio_full_filename }}"
+        dest: "{{ minio_download_dir }}"
+        creates: "{{ minio_download_dir }}/{{ binary_name }}"
+        remote_src: true
+      check_mode: false
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ minio_download_dir }}/{{ minio_full_filename }}"
+        src: "{{ minio_download_dir }}/{{ item }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
         owner: root
         group: root
       with_items: ["{{ binary_name }}"]
-
-  always:
-    - name: Delete downloaded files
-      ansible.builtin.file:
-        state: absent
-        path: "{{ item }}"
-      with_items: ["{{ minio_download_dir }}"]
-      failed_when: false
-
-    - name: Restart service
-      ansible.builtin.systemd:
-        name: "{{ service_name }}"
-        state: restarted
-      failed_when: false
-      when: minio_stopped_service is defined and minio_stopped_service is changed
+#  always:
+#    - name: Delete downloaded files
+#      ansible.builtin.file:
+#        state: absent
+#        path: "{{ item }}"
+#      with_items: ["{{ minio_download_dir }}"]
+#      failed_when: false

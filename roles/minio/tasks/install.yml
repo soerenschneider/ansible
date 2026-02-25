@@ -8,7 +8,7 @@
   ansible.builtin.user:
     name: "{{ minio_user }}"
     group: "{{ minio_group }}"
-    shell: /usr/sbin/nologin
+    shell: "/usr/sbin/nologin"
   tags: [minio, minio-install]
 
 - name: Add minio certs dir

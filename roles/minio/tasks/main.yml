@@ -6,9 +6,9 @@
 - name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
-    binary_name: minio
-    github_repo: minio/minio
-    service_name: minio
+    binary_name: "minio"
+    github_repo: "pgsty/minio"
+    service_name: "minio"
     version_wanted: "{{ minio_version }}"
   tags: always
 

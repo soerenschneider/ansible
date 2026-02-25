@@ -2,9 +2,9 @@
 # Minio binaries path
 minio_server_bin: /usr/local/bin/minio
 minio_client_bin: /usr/local/bin/mc
-# renovate: datasource=github-releases depName=minio/minio versioning="regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})"
-minio_server_version: RELEASE.2023-12-20T01-00-02Z
-minio_client_version: RELEASE.2023-12-20T01-00-02Z
+# renovate: datasource=github-releases depName=pgsty/minio versioning="regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})"
+minio_server_version: RELEASE.2026-02-14T12-00-00Z
+minio_client_version: RELEASE.2026-02-14T12-00-00Z
 
 minio_group: minio
 minio_user: minio

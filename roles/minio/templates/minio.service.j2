@@ -17,7 +17,36 @@ RestrictSUIDSGID=true
 ReadWritePaths={{ minio_volumes }}
 ReadOnlyPaths=/etc/minio.conf /home/{{ minio_user }}/.minio/certs/public.crt /home/{{ minio_user }}/.minio/certs/private.key
 
-WorkingDirectory=/usr/local/
+# --- Privilege restrictions ---
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SecureBits=keep-caps-locked noroot noroot-locked
+
+# --- Kernel / syscall hardening ---
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RemoveIPC=true
+
+# Go binaries need a broader syscall surface than a typical C service
+SystemCallArchitectures=native
+SystemCallFilter=@system-service @resources
+SystemCallFilter=~@debug @mount @cpu-emulation @obsolete @privileged @reboot @swap @raw-io @clock
+
+# --- Network restrictions ---
+IPAddressDeny=any
+IPAddressAllow=127.0.0.0/8
+IPAddressAllow=::1/128
+IPAddressAllow=192.168.0.0/16
 
 User={{ minio_user }}
 Group={{ minio_group }}
