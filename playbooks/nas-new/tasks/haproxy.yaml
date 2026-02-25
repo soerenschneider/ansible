@@ -1,9 +1,4 @@
 ---
-- name: Install haproxy
-  ansible.builtin.package:
-    name: haproxy
-  tags: haproxy
-
 - name: Including role
   ansible.builtin.include_role:
     name: haproxy
@@ -46,24 +41,31 @@
           acl is_prometheus hdr_beg(User-Agent) "Blackbox Exporter/"
           http-request return status 200 content-type "text/plain" lf-string "OK"  if is_prometheus
 
+          http-request redirect code 301 prefix / drop-query append-slash if { path /browse }
           http-request redirect code 301 prefix / drop-query append-slash if { path /media }
+          http-request redirect code 301 prefix / drop-query append-slash if { path /minio-ui }
           http-request redirect code 301 prefix / drop-query append-slash if { path /pub }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
           http-request redirect code 301 prefix / drop-query append-slash if { path /syncthing }
+          http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
 
+          acl filebrowser path_beg,url_dec -m beg /browse/
           acl media path_beg,url_dec -m beg /media/
-          acl videos path_beg,url_dec -m beg /videos/
+          acl minio_ui path_beg,url_dec -m beg /minio-ui/
           acl pub path_beg,url_dec -m beg /pub/
+          acl syncthing path_beg,url_dec -m beg /syncthing/
+          acl videos path_beg,url_dec -m beg /videos/
+
           acl is_soeren src 192.168.2.206 192.168.64.0/24 192.168.72.0/24 192.168.200.100/28
           #http-request deny if media !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
-          use_backend dufs_media if media is_soeren
-          use_backend nginx if media || pub || videos
 
-          acl syncthing path_beg,url_dec -m beg /syncthing/
-          #http-request deny if syncthing !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+          use_backend filebrowser if filebrowser
+          use_backend nginx if media || pub || videos
+          use_backend minio_ui if minio_ui
           use_backend syncthing if syncthing
 
-          default_backend nginx
+          #http-request deny if syncthing !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
+
+          default_backend minio
 
       frontend directory_exporter
           bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
@@ -103,25 +105,43 @@
         http-request add-header X-Forwarded-Proto https if { ssl_fc }
         # http-request set-path '%[path,regsub("^/syncthing/","/")]'
         http-request set-path '%[path,regsub("^/syncthing(/|$)","/")]'
+        http-check send meth HEAD uri /rest/noauth/health
         server syncthing 127.0.0.1:8384 check inter 30s
-
-      backend dufs_media
-        option httpchk
-        http-check send meth HEAD uri /media
-        server dufs 127.0.0.1:5000 check inter 1m
 
       backend prom_node_exporter
         option httpchk
         server node_exporter 127.0.0.1:9100 check inter 5m
-      
+
       backend prom_sc_agent
         option httpchk
         server node_exporter 127.0.0.1:15283 check inter 5m
+
+      backend filebrowser
+        option httpchk
+        http-check send meth HEAD uri /health
+        server filebrowser 127.0.0.1:8888 check inter 30s
 
       backend prom_directory_exporter
         option httpchk
         http-check send meth GET uri /health
         http-check expect status 404
         server node_exporter 127.0.0.1:2112 check inter 30s
+
+      backend minio
+        option httpchk
+        option forwardfor
+        http-check send meth GET uri /minio/health/live ver HTTP/1.1 hdr Host {{ minio_server_url | default(inventory_hostname) }}
+        http-request set-header X-Forwarded-Port %[dst_port]
+        http-request add-header X-Forwarded-Proto https if { ssl_fc }
+        server minio 127.0.0.1:9000 ssl verify none check inter 30s
+
+      backend minio_ui
+        option httpchk
+        option forwardfor
+        http-check send meth GET  uri /minio/health/live
+        http-request set-header X-Forwarded-Port %[dst_port]
+        http-request add-header X-Forwarded-Proto https if { ssl_fc }
+        http-request set-path '%[path,regsub("^/minio-ui(/|$)","/")]'
+        server minio-ui 127.0.0.1:9009 ssl verify none check inter 30s
   notify: Restart haproxy
   tags: [haproxy]

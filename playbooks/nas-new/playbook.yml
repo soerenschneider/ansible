@@ -26,6 +26,16 @@
         name: samba
       tags: always
 
+    - name: "Run role filebrowser"
+      ansible.builtin.include_role:
+        name: "filebrowser"
+      tags: always
+
+    - name: "Run role minio"
+      ansible.builtin.include_role:
+        name: minio
+      tags: always
+
     - name: "Run role flac_converter"
       ansible.builtin.include_role:
         name: flac_converter
