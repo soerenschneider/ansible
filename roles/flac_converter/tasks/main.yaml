@@ -1,4 +1,9 @@
 ---
+- name: "Install ffmpeg"
+  ansible.builtin.package:
+    name: "ffmpeg"
+  tags: [flac, flac-converter]
+
 - name: Copy flac-converter script
   ansible.builtin.copy:
     src: flac-converter.sh
