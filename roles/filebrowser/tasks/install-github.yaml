@@ -1,0 +1,147 @@
+---
+- name: "Set variables"
+  ansible.builtin.set_fact:
+    filebrowser_local_binary: ""
+    filebrowser_installed_version: ""
+    filebrowser_desired_version: "{{ filebrowser_version | default('') }}"
+    filebrowser_download_archive: ""
+    filebrowser_download_signature: ""
+    filebrowser_stopped_service: ""
+    filebrowser_github_release: ""
+    filebrowser_go_os: ""
+    filebrowser_go_arch: ""
+    filebrowser_checksum_signature_file: ""
+    filebrowser_checksum_file: ""
+    filebrowser_full_filename: ""
+    filebrowser_release_checksum: ""
+  tags: [filebrowser, filebrowser-install, deps]
+
+- name: "Check for existing binary"
+  ansible.builtin.stat:
+    path: "/usr/local/bin/{{ binary_name }}"
+  register: filebrowser_local_binary
+  tags: [filebrowser, filebrowser-install, deps]
+
+- name: "Check installed version"
+  when: filebrowser_local_binary.stat.exists
+  tags: [filebrowser, filebrowser-install, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.shell:
+        cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} version | grep Version | awk '{print $3}'"
+        executable: "/bin/bash"
+      register: filebrowser_installed_version
+      changed_when: false
+
+    - name: Register local version
+      ansible.builtin.set_fact:
+        filebrowser_installed_version: "{{ filebrowser_installed_version.stdout }}"
+      changed_when: false
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ filebrowser_installed_version }}"
+      changed_when: false
+
+- name: Fetch latest release information from github
+  when: filebrowser_desired_version is not defined or not filebrowser_desired_version
+  tags: [filebrowser, filebrowser-install, deps]
+  block:
+    - name: Print debug information
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ github_repo }}/releases/latest"
+        return_content: true
+      register: filebrowser_github_release
+      retries: 3
+      delay: 5
+      until: filebrowser_github_release is not failed
+
+    - name: Set github release
+      ansible.builtin.set_fact:
+        filebrowser_desired_version: "{{ filebrowser_github_release.json.tag_name }}"
+      changed_when: false
+
+    - name: Print latest GitHub version
+      ansible.builtin.debug:
+        msg: "Latest GitHub version: {{ filebrowser_desired_version }}"
+      changed_when: false
+
+- name: "Download artifacts"
+  when: not filebrowser_local_binary.stat.exists or filebrowser_desired_version != filebrowser_installed_version
+  tags: [filebrowser, filebrowser-install, deps]
+  block:
+    - name: Generate temp dir
+      become: false
+      ansible.builtin.tempfile:
+        state: "directory"
+        suffix: "{{ binary_name }}"
+      register: filebrowser_download_dir
+
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        filebrowser_os: "{{ ansible_system | lower }}"
+        filebrowser_download_dir: "{{ filebrowser_download_dir.path }}"
+
+    - name: Set target asset name
+      ansible.builtin.set_fact:
+        filebrowser_full_filename: "{{ filebrowser_os }}-{{ filebrowser_arch }}-filebrowser"
+
+    - name: Query GitHub API for release metadata
+      ansible.builtin.uri:
+        url: "https://api.github.com/repos/{{ github_repo }}/releases/tags/{{ filebrowser_desired_version }}"
+        return_content: yes
+      register: filebrowser_release_data
+
+    - name: Extract asset info for this architecture
+      ansible.builtin.set_fact:
+        filebrowser_selected_asset: >-
+          {{
+            (filebrowser_release_data.json.assets
+            | selectattr('name','equalto', filebrowser_full_filename)
+            | list)[0]
+          }}
+
+    - name: Ensure asset was found
+      ansible.builtin.fail:
+        msg: "Asset {{ filebrowser_full_filename }} not found in release"
+      when: filebrowser_selected_asset is not defined
+
+    - name: "Print URL and digest"
+      ansible.builtin.debug:
+        msg: "Downloading {{ filebrowser_selected_asset.browser_download_url }} with {{ filebrowser_selected_asset.digest | trim | to_json }}"
+
+    - name: Download filebrowser with verified checksum
+      ansible.builtin.get_url:
+        url: "{{ filebrowser_selected_asset.browser_download_url }}"
+        dest: "{{ filebrowser_download_dir }}/{{ filebrowser_full_filename }}"
+        mode: "0640"
+        checksum: "{{ filebrowser_selected_asset.digest | trim }}"
+      register: filebrowser_download_archive
+      until: filebrowser_download_archive is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Stop service
+      ansible.builtin.service:
+        name: "{{ service_name }}"
+        state: stopped
+      failed_when: false
+      notify: "Restart filebrowser"
+      register: filebrowser_stopped_service
+
+    - name: Copy binaries
+      ansible.builtin.copy:
+        src: "{{ filebrowser_download_dir }}/{{ filebrowser_full_filename }}"
+        dest: "/usr/local/bin/{{ item }}"
+        remote_src: true
+        mode: "0755"
+        owner: "root"
+        group: "root"
+      with_items: ["{{ binary_name }}"]
+  always:
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ item }}"
+      with_items: ["{{ filebrowser_download_dir }}"]
+      failed_when: false

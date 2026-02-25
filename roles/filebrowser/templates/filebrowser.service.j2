@@ -1,0 +1,91 @@
+[Unit]
+Description=File Browser
+Documentation=https://filebrowser.org
+After=network.target
+Wants=network.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+# --- Identity ---
+User={{ filebrowser_user }}
+Group={{ filebrowser_group }}
+UMask=0027
+
+# --- Execution ---
+WorkingDirectory={{ filebrowser_base_dir }}
+Type=simple
+ExecStart=/usr/local/bin/filebrowser
+Restart=on-failure
+RestartSec=60s
+
+# --- Filesystem hardening ---
+# Read-write access to state and uploads
+ReadWritePaths={{ (filebrowser_paths_readwrite + [filebrowser_base_dir]) | join(' ') }}
+# Read-only access to the broader file tree
+ReadOnlyPaths={{ filebrowser_paths_read | join(' ') }}
+# Everything else is inaccessible
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+# --- Privilege restrictions ---
+NoNewPrivileges=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+SecureBits=keep-caps-locked noroot noroot-locked
+
+# --- Kernel / syscall hardening ---
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+RemoveIPC=true
+
+# Go binaries need a broader syscall surface than a typical C service
+SystemCallArchitectures=native
+SystemCallFilter=@system-service @resources
+SystemCallFilter=~@debug @mount @cpu-emulation @obsolete @privileged @reboot @swap @raw-io @clock
+
+# --- Network restrictions ---
+IPAddressDeny=any
+IPAddressAllow=127.0.0.0/8
+IPAddressAllow=::1/128
+{% for ip in filebrowser_security_ips_allow %}
+IPAddressAllow={{ ip }}
+{% endfor %}
+
+# --- Resource limits ---
+LimitNOFILE=65536
+LimitNPROC=512
+
+# CPU: allow bursting up to 2 cores, but yield to other services under load
+CPUQuota=200%
+CPUWeight=50
+
+# Memory: throttle at 768M, hard-kill at 1G, no swap
+MemoryHigh=768M
+MemoryMax=1G
+MemorySwapMax=0
+
+# Tasks: cap goroutine/thread explosion
+TasksMax=128
+
+# IO: yield disk to other services under contention
+IOWeight=50
+
+# --- Logging ---
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=filebrowser
+
+[Install]
+WantedBy=multi-user.target

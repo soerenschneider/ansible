@@ -1,0 +1,28 @@
+---
+# renovate: datasource=github-releases depName=gtsteffaniak/filebrowser
+filebrowser_version: "v1.2.0-stable"
+
+filebrowser_user: "filebrowser"
+filebrowser_group: "filebrowser"
+filebrowser_security_ips_allow:
+  - "192.168.0.0/16"
+
+filebrowser_listen_address: "0.0.0.0"
+filebrowser_listen_port: 8080
+filebrowser_base_url: ""
+filebrowser_external_url: ""
+
+filebrowser_base_dir: "/var/lib/filebrowser"
+filebrowser_config_file: "{{ filebrowser_base_dir }}/config.yaml"
+
+filebrowser_paths_read: []
+filebrowser_paths_readwrite: []
+filebrowser_sources: []
+
+filebrowser_arch: >-
+  {{ {
+    'x86_64':  'amd64',
+    'aarch64': 'arm64',
+    'armv7l':  'armv7',
+    'armv6l':  'armv6'
+  }[ansible_architecture] }}

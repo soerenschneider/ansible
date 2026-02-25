@@ -1,0 +1,69 @@
+---
+- name: Check if group exists
+  ansible.builtin.getent:
+    database: group
+    key: "{{ filebrowser_group }}"
+  register: _filebrowser_group_check
+  ignore_errors: true
+  tags: [filebrowser, filebrowser-install]
+
+- name: Create group
+  ansible.builtin.group:
+    name: "{{ filebrowser_group }}"
+    state: absent
+  when: _filebrowser_group_check is failed
+  tags: [filebrowser, filebrowser-install]
+
+- name: Check if user exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ filebrowser_user }}"
+  register: _filebrowser_user_check
+  ignore_errors: true
+  tags: [filebrowser, filebrowser-install]
+
+- name: Create user
+  ansible.builtin.user:
+    name: "{{ filebrowser_user }}"
+    state: absent
+    shell: /bin/false
+  when: _filebrowser_user_check is failed
+  tags: [filebrowser, filebrowser-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: "install-github.yaml"
+  vars:
+    binary_name: "filebrowser"
+    github_repo: "gtsteffaniak/filebrowser"
+    service_name: "filebrowser"
+    version_wanted: "{{ filebrowser_version }}"
+  tags: [filebrowser, filebrowser-install, deps]
+
+- name: "Create filebrowser dir"
+  ansible.builtin.file:
+    state: "directory"
+    path: "{{ filebrowser_base_dir }}"
+    owner: "{{ filebrowser_user }}"
+    group: "{{ filebrowser_group }}"
+    mode: "0750"
+  tags: [filebrowser, filebrowser-install]
+
+- name: "Create filebrowser systemd unit"
+  ansible.builtin.template:
+    src: "templates/filebrowser.service.j2"
+    dest: "/etc/systemd/system/filebrowser.service"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  notify: "Restart filebrowser"
+  tags: [filebrowser, filebrowser-configure]
+
+- name: "Create filebrowser config"
+  ansible.builtin.template:
+    src: "templates/config.yaml.j2"
+    dest: "{{ filebrowser_config_file }}"
+    owner: "{{ filebrowser_user }}"
+    group: "{{ filebrowser_group }}"
+    mode: "0640"
+  notify: "Restart filebrowser"
+  tags: [filebrowser, filebrowser-configure]

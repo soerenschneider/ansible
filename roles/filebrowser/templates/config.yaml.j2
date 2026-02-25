@@ -1,0 +1,23 @@
+---
+server:
+  listen: "{{ filebrowser_listen_address }}"
+  port: {{ filebrowser_listen_port | int }}
+
+{% if filebrowser_base_url != "" %}
+  baseURL: "{{ filebrowser_base_url }}"
+{% endif %}
+
+{% if filebrowser_external_url != "" %}
+  externalUrl: "{{ filebrowser_external_url }}"
+{% endif %}
+
+  disableUpdateCheck: true
+  maxArchiveSize: 5
+
+  sources:
+{% for source in filebrowser_sources %}
+    - path: {{ source.path }}
+      name: {{ source.name }}
+      config:
+        denyByDefault: {{ source.deny_by_default | default(true) }}
+{% endfor %}
