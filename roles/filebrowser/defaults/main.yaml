@@ -1,5 +1,5 @@
 ---
-# renovate: datasource=github-releases depName=gtsteffaniak/filebrowser
+# renovate: datasource=github-releases depName=gtsteffaniak/filebrowser versioning=semver-coerced
 filebrowser_version: "v1.2.0-stable"
 
 filebrowser_user: "filebrowser"
