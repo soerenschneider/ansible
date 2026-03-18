@@ -58,36 +58,36 @@
       register: ignore_errors_register
       tags: always
 
-    - include_tasks: tasks/repos.yml
+    - ansible.builtin.include_tasks: tasks/repos.yml
       tags: always
 
-    - include_tasks: tasks/dirs.yml
+    - ansible.builtin.include_tasks: tasks/dirs.yml
       tags: always
 
-    - include_tasks: tasks/zsh.yml
+    - ansible.builtin.include_tasks: tasks/zsh.yml
       tags: always
     
-    - include_tasks: tasks/rpmfusion.yml
+    - ansible.builtin.include_tasks: tasks/rpmfusion.yml
       tags: always
 
-    - include_tasks: tasks/fedora-packages.yaml
+    - ansible.builtin.include_tasks: tasks/fedora-packages.yaml
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
-    - include_tasks: tasks/flatpak.yaml
+    - ansible.builtin.include_tasks: tasks/flatpak.yaml
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
-    - include_tasks: tasks/auto_updates.yml
+    - ansible.builtin.include_tasks: tasks/auto_updates.yml
       tags: always
 
-    - include_tasks: tasks/go.yaml
+    - ansible.builtin.include_tasks: tasks/go.yaml
       tags: always
 
-    - include_tasks: tasks/go_tools.yaml
+    - ansible.builtin.include_tasks: tasks/go_tools.yaml
       tags: always
 
-    - include_tasks: tasks/dav.yml
+    - ansible.builtin.include_tasks: tasks/dav.yml
       tags: always
 
     - name: Add private CA
@@ -124,15 +124,15 @@
       tags: always
 
     - name: "Run tasks ssh-ca.yaml"
-      ansible.builtin.include_tasks: tasks/ssh-ca.yaml
+      ansible.builtin.ansible.builtin.include_tasks: tasks/ssh-ca.yaml
       tags: always
 
     - name: "Run tasks signify.yml"
-      ansible.builtin.include_tasks: tasks/signify.yml
+      ansible.builtin.ansible.builtin.include_tasks: tasks/signify.yml
       tags: always
 
     - name: "Run role vault_approle"
-      ansible.builtin.include_tasks: "tasks/sc.yaml"
+      ansible.builtin.ansible.builtin.include_tasks: "tasks/sc.yaml"
       tags: always
 
     - name: "Configure wireguard"
