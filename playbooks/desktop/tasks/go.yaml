@@ -1,6 +1,6 @@
 ---
 - name: Get current Go releases information
-  # checkov:skip=CKV2_ANSIBLE_2:false positive
+  # checkov:skip=CKV2_ANSIBLE_2: false positive
   ansible.builtin.uri:
     url: "{{ go_releases_url }}"
     method: "GET"

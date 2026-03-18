@@ -124,15 +124,15 @@
       tags: always
 
     - name: "Run tasks ssh-ca.yaml"
-      ansible.builtin.ansible.builtin.include_tasks: tasks/ssh-ca.yaml
+      ansible.builtin.include_tasks: tasks/ssh-ca.yaml
       tags: always
 
     - name: "Run tasks signify.yml"
-      ansible.builtin.ansible.builtin.include_tasks: tasks/signify.yml
+      ansible.builtin.include_tasks: tasks/signify.yml
       tags: always
 
     - name: "Run role vault_approle"
-      ansible.builtin.ansible.builtin.include_tasks: "tasks/sc.yaml"
+      ansible.builtin.include_tasks: "tasks/sc.yaml"
       tags: always
 
     - name: "Configure wireguard"
