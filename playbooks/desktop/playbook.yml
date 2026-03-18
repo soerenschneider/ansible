@@ -58,19 +58,24 @@
       register: ignore_errors_register
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/repos.yml
+    - name: "Include task repos"
+      ansible.builtin.include_tasks: tasks/repos.yml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/dirs.yml
+    - name: "Include task dirs"
+      ansible.builtin.include_tasks: tasks/dirs.yml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/zsh.yml
+    - name: "Include task zsh"
+      ansible.builtin.include_tasks: tasks/zsh.yml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/rpmfusion.yml
+    - name: "Include task rpmfusion"
+      ansible.builtin.include_tasks: tasks/rpmfusion.yml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/fedora-packages.yaml
+    - name: "Include task fedora-packages"
+      ansible.builtin.include_tasks: tasks/fedora-packages.yaml
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
@@ -78,16 +83,20 @@
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/auto_updates.yml
+    - name: "Include task auto_updates"
+      ansible.builtin.include_tasks: tasks/auto_updates.yml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/go.yaml
+    - name: "Include task go"
+      ansible.builtin.include_tasks: tasks/go.yaml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/go_tools.yaml
+    - name: "Include task go_tools"
+      ansible.builtin.include_tasks: tasks/go_tools.yaml
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/dav.yml
+    - name: "Include task dav"
+      ansible.builtin.include_tasks: tasks/dav.yml
       tags: always
 
     - name: Add private CA
