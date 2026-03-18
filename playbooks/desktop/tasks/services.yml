@@ -45,6 +45,7 @@
 
 - name: Install powertop
   when: auto_run_powertop | default(false)
+  tags: [powertop, services]
   block:
     - name: Copy powertop systemd service
       ansible.builtin.copy:
@@ -60,6 +61,3 @@
         name: powertop
         enabled: true
         state: started
-  tags:
-    - powertop
-    - services
