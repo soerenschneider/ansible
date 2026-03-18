@@ -90,6 +90,7 @@
 
 - name: Install terragrunt
   become: false
+  tags: [terragrunt, go, packages]
   block:
     - name: Clone repo
       ansible.builtin.git:
@@ -108,4 +109,3 @@
         src: "{{ sw_dir }}/terragrunt/terragrunt"
         dest: "/home/{{ user }}/bin/terragrunt"
         mode: "0755"
-  tags: [terragrunt, go, packages]

@@ -31,11 +31,13 @@
   args:
     chdir: "{{ github_dir }}/dotfiles"
   register: output
+  changed_when: true
   tags: repos
 
 - name: Install scripts
   ansible.builtin.command: make install
   become: false
+  changed_when: true
   args:
     chdir: "{{ github_dir }}/scripts"
   tags: repos

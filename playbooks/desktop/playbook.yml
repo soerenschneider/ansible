@@ -79,7 +79,8 @@
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
-    - ansible.builtin.include_tasks: tasks/flatpak.yaml
+    - name: "Include task flatpak"
+      ansible.builtin.include_tasks: tasks/flatpak.yaml
       when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
       tags: always
 
