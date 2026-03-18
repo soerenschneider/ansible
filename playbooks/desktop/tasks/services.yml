@@ -1,0 +1,64 @@
+---
+- name: Stop and disable services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+  with_items: "{{ systemd_disabled_services }}"
+  ignore_errors: true
+  tags:
+    - services
+
+- name: Start and enable services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  with_items: "{{ systemd_enabled_services }}"
+  ignore_errors: true
+  tags:
+    - services
+
+- name: Check resolv.conf
+  ansible.builtin.stat: 
+    path: /etc/resolv.conf
+  register: resolv_conf
+  tags:
+    - services
+
+- name: Delete /etc/resolv
+  ansible.builtin.file:
+    path: /etc/resolv
+    state: absent
+  when: resolv_conf.stat.islnk
+  tags:
+    - services
+
+- name: Restart NetworkManager
+  become: true
+  ansible.builtin.systemd:
+    name: NetworkManager
+    state: restarted
+  when: resolv_conf.stat.islnk
+  tags:
+    - services
+
+- block:
+  - name: Copy powertop systemd service
+    ansible.builtin.copy:
+      src: powertop.service
+      dest: /etc/systemd/system/powertop.service
+      owner: root
+      group: root
+      mode: "0644"
+      
+  - name: Enable powertop service
+    ansible.builtin.systemd:
+      daemon_reload: true
+      name: powertop
+      enabled: true
+      state: started
+  when: auto_run_powertop | default(false)
+  tags:
+    - powertop
+    - services

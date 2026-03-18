@@ -1,0 +1,36 @@
+---
+- name: Set RPM Fusion distro type
+  ansible.builtin.set_fact:
+    _rpmfusion_distro: "{{ 'fedora' if ansible_distribution == 'Fedora' else 'el' }}"
+    _rpmfusion_major: "{{ ansible_distribution_major_version }}"
+
+- name: Install distribution-gpg-keys
+  ansible.builtin.dnf:
+    name: distribution-gpg-keys
+    state: present
+
+- name: Import RPM Fusion Free GPG key
+  ansible.builtin.rpm_key:
+    key: "/usr/share/distribution-gpg-keys/rpmfusion/RPM-GPG-KEY-rpmfusion-free-{{ _rpmfusion_distro }}-{{ _rpmfusion_major }}"
+    state: present
+
+- name: Import RPM Fusion Non-Free GPG key
+  ansible.builtin.rpm_key:
+    key: "/usr/share/distribution-gpg-keys/rpmfusion/RPM-GPG-KEY-rpmfusion-nonfree-{{ _rpmfusion_distro }}-{{ _rpmfusion_major }}"
+    state: present
+
+- name: Install RPM Fusion Free release RPM
+  ansible.builtin.command:
+    cmd: >-
+      dnf install -y --setopt=localpkg_gpgcheck=1
+      https://mirrors.rpmfusion.org/free/{{ _rpmfusion_distro }}/rpmfusion-free-release-{{ _rpmfusion_major }}.noarch.rpm
+  args:
+    creates: /etc/yum.repos.d/rpmfusion-free.repo
+
+- name: Install RPM Fusion Non-Free release RPM
+  ansible.builtin.command:
+    cmd: >-
+      dnf install -y --setopt=localpkg_gpgcheck=1
+      https://mirrors.rpmfusion.org/nonfree/{{ _rpmfusion_distro }}/rpmfusion-nonfree-release-{{ _rpmfusion_major }}.noarch.rpm
+  args:
+    creates: /etc/yum.repos.d/rpmfusion-nonfree.repo

@@ -1,0 +1,36 @@
+---
+- name: Install zsh
+  ansible.builtin.package:
+    name: zsh
+  tags:
+    - zsh
+    - ohmyzsh
+
+- name: Use zsh instead of bash
+  ansible.builtin.user:
+    name: "{{ user }}"
+    shell: /usr/bin/zsh
+  tags:
+    - zsh
+    - ohmyzsh
+
+- name: Checkout oh-my-zsh
+  become: false
+  ansible.builtin.git:
+    repo: "https://github.com/ohmyzsh/ohmyzsh.git"
+    dest: "/home/{{ user }}/.oh-my-zsh"
+  tags:
+    - ohmyzsh
+    - zsh
+
+- name: create completions dir
+  become: false
+  ansible.builtin.file:
+    path: "/home/{{ user }}/.oh-my-zsh/completions"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0700"
+    state: directory
+  tags:
+    - ohmyzsh
+    - zsh

@@ -14,5 +14,5 @@
     mode: "0640"
   become: true
   become_user: soeren
-  when: sc_profiles is defined
+  when: false and sc_profiles is defined
   tags: [sc]

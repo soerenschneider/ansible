@@ -1,0 +1,50 @@
+---
+- name: Import ssh public keys
+  ansible.builtin.known_hosts:
+    key: "{{ item.key }}"
+    name: "{{ item.name }}"
+    state: "{{ item.state | default('present') }}"
+    path: "/etc/ssh/ssh_known_hosts"
+  with_items: "{{ ssh_known_hosts | selectattr('name', 'in', ['github.com', 'gitlab.com']) | list }}"
+  tags: repos
+
+- name: Make sure git directories exists
+  become: false
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0750
+    owner: "{{ default_user }}"
+    group: "{{ default_user }}"
+  with_items:
+    - "{{ github_dir }}"
+  tags: repos
+
+- include_tasks: repos_checkout.yml
+  with_items: "{{ repos }}"
+  tags: repos
+
+- name: Install dotfiles
+  ansible.builtin.command: sh ./install.sh
+  become: false
+  args:
+    chdir: "{{ github_dir }}/dotfiles"
+  register: output
+  tags: repos
+
+- name: Install scripts
+  ansible.builtin.command: make install
+  become: false
+  args:
+    chdir: "{{ github_dir }}/scripts"
+  tags: repos
+
+- name: Create pass link to repo
+  become: false
+  ansible.builtin.file:
+    src: "{{ github_dir }}/abrakadabra"
+    dest: "/home/{{ user }}/.password-store"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    state: link
+  tags: repos

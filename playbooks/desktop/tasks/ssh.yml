@@ -1,0 +1,7 @@
+---
+- name: Enable sshd
+  ansible.builtin.service:
+    name: sshd
+    state: enabled
+  register: sshd_service
+  tags: sshd

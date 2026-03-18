@@ -1,0 +1,83 @@
+---
+# renovate: datasource=github-releases depName=sigstore/cosign
+cosign_version: "v3.0.5"
+# renovate: datasource=github-releases depName=antonmedv/fx
+fx_version: "39.2.0"
+# renovate: datasource=github-releases depName=mikefarah/yq
+yq_version: "v4.52.4"
+# renovate: datasource=github-releases depName=golangci/golangci-lint
+golangci_lint_version: "v2.11.3"
+# renovate: datasource=github-releases depName=gsamokovarov/jump
+jump_version: "v0.67.0"
+# renovate: datasource=github-releases depName=int128/kubelogin
+kubelogin_version: "v1.36.0"
+# renovate: datasource=github-releases depName=ahmetb/kubectx
+kubectx_version: "v0.9.5"
+# renovate: datasource=github-releases depName=getsops/sops
+sops_version: "v3.12.1"
+# renovate: datasource=github-releases depName=gruntwork-io/terragrunt
+terragrunt_version: "v0.99.4"
+# renovate: datasource=github-releases depName=soerenschneider/sc
+sc_version: "v1.7.0"
+# renovate: datasource=github-releases depName=nats-io/natscli
+nats_version: "v0.3.1"
+# renovate: datasource=github-releases depName=mathismqn/godeez
+godeez_version: "v1.4.0"
+# renovate: datasource=github-tags depName=golang/go
+go_version: "1.26.1"
+
+go_install_dir: "/usr/local"
+go_binary_dir: "/usr/local/go/bin"
+go_releases_url: "https://go.dev/dl/?mode=json"
+
+user: "soeren"
+sw_dir: "/home/{{ user }}/sw"
+
+ssh_known_hosts:
+  - name: "github.com"
+    key: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl"
+  - name: "github.com"
+    key: "github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk="
+  - name: "gitlab.com"
+    key: "gitlab.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAfuCHKVTjquxvt6CM6tdG4SLp1Btn/nOeHHE5UOzRdf"
+  - name: "gitlab.com"
+    key: "gitlab.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UKSeOvuP4D6TPqKF1onrSzH9bx9XUf2lEdWT/ia1NEKjunUqu1xOB/StKDHMoX4/OKyIzuS0q/T1zOATthvasJFoPrAjkohTyaDUz2LN5JoH839hViyEG82yB+MjcFV5MU3N1l1QL3cVUCh93xSaua1N85qivl+siMkPGbO5xR/En4iEY6K2XPASUEMaieWVNTRCtJ4S8H+9"
+
+
+gitlab_dir: "/home/{{ user }}/src/gitlab"
+github_dir: "/home/{{ user }}/src/github"
+gitlab_host: "git@gitlab.com:soerenschneider"
+github_host: "git@github.com:soerenschneider"
+abrakadabra_repo: "{{ github_host }}/abrakadabra"
+dotfiles_repo: "{{ github_host }}/dotfiles"
+scripts_repo: "{{ github_host }}/scripts"
+wallpapers_repo: "{{ github_host }}/wallpapers"
+repos:
+  - repo: "{{ dotfiles_repo }}"
+    dest: "{{ github_dir }}/dotfiles"
+    fail_on_dirty: false
+  - repo: "{{ scripts_repo }}"
+    dest: "{{ github_dir }}/scripts"
+    fail_on_dirty: false
+  - repo: "{{ abrakadabra_repo }}"
+    dest: "{{ github_dir }}/abrakadabra"
+    fail_on_dirty: true
+
+additional_user_groups:
+  - libvirt
+
+install_gcloud: false
+
+systemd_disabled_services: 
+  - avahi-daemon
+  - systemd-resolved
+  - ModemManager
+
+systemd_enabled_services: 
+  - fwupd
+  - fstrim.timer
+  - libvirtd
+
+taskwarrior_sync_cron:
+  disabled: false
+  special_time: "hourly"
