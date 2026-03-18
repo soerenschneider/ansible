@@ -1,5 +1,5 @@
 ---
-- name: "Check if repo {{ item.dest }} is already checked out"
+- name: "Check if repo is already checked out"
   ansible.builtin.stat:
     path: "{{ item.dest }}"
   register: _local_repo
@@ -7,16 +7,17 @@
   changed_when: false
   tags: repos
 
-- name: "Check if repo {{ item.dest }} has local changes"
+- name: "Check if repo has local changes"
   ansible.builtin.command: "git status --porcelain"  # noqa: command-instead-of-module
   when: _local_repo.stat.exists
   register: _repo_status
+  changed_when: false
   become: false
   args:
     chdir: "{{ item.dest }}"
   tags: repos
 
-- name: "Checkout repo {{ item.repo }}"
+- name: "Clone/checkout repo"
   ansible.builtin.git:
     repo: "{{ item.repo }}"
     dest: "{{ item.dest }}"

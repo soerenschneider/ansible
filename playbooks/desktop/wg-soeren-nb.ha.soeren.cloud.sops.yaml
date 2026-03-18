@@ -1,3 +1,4 @@
+---
 wg_private_keys:
     mesh:
         soeren-nb.ha.soeren.cloud: ENC[AES256_GCM,data:8GFcmqrZnxThGW6BU8QfkMW6uUc+tud8jm0b6YtBmu8VDPASHrfqcIBYGJg=,iv:a/CEOV5ao8o4ygnfhojrmlP/eNO+wFIxHTLibjwOWgE=,tag:H0/bu3UYebX6xilJiO89cA==,type:str]
