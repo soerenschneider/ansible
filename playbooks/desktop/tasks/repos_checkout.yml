@@ -8,7 +8,7 @@
   tags: repos
 
 - name: "Check if repo {{ item.dest }} has local changes"
-  ansible.builtin.command: git status --porcelain
+  ansible.builtin.command: "git status --porcelain"  # noqa: command-instead-of-module
   when: _local_repo.stat.exists
   register: _repo_status
   become: false

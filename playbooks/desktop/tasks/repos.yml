@@ -20,7 +20,7 @@
     - "{{ github_dir }}"
   tags: repos
 
-- include_tasks: repos_checkout.yml
+- ansible.builtin.include_tasks: repos_checkout.yml
   with_items: "{{ repos }}"
   tags: repos
 
