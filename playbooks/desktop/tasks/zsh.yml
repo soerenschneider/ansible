@@ -23,7 +23,7 @@
     - ohmyzsh
     - zsh
 
-- name: create completions dir
+- name: Create completions dir
   become: false
   ansible.builtin.file:
     path: "/home/{{ user }}/.oh-my-zsh/completions"
