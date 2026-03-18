@@ -10,7 +10,7 @@ navidrome_data_dir: "/var/lib/navidrome"
 navidrome_music_dir: "/srv/files/media/music-opus"
 navidrome_metrics_addr: "127.0.0.1:9166"
 navidrome_base_url: "/music"
-navidrome_addr: "127.0.0.1" # supposed to be exposed via reverse proxy
+navidrome_addr: "127.0.0.1"  # supposed to be exposed via reverse proxy
 
 navidrome_env:
   ND_LOGLEVEL: "info"

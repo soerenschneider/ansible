@@ -20,7 +20,7 @@
     - services
 
 - name: Check resolv.conf
-  ansible.builtin.stat: 
+  ansible.builtin.stat:
     path: /etc/resolv.conf
   register: resolv_conf
   tags:
@@ -43,22 +43,23 @@
   tags:
     - services
 
-- block:
-  - name: Copy powertop systemd service
-    ansible.builtin.copy:
-      src: powertop.service
-      dest: /etc/systemd/system/powertop.service
-      owner: root
-      group: root
-      mode: "0644"
-      
-  - name: Enable powertop service
-    ansible.builtin.systemd:
-      daemon_reload: true
-      name: powertop
-      enabled: true
-      state: started
+- name: Install powertop
   when: auto_run_powertop | default(false)
+  block:
+    - name: Copy powertop systemd service
+      ansible.builtin.copy:
+        src: powertop.service
+        dest: /etc/systemd/system/powertop.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Enable powertop service
+      ansible.builtin.systemd:
+        daemon_reload: true
+        name: powertop
+        enabled: true
+        state: started
   tags:
     - powertop
     - services

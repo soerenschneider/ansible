@@ -68,12 +68,12 @@ additional_user_groups:
 
 install_gcloud: false
 
-systemd_disabled_services: 
+systemd_disabled_services:
   - avahi-daemon
   - systemd-resolved
   - ModemManager
 
-systemd_enabled_services: 
+systemd_enabled_services:
   - fwupd
   - fstrim.timer
   - libvirtd

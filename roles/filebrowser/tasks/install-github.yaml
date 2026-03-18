@@ -89,7 +89,7 @@
     - name: Query GitHub API for release metadata
       ansible.builtin.uri:
         url: "https://api.github.com/repos/{{ github_repo }}/releases/tags/{{ filebrowser_desired_version }}"
-        return_content: yes
+        return_content: true
       register: filebrowser_release_data
 
     - name: Extract asset info for this architecture

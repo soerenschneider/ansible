@@ -1,3 +1,4 @@
+---
 - name: Install dnf-automatic
   ansible.builtin.dnf:
     name: dnf-automatic

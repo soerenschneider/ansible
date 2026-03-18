@@ -1,3 +1,4 @@
+---
 uninstall_packages: []
 
 install_flatpaks:
@@ -112,7 +113,7 @@ install_packages:
   - qemu-img
   - libvirt-client
   - virt-manager
-  
+
   ######################################
   # DEVEL python
   ######################################
@@ -201,7 +202,7 @@ install_packages:
   # TEX
   ######################################
   - texlive
-  - texlive-base 
+  - texlive-base
   - texlive-collection-science
   - texlive-hyphen-german
   - texlive-german
