@@ -42,7 +42,7 @@
        "{{ lookup('env', 'HOME') }}/go/bin/kubectl-oidc_login"
   args:
     removes: "{{ lookup('env', 'HOME') }}/go/bin/kubelogin"
-  ignore_errors: true
+  ignore_errors: true  # noqa: ignore-errors
   changed_when: true
   tags: [kubelogin, go, packages]
 
