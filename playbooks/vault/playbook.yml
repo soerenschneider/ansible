@@ -5,7 +5,7 @@
   vars:
     openbao_dir: "/etc/openbao.d"
   tasks:
-    - name: "Run role platform"
+    - name: "Print user info"
       ansible.builtin.debug:
         msg: "User is: {{ ansible_user }}"
 

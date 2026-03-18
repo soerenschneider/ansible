@@ -20,6 +20,7 @@
   ansible.builtin.git:
     repo: "{{ item.repo }}"
     dest: "{{ item.dest }}"
+  # noqa: latest[git]
   become: false
   failed_when:
     - item.fail_on_dirty | default(true)
