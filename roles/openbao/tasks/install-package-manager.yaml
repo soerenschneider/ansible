@@ -1,0 +1,124 @@
+---
+- name: "Install for Debian"
+  tags: [openbao, openbao-install]
+  when: ansible_facts["os_family"] == "Debian"
+  block:
+    - name: "[Debian] Install prerequisites"
+      ansible.builtin.apt:
+        name:
+          - gnupg
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: "[Debian] Create keyrings directory"
+      ansible.builtin.file:
+        path: /usr/share/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: "[Debian] Write armored GPG key to temp file"
+      ansible.builtin.copy:
+        dest: /tmp/openbao-gpg-pub.asc
+        content: "{{ openbao_gpg_key }}"
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: "[Debian] Dearmor GPG key into keyrings directory"
+      ansible.builtin.shell: |
+        gpg2 --dearmor --yes --output {{ openbao_gpg_key_path }} /tmp/openbao-gpg-pub.asc
+      args:
+        creates: "{{ openbao_gpg_key_path }}"
+
+    - name: "[Debian] Remove temporary armored key file"
+      ansible.builtin.file:
+        path: /tmp/openbao-gpg-pub.asc
+        state: absent
+
+    - name: "[Debian] Set correct permissions on GPG key file"
+      ansible.builtin.file:
+        path: "{{ openbao_gpg_key_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: "[Debian] Add OpenBao apt repository (deb822 format)"
+      ansible.builtin.copy:
+        dest: "{{ openbao_apt_repo_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          Types: deb
+          URIs: {{ openbao_apt_repo_uri }}
+          Suites: stable
+          Components: main
+          Signed-By: {{ openbao_gpg_key_path }}
+
+    - name: "[Debian] Install OpenBao"
+      ansible.builtin.apt:
+        name: openbao
+        update_cache: true
+        state: present
+
+# -------------------------------------------------------------------------
+# RHEL / CentOS / Rocky / AlmaLinux
+# -------------------------------------------------------------------------
+- name: "Install for RHEL"
+  tags: [openbao, openbao-install]
+  when: ansible_facts["os_family"] == "Debian"
+  block:
+    - name: "[RHEL] Write GPG key to RPM GPG directory"
+      ansible.builtin.copy:
+        dest: "{{ openbao_rpm_gpg_key_path }}"
+        content: "{{ openbao_gpg_key }}"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: "[RHEL] Import OpenBao GPG key into RPM keyring"
+      ansible.builtin.rpm_key:
+        key: "{{ openbao_rpm_gpg_key_path }}"
+        state: present
+
+    - name: "[RHEL] Add OpenBao YUM repository"
+      ansible.builtin.copy:
+        dest: "{{ openbao_rpm_repo_file }}"
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [openbao]
+          name=openbao
+          baseurl={{ openbao_rpm_baseurl }}
+          repo_gpgcheck=0
+          gpgcheck=1
+          enabled=1
+          gpgkey=file://{{ openbao_rpm_gpg_key_path }}
+          sslverify=1
+          sslcacert=/etc/pki/tls/certs/ca-bundle.crt
+          metadata_expire=300
+
+    - name: "[RHEL] Install OpenBao"
+      ansible.builtin.dnf:
+        name: openbao
+        state: present
+
+# -------------------------------------------------------------------------
+# Post-install (both families)
+# -------------------------------------------------------------------------
+
+- name: "Verify OpenBao binary is present"
+  ansible.builtin.command:
+    cmd: bao version
+  changed_when: false
+  register: bao_version_output
+  tags: [openbao, openbao-install]
+
+- name: "Print OpenBao version"
+  ansible.builtin.debug:
+    msg: "{{ bao_version_output.stdout }}"
+  tags: [openbao, openbao-install]

@@ -4,14 +4,14 @@
   tags: [openbao, openbao-install, deps]
   block:
     - name: "Check if key is already in keyring"
-      ansible.builtin.command: "gpg2 --list-keys {{ openbao_gpg_pubkey_id }}"
+      ansible.builtin.command: "gpg2 --list-keys {{ openbao_gpg_key_id }}"
       changed_when: false
   rescue:
     - name: "Copy GPG pub key"
       become: false
       ansible.builtin.copy:
-        content: "{{ openbao_gpg_pubkey }}"
-        dest: "/tmp/openbao-signing-key.pub"
+        content: "{{ openbao_gpg_key }}"
+        dest: "/etc/openbao-signing-key.pub"
         mode: "0644"
 
     - name: "Import GPG public key"
@@ -28,6 +28,11 @@
   ansible.builtin.include_tasks: "configure.yaml"
   tags: [openbao, openbao-configure]
 
+- name: "Run tasks install-package-manager.yaml"
+  ansible.builtin.include_tasks: "install-package-manager.yaml"
+  tags: [openbao, openbao-install]
+  when: ansible_facts["os_family"] == "Debian" or ansible_facts["os_family"] == "RedHat"
+
 - name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: "install-github.yaml"
   vars:
@@ -35,6 +40,7 @@
     github_repo: "openbao/openbao"
     service_name: "openbao"
   tags: [openbao, openbao-install]
+  when: ansible_facts["os_family"] != "Debian" and ansible_facts["os_family"] != "RedHat"
 
 - name: "Run tasks install-plugin.yml"
   ansible.builtin.include_tasks: "install-plugin.yaml"

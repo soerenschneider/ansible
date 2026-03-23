@@ -18,6 +18,13 @@ openbao_storage_dir: "{{ openbao_dir }}/storage"
 openbao_config_file: "{{ openbar_dir }}/openbao.hcl"
 openbao_ui: true
 
+openbao_gpg_key_path: "/usr/share/keyrings/openbao-archive-keyring.gpg"
+openbao_apt_repo_uri: "https://pkgs.openbao.org/deb/"
+openbao_apt_repo_file: "/etc/apt/sources.list.d/openbao.sources"
+openbao_rpm_baseurl: "https://pkgs.openbao.org/rpm/$basearch"
+openbao_rpm_repo_file: "/etc/yum.repos.d/openbao.repo"
+openbao_rpm_gpg_key_path: "/etc/pki/rpm-gpg/openbao-gpg-pub.asc"
+
 # openbao_gpg_keys is used to encrypt root token when initializing openbao
 openbao_gpg_keys: {}
 openbao_allow_insecure: false
@@ -32,8 +39,8 @@ openbao_cluster_name: "prod"
 openbao_cluster_nodes_group: "vault"
 openbao_cluster_first_node: "{{ groups[openbao_cluster_nodes_group][0] }}"
 
-openbao_gpg_pubkey_id: "0xD200CD702853E6D0"
-openbao_gpg_pubkey: |
+openbao_gpg_key_id: "0xD200CD702853E6D0"
+openbao_gpg_key: |
   -----BEGIN PGP PUBLIC KEY BLOCK-----
   mQINBGZx4nABEACnQllkFhq8bMuf9cgEqtpuJ133TWogetAW21nQUL7mKaPrrSdC
   S63wR5hCTiSLpoBFSNACUTYINviIDcmseq54peOivGBQvw5ywZAznPDX7DqrrOP/

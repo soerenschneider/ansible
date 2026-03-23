@@ -78,8 +78,8 @@
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        openbao_go_os: "{{ ansible_system | lower }}"
-        openbao_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        openbao_go_os: "{{ ansible_facts['system'] | lower }}"
+        openbao_go_arch: "{{ 'amd64' if ansible_facts['architecture'] == 'x86_64' else 'armv6' if ansible_facts['architecture'] == 'armv6l' else 'armv7' if ansible_facts['architecture'] == 'armv7l' else 'arm64' if ansible_facts['architecture'] == 'aarch64' }}"
         openbao_download_dir: "{{ openbao_download_dir.path }}"
       changed_when: false
 
