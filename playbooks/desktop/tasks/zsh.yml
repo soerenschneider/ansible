@@ -20,6 +20,7 @@
   when: ansible_facts['system'] == "Darwin"
   become: true
   ansible.builtin.command: "chsh -s /opt/homebrew/bin/zsh {{ ansible_facts['user_id'] }}"
+  changed_when: false
   tags:
     - zsh
     - ohmyzsh
