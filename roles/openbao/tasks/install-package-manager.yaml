@@ -115,10 +115,10 @@
   ansible.builtin.command:
     cmd: bao version
   changed_when: false
-  register: bao_version_output
+  register: openbao_version_output
   tags: [openbao, openbao-install]
 
 - name: "Print OpenBao version"
   ansible.builtin.debug:
-    msg: "{{ bao_version_output.stdout }}"
+    msg: "{{ openbao_version_output.stdout }}"
   tags: [openbao, openbao-install]
