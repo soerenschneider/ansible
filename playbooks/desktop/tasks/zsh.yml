@@ -6,10 +6,20 @@
     - zsh
     - ohmyzsh
 
-- name: Use zsh instead of bash
+- name: Set zsh as default shell (Linux)
+  when: ansible_facts['system'] == "Linux"
+  become: true
   ansible.builtin.user:
-    name: "{{ user }}"
+    name: "{{ ansible_facts['user_id'] }}"
     shell: /usr/bin/zsh
+  tags:
+    - zsh
+    - ohmyzsh
+
+- name: Set zsh as default shell (Darwin)
+  when: ansible_facts['system'] == "Darwin"
+  become: true
+  ansible.builtin.command: "chsh -s /opt/homebrew/bin/zsh {{ ansible_facts['user_id'] }}"
   tags:
     - zsh
     - ohmyzsh
@@ -18,7 +28,7 @@
   become: false
   ansible.builtin.git:
     repo: "https://github.com/ohmyzsh/ohmyzsh.git"
-    dest: "/home/{{ user }}/.oh-my-zsh"
+    dest: "{{ user_home }}/.oh-my-zsh"
   # noqa: latest[git]
   tags:
     - ohmyzsh
@@ -27,9 +37,9 @@
 - name: Create completions dir
   become: false
   ansible.builtin.file:
-    path: "/home/{{ user }}/.oh-my-zsh/completions"
-    owner: "{{ user }}"
-    group: "{{ user }}"
+    path: "{{ user_home }}/.oh-my-zsh/completions"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
     mode: "0700"
     state: directory
   tags:

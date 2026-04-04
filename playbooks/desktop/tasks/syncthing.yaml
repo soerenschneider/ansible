@@ -1,0 +1,64 @@
+- name: Syncthing
+  when: ansible_facts['system'] == "Linux"
+  block:
+    - name: Load syncthing config...
+      ansible.builtin.include_vars:
+        file: "{{ inventory_path }}/group_vars/desktop/syncthing.yaml"
+      ignore_errors: false
+      tags: syncthing
+
+    - name: Create folders
+      become: false
+      ansible.builtin.file:
+        state: directory
+        path: "{{ item.path }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0700"
+      with_items: "{{ syncthing_folders }}"
+      tags: syncthing
+
+    - name: "Run role syncthing"
+      ansible.builtin.include_role:
+        name: syncthing
+      vars:
+        syncthing_collect_metrics: false
+      tags: always
+
+    - name: "Run tasks ssh-ca.yaml"
+      ansible.builtin.include_tasks: tasks/ssh-ca.yaml
+      tags: always
+
+    - name: "Run tasks signify.yml"
+      ansible.builtin.include_tasks: tasks/signify.yml
+      tags: always
+
+    - name: "Run role vault_approle"
+      ansible.builtin.include_tasks: "tasks/sc.yaml"
+      tags: always
+
+    - name: "Configure wireguard"
+      when: use_wireguard | default(False)
+      tags: always
+      block:
+        - name: Load wireguard pubkeys
+          ansible.builtin.include_vars:
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-pubkeys.yaml"
+          ignore_errors: false
+
+        - name: Load wireguard networks
+          ansible.builtin.include_vars:
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-nets.yaml"
+          ignore_errors: false
+
+        - name: Load wireguard psk keys
+          community.sops.load_vars:
+            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-psks.sops.yaml"
+
+        - name: Load wireguard private key
+          community.sops.load_vars:
+            file: wg-{{ hostname }}.sops.yaml
+
+        - name: "Run role wireguard"
+          ansible.builtin.include_role:
+            name: wireguard

@@ -1,0 +1,3 @@
+---
+gitlab_dir: "{{ user_home }}/Private/gitlab"
+github_dir: "{{ user_home }}/Private/github"

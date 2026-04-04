@@ -5,14 +5,12 @@
   ignore_errors: false
   tags: sc
 
-- name: Create sc profiles file
+- name: "Create sc profiles file"
   ansible.builtin.copy:
-    dest: "{{ user_home_dir.stat.path }}/.sc-profiles.yaml"
+    dest: "{{ user_home }}/.sc-profiles.yaml"
     content: "{{ sc_profiles }}"
-    owner: "soeren"
-    group: "soeren"
-    mode: "0640"
-  become: true
-  become_user: soeren
-  when: false and sc_profiles is defined
+    owner: "ansible_facts['user_id']"
+    group: "ansible_facts['user_id']"
+    mode: "0600"
+  when: sc_profiles is defined
   tags: [sc]

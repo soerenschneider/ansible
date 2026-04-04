@@ -1,21 +1,37 @@
 ---
 - name: Make sure .config exists
-  become: false
   ansible.builtin.file:
-    path: "/home/{{ user }}/.config"
-    owner: "{{ user }}"
-    group: "{{ user }}"
+    path: "{{ user_home }}/.config"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
     mode: "0700"
-    state: directory
+    state: "directory"
   tags:
     - dirs
 
 - name: Create sw dir
-  become: false
   ansible.builtin.file:
     path: "{{ sw_dir }}"
-    owner: "{{ user }}"
-    group: "{{ user }}"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
     mode: "0700"
-    state: directory
+    state: "directory"
   tags: dirs
+
+- name: Create contacts
+  ansible.builtin.file:
+    path: "{{ user_home }}/.contacts"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
+    state: "directory"
+    mode: "0700"
+  tags: dav
+
+- name: Create calendars
+  ansible.builtin.file:
+    path: "{{ user_home }}/.calendars"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
+    state: "directory"
+    mode: "0700"
+  tags: dav

@@ -1,37 +1,15 @@
 ---
 - name: Install desktop
   hosts: localhost
-  become: true
+  become: false
   vars:
-    default_user: "soeren"
     vault_configure_server: false
     inventory_path: "{{ lookup('env', 'ANSIBLE_INVENTORY') | dirname }}"
-    github_dir: "/home/soeren/src/github"
+    user_home: "{{ ansible_facts['env']['HOME'] }}"
   tasks:
-    - name: Get user home dir
-      tags: always
-      block:
-        - name: Get home dir of default_user via getent
-          ansible.builtin.command: "getent passwd {{ default_user }}"
-          register: getent_passwd
-          changed_when: false
-          failed_when: getent_passwd.rc != 0 or getent_passwd.stdout == ""
-          tags: always
-
-        - name: Extract home dir from getent output
-          ansible.builtin.set_fact:
-            target_user_home: "{{ getent_passwd.stdout.split(':')[5] }}"
-          when: getent_passwd.stdout.split(':') | length > 5
-
-        - name: Check if home directory exists
-          ansible.builtin.stat:
-            path: "{{ target_user_home }}"
-          register: user_home_dir
-          when: target_user_home is defined
-
-    - name: Determine hostname (without ansible facts)
-      ansible.builtin.command: hostname
-      register: _hostname_output
+    - name: "Determine hostname (without ansible facts)"
+      ansible.builtin.command: "hostname"
+      register: "_hostname_output"
       changed_when: false
       tags: always
 
@@ -39,6 +17,7 @@
       ansible.builtin.set_fact:
         hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
         inventory_hostname: "{{ _hostname_output.stdout }}"  # noqa: var-naming[read-only]
+      become: true
       tags: always
 
     - name: "Print hostname"
@@ -46,58 +25,60 @@
         msg: "{{ inventory_hostname }}"
       tags: always
 
-    - name: Load general settings
+    - name: "Load general settings"
       ansible.builtin.include_vars:
-        file: settings.yml
+        file: "settings/general.yaml"
       tags: always
 
-    - name: Load host-based settings
+    - name: "Load host-based settings"
       ansible.builtin.include_vars:
-        file: settings-{{ hostname }}.yml
+        file: "settings/host-{{ hostname }}.yaml"
       ignore_errors: true
       register: ignore_errors_register
       tags: always
 
     - name: "Include task repos"
-      ansible.builtin.include_tasks: tasks/repos.yml
+      ansible.builtin.include_tasks: "tasks/repos.yml"
       tags: always
 
     - name: "Include task dirs"
-      ansible.builtin.include_tasks: tasks/dirs.yml
+      ansible.builtin.include_tasks: "tasks/dirs.yml"
       tags: always
 
     - name: "Include task zsh"
-      ansible.builtin.include_tasks: tasks/zsh.yml
+      ansible.builtin.include_tasks: "tasks/zsh.yml"
       tags: always
 
-    - name: "Include task rpmfusion"
-      ansible.builtin.include_tasks: tasks/rpmfusion.yml
-      tags: always
+    - name: "Install packages"
+      when: ansible_facts["os_family"] == "RedHat"
+      block:
+        - name: "Include task rpmfusion"
+          ansible.builtin.include_tasks: tasks/rhel-rpmfusion.yml
+          tags: always
 
-    - name: "Include task fedora-packages"
-      ansible.builtin.include_tasks: tasks/fedora-packages.yaml
-      when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
-      tags: always
+        - name: "Include task flatpak"
+          ansible.builtin.include_tasks: tasks/install-flatpak.yaml
+          tags: always
 
-    - name: "Include task flatpak"
-      ansible.builtin.include_tasks: tasks/flatpak.yaml
-      when: ansible_distribution in ['Fedora', 'CentOS', 'Red Hat Enterprise Linux']
-      tags: always
+        - name: "Include task auto_updates"
+          ansible.builtin.include_tasks: tasks/rhel-auto-updates.yml
+          tags: always
 
-    - name: "Include task auto_updates"
-      ansible.builtin.include_tasks: tasks/auto_updates.yml
-      tags: always
+        - name: "Include task go"
+          ansible.builtin.include_tasks: tasks/install-go.yaml
+          tags: always
 
-    - name: "Include task go"
-      ansible.builtin.include_tasks: tasks/go.yaml
-      tags: always
+        - name: "Include task go_tools"
+          ansible.builtin.include_tasks: tasks/install-go-tools.yaml
+          tags: always
 
-    - name: "Include task go_tools"
-      ansible.builtin.include_tasks: tasks/go_tools.yaml
-      tags: always
+        - name: "Include task dav"
+          ansible.builtin.include_tasks: tasks/dav.yml
+          tags: always
 
-    - name: "Include task dav"
-      ansible.builtin.include_tasks: tasks/dav.yml
+    - name: "Configure Linux services"
+      when: ansible_facts['system'] == "Linux"
+      ansible.builtin.include_tasks: "tasks/services.yaml"
       tags: always
 
     - name: Add private CA
@@ -107,66 +88,5 @@
         owner: root
         group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
         mode: "0644"
+      when: ansible_facts['system'] == "Linux"
       tags: [base, pki]
-
-    - name: Load syncthing config...
-      ansible.builtin.include_vars:
-        file: "{{ inventory_path }}/group_vars/desktop/syncthing.yaml"
-      ignore_errors: false
-      tags: syncthing
-
-    - name: Create folders
-      become: false
-      ansible.builtin.file:
-        state: directory
-        path: "{{ item.path }}"
-        owner: "{{ default_user }}"
-        group: "{{ default_user }}"
-        mode: "0700"
-      with_items: "{{ syncthing_folders }}"
-      tags: syncthing
-
-    - name: "Run role syncthing"
-      ansible.builtin.include_role:
-        name: syncthing
-      vars:
-        syncthing_collect_metrics: false
-      tags: always
-
-    - name: "Run tasks ssh-ca.yaml"
-      ansible.builtin.include_tasks: tasks/ssh-ca.yaml
-      tags: always
-
-    - name: "Run tasks signify.yml"
-      ansible.builtin.include_tasks: tasks/signify.yml
-      tags: always
-
-    - name: "Run role vault_approle"
-      ansible.builtin.include_tasks: "tasks/sc.yaml"
-      tags: always
-
-    - name: "Configure wireguard"
-      when: use_wireguard | default(False)
-      tags: always
-      block:
-        - name: Load wireguard pubkeys
-          ansible.builtin.include_vars:
-            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-pubkeys.yaml"
-          ignore_errors: false
-
-        - name: Load wireguard networks
-          ansible.builtin.include_vars:
-            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-nets.yaml"
-          ignore_errors: false
-
-        - name: Load wireguard psk keys
-          community.sops.load_vars:
-            file: "{{ inventory_path }}/group_vars/wireguard_mesh/wireguard-psks.sops.yaml"
-
-        - name: Load wireguard private key
-          community.sops.load_vars:
-            file: wg-{{ hostname }}.sops.yaml
-
-        - name: "Run role wireguard"
-          ansible.builtin.include_role:
-            name: wireguard

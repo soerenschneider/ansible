@@ -30,8 +30,9 @@ go_install_dir: "/usr/local"
 go_binary_dir: "/usr/local/go/bin"
 go_releases_url: "https://go.dev/dl/?mode=json"
 
-user: "soeren"
-sw_dir: "/home/{{ user }}/sw"
+sw_dir: "{{ user_home }}/sw"
+gitlab_dir: "{{ user_home }}/src/gitlab"
+github_dir: "{{ user_home }}/src/github"
 
 ssh_known_hosts:
   - name: "github.com"
@@ -43,9 +44,6 @@ ssh_known_hosts:
   - name: "gitlab.com"
     key: "gitlab.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCsj2bNKTBSpIYDEGk9KxsGh3mySTRgMtXL583qmBpzeQ+jqCMRgBqB98u3z++J1sKlXHWfM9dyhSevkMwSbhoR8XIq/U0tCNyokEi/ueaBMCvbcTHhO7FcwzY92WK4Yt0aGROY5qX2UKSeOvuP4D6TPqKF1onrSzH9bx9XUf2lEdWT/ia1NEKjunUqu1xOB/StKDHMoX4/OKyIzuS0q/T1zOATthvasJFoPrAjkohTyaDUz2LN5JoH839hViyEG82yB+MjcFV5MU3N1l1QL3cVUCh93xSaua1N85qivl+siMkPGbO5xR/En4iEY6K2XPASUEMaieWVNTRCtJ4S8H+9"
 
-
-gitlab_dir: "/home/{{ user }}/src/gitlab"
-github_dir: "/home/{{ user }}/src/github"
 gitlab_host: "git@gitlab.com:soerenschneider"
 github_host: "git@github.com:soerenschneider"
 abrakadabra_repo: "{{ github_host }}/abrakadabra"

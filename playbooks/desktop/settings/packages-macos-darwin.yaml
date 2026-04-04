@@ -1,0 +1,30 @@
+---
+install_packages:
+  - bash
+  - coreutils
+  - stow
+  - gnu-tar
+  - golang
+  - golangci-lint
+  - kubectl
+  - kubectx
+  - istioctl
+  - syncthing
+  - ansible
+  - atuin
+  - crane
+  - obsidian
+  - terragrunt
+  - opentofu
+  - openbao
+  - jump
+  - task
+  - mermaid-cli
+  - battery
+  - age
+  - age-plugin-yubikey
+  - gnupg
+  - pass
+  - pass-otp
+  - sops
+  - flac

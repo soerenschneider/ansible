@@ -1,0 +1,37 @@
+---
+- name: "Load package list"
+  ansible.builtin.include_vars:
+    file: "{{ 'settings/packages-macos-darwin.yaml' if ansible_facts['os_family'] == 'Darwin' else 'settings/packages-linux-' + ansible_facts['distribution'] | lower + '.yaml' }}"
+
+  tags: packages
+
+- name: Handle packages (Mac)
+  when: ansible_facts['system'] == "Darwin"
+  block:
+    - name: "Install packages (Mac)"
+      ansible.builtin.package:
+        name: "{{ install_packages }}"
+      tags: packages
+
+    - name: "Uninstall packages"
+      ansible.builtin.package:
+        name: "{{ uninstall_packages | default([]) }}"
+        state: absent
+      tags: packages
+
+- name: Handle packages (Mac)
+  when: ansible_facts['system'] == "Darwin"
+  block:
+    - name: "Install packages (Linux)"
+      become: true
+      when: ansible_facts['system'] == "Linux"
+      ansible.builtin.package:
+        name: "{{ install_packages }}"
+      tags: packages
+
+    - name: "Uninstall packages"
+      become: true
+      ansible.builtin.package:
+        name: "{{ uninstall_packages | default([]) }}"
+        state: absent
+      tags: packages

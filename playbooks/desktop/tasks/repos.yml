@@ -6,6 +6,7 @@
     state: "{{ item.state | default('present') }}"
     path: "/etc/ssh/ssh_known_hosts"
   with_items: "{{ ssh_known_hosts | selectattr('name', 'in', ['github.com', 'gitlab.com']) | list }}"
+  become: true
   tags: repos
 
 - name: Make sure git directories exists
@@ -14,19 +15,19 @@
     path: "{{ item }}"
     state: directory
     mode: 0750
-    owner: "{{ default_user }}"
-    group: "{{ default_user }}"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
   with_items:
     - "{{ github_dir }}"
   tags: repos
 
 - name: "Include task repos_checkout"
-  ansible.builtin.include_tasks: repos_checkout.yml
+  ansible.builtin.include_tasks: repos-checkout.yml
   with_items: "{{ repos }}"
   tags: repos
 
-- name: Install dotfiles
-  ansible.builtin.command: sh ./install.sh
+- name: "Install dotfiles"
+  ansible.builtin.command: "bash ./install.sh"
   become: false
   args:
     chdir: "{{ github_dir }}/dotfiles"
@@ -34,7 +35,7 @@
   changed_when: true
   tags: repos
 
-- name: Install scripts
+- name: "Install scripts"
   ansible.builtin.command: make install
   become: false
   changed_when: true
@@ -42,12 +43,12 @@
     chdir: "{{ github_dir }}/scripts"
   tags: repos
 
-- name: Create pass link to repo
+- name: "Create pass link to repo"
   become: false
   ansible.builtin.file:
     src: "{{ github_dir }}/abrakadabra"
-    dest: "/home/{{ user }}/.password-store"
-    owner: "{{ user }}"
-    group: "{{ user }}"
+    dest: "{{ user_home }}/.password-store"
+    owner: "{{ ansible_facts['user_id'] }}"
+    group: "{{ ansible_facts['user_id'] }}"
     state: link
   tags: repos

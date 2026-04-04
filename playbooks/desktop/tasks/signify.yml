@@ -1,8 +1,8 @@
 ---
 - name: Create signify dir
   ansible.builtin.file:
-    path: /etc/signify
-    state: directory
+    path: "/etc/signify"
+    state: "directory"
     owner: root
     group: "{% if ansible_system == 'OpenBSD' %}wheel{% else %}root{% endif %}"
     mode: "0755"
