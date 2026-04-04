@@ -11,6 +11,7 @@ install_packages:
   - istioctl
   - syncthing
   - ansible
+  - ansible-lint
   - atuin
   - crane
   - obsidian
@@ -28,3 +29,4 @@ install_packages:
   - pass-otp
   - sops
   - flac
+  - yamllint
