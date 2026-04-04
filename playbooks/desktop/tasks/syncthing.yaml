@@ -1,3 +1,4 @@
+---
 - name: Syncthing
   when: ansible_facts['system'] == "Linux"
   block:
