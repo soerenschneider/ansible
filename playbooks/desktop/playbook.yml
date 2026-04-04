@@ -72,10 +72,6 @@
           ansible.builtin.include_tasks: tasks/install-go-tools.yaml
           tags: always
 
-        - name: "Include task dav"
-          ansible.builtin.include_tasks: tasks/dav.yml
-          tags: always
-
     - name: "Configure Linux services"
       when: ansible_facts['system'] == "Linux"
       ansible.builtin.include_tasks: "tasks/services.yaml"
