@@ -5,7 +5,7 @@
 
   tags: packages
 
-- name: Handle packages (Mac)
+- name: "Install homebrew packages (Mac)"
   when: ansible_facts['system'] == "Darwin"
   block:
     - name: "Install packages (Mac)"
@@ -19,8 +19,15 @@
         state: absent
       tags: packages
 
-- name: Handle packages (Mac)
-  when: ansible_facts['system'] == "Darwin"
+- name: "Include task rpmfusion"
+  ansible.builtin.include_tasks: tasks/rhel-rpmfusion.yml
+  when:
+    - ansible_facts['system'] == "Linux"
+    - ansible_facts["os_family"] == "RedHat"
+  tags: always
+
+- name: "Install distribution packages (Linux)"
+  when: ansible_facts['system'] == "Linux"
   block:
     - name: "Install packages (Linux)"
       become: true
@@ -35,3 +42,18 @@
         name: "{{ uninstall_packages | default([]) }}"
         state: absent
       tags: packages
+
+- name: "Install Flatpak packages (Linux)"
+  when: ansible_facts['system'] == "Linux"
+  block:
+    - name: "Add the flathub flatpak repository remote"
+      community.general.flatpak_remote:
+        name: "flathub"
+        state: "present"
+        flatpakrepo_url: "https://dl.flathub.org/repo/flathub.flatpakrepo"
+      tags: [packages, flatpak]
+
+    - name: "Install flatpak packages"
+      community.general.flatpak:
+        name: "{{ install_flatpaks }}"
+      tags: [packages, flatpak]

@@ -96,6 +96,7 @@
   tags: go
 
 - name: Remove existing Go installation
+  become: true
   ansible.builtin.file:
     path: "{{ go_install_dir }}/go"
     state: absent
@@ -125,6 +126,7 @@
         mode: '0644'
 
     - name: Extract Go archive
+      become: true
       ansible.builtin.unarchive:
         src: "{{ temp_dir.path }}/{{ go_file.filename }}"
         dest: "{{ go_install_dir }}"
@@ -132,6 +134,7 @@
         creates: "{{ go_install_dir }}/go/bin/go"
 
     - name: Set Go binary permissions
+      become: true
       ansible.builtin.file:
         path: "{{ go_install_dir }}/go/bin/{{ item }}"
         mode: '0755'
@@ -145,6 +148,7 @@
         state: absent
 
     - name: Add Go to PATH in profile
+      become: true
       ansible.builtin.lineinfile:
         path: /etc/profile.d/go.sh
         line: 'export PATH=$PATH:{{ go_binary_dir }}'
@@ -152,6 +156,7 @@
         mode: '0644'
 
     - name: Add GOPATH to profile
+      become: true
       ansible.builtin.lineinfile:
         path: /etc/profile.d/go.sh
         line: 'export GOPATH=$HOME/go'

@@ -45,39 +45,38 @@
       ansible.builtin.include_tasks: "tasks/dirs.yml"
       tags: always
 
-    - name: "Include task zsh"
-      ansible.builtin.include_tasks: "tasks/zsh.yml"
+    - name: "Include task rhel-auto-updates"
+      ansible.builtin.include_tasks: tasks/rhel-auto-updates.yml
+      when: ansible_facts["os_family"] == "RedHat"
       tags: always
 
-    - name: "Install packages"
-      when: ansible_facts["os_family"] == "RedHat"
+    - name: "Install go and go tools"
+      when: ansible_facts['system'] == "Linux"
       block:
-        - name: "Include task rpmfusion"
-          ansible.builtin.include_tasks: tasks/rhel-rpmfusion.yml
-          tags: always
-
-        - name: "Include task flatpak"
-          ansible.builtin.include_tasks: tasks/install-flatpak.yaml
-          tags: always
-
-        - name: "Include task auto_updates"
-          ansible.builtin.include_tasks: tasks/rhel-auto-updates.yml
-          tags: always
-
-        - name: "Include task go"
+        - name: "Include task install-go"
           ansible.builtin.include_tasks: tasks/install-go.yaml
           tags: always
 
-        - name: "Include task go_tools"
+        - name: "Include task install-go-tools"
           ansible.builtin.include_tasks: tasks/install-go-tools.yaml
           tags: always
+
+    - name: "Include task install-packages"
+      ansible.builtin.include_tasks: "tasks/install-packages.yaml"
+      tags: always
 
     - name: "Configure Linux services"
       when: ansible_facts['system'] == "Linux"
       ansible.builtin.include_tasks: "tasks/services.yaml"
       tags: always
+    
+    - name: "Include task zsh"
+      ansible.builtin.include_tasks: "tasks/zsh.yml"
+      tags: always
+
 
     - name: Add private CA
+      become: true
       ansible.builtin.copy:
         content: "{{ pki_soerenschneider_ca_crt }}"
         dest: "{{ pki_soerenschneider_ca_file }}"

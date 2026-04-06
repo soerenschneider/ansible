@@ -107,5 +107,5 @@
     - name: Copy file
       ansible.builtin.copy:
         src: "{{ sw_dir }}/terragrunt/terragrunt"
-        dest: "/home/{{ user }}/bin/terragrunt"
+        dest: "{{ user_home }}/bin/terragrunt"
         mode: "0755"

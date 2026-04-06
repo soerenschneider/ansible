@@ -1,10 +1,12 @@
 ---
 - name: Install dnf-automatic
+  become: true
   ansible.builtin.dnf:
     name: dnf-automatic
   tags: auto_updates
 
 - name: Ensure /etc/dnf/automatic.conf exists
+  become: true
   ansible.builtin.file:
     path: /etc/dnf/automatic.conf
     state: touch
@@ -12,6 +14,7 @@
   tags: auto_updates
 
 - name: Auto apply updates
+  become: true
   ansible.builtin.lineinfile:
     path: /etc/dnf/automatic.conf
     regexp: "^apply_updates"
@@ -19,6 +22,7 @@
   tags: auto_updates
 
 - name: Enable dnf-automatic timer
+  become: true
   ansible.builtin.systemd:
     name: dnf-automatic.timer
     enabled: true

@@ -1,11 +1,4 @@
 ---
-- name: Install zsh
-  ansible.builtin.package:
-    name: zsh
-  tags:
-    - zsh
-    - ohmyzsh
-
 - name: Set zsh as default shell (Linux)
   when: ansible_facts['system'] == "Linux"
   become: true
