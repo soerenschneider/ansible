@@ -73,7 +73,10 @@
     - name: "Include task zsh"
       ansible.builtin.include_tasks: "tasks/zsh.yml"
       tags: always
-
+    
+    - name: "Include task syncthing"
+      ansible.builtin.include_tasks: "tasks/syncthing.yaml"
+      tags: always
 
     - name: Add private CA
       become: true
