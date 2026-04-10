@@ -9,6 +9,11 @@
       ansible.builtin.debug:
         msg: "User is: {{ ansible_user }}"
 
+    - name: "Run role openbao"
+      ansible.builtin.include_role:
+        name: "openbao"
+      tags: always
+
     - name: "Run role platform"
       ansible.builtin.include_role:
         name: "platform"
