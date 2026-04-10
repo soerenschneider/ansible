@@ -12,7 +12,7 @@ quality_mode="${5:-vbr}"
 num_threads="${6:-$(nproc --all)}"
 
 # Config
-LAST_RUN_FILE="${input_dir}/.flac_convert_timestamp"
+LAST_RUN_FILE="${input_dir}/.flac_convert_timestamp_${codec}_${bitrate}.txt"
 
 # Step 1: Load the last run time, or default to epoch if not available
 if [[ -f "${LAST_RUN_FILE}" ]]; then
@@ -115,7 +115,7 @@ convert_flac() {
     fi
 
     # Set ffmpeg options based on codec and quality mode
-    ffmpeg_opts=("-y" "-loglevel" "quiet" "-i" "${flac_file}" "-c:a" "${audio_codec}")
+    ffmpeg_opts=("-y" "-loglevel" "quiet" "-i" "${flac_file}" "-c:a" "${audio_codec}" "-compression_level" "10")
 
     if [[ "${codec}" == "opus" ]]; then
         # Opus supports different VBR/CBR modes

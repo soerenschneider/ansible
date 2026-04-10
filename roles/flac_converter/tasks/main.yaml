@@ -4,35 +4,42 @@
     name: "ffmpeg"
   tags: [flac, flac-converter]
 
-- name: Copy flac-converter script
+- name: "Copy flac-converter script"
   ansible.builtin.copy:
-    src: flac-converter.sh
+    src: "flac-converter.sh"
     dest: "/usr/local/bin/flac-converter.sh"
     remote_src: false
-    owner: root
-    group: root
+    owner: "root"
+    group: "root"
     mode: "0755"
   tags: [flac, flac-converter]
 
-- name: Add systemd unit
+- name: "Set names for systemd units"
+  ansible.builtin.set_fact:
+    _flac_converter_systemd_names:
+      - "flac-converter-{{ flac_converter_codec }}-{{ flac_converter_bitrate }}.service"
+      - "flac-converter-{{ flac_converter_codec }}-{{ flac_converter_bitrate }}.timer"
+  tags: [flac, flac-converter]
+
+- name: "Add systemd unit"
   ansible.builtin.template:
-    src: "{{ item }}.j2"
-    dest: "/etc/systemd/system/{{ item }}"
-    owner: root
-    group: root
+    src: "flac-converter.{{ item }}.j2"
+    dest: "/etc/systemd/system/flac-converter-{{ flac_converter_codec }}-{{ flac_converter_bitrate }}.{{ item }}"
+    owner: "root"
+    group: "root"
     mode: "0755"
   with_items:
-    - flac-converter.service
-    - flac-converter.timer
+    - service
+    - timer
   register: _flac_converter_systemd
   tags: [flac, flac-converter]
 
-- name: Enable systemd unit
+- name: "Enable systemd unit"
   ansible.builtin.systemd:
-    name: "{{ item }}"
+    name: "flac-converter-{{ flac_converter_codec }}-{{ flac_converter_bitrate }}.{{ item }}"
     enabled: true
     daemon_reload: "{{ _flac_converter_systemd is changed }}"
   with_items:
-    - flac-converter.service
-    - flac-converter.timer
+    - service
+    - timer
   tags: [flac, flac-converter]
