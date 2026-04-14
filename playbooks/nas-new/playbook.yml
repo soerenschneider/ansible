@@ -3,6 +3,8 @@
   hosts: nas
   become: true
   gather_facts: true
+  vars:
+    node_exporter_add_users: ["{{ nas_media_user }}"]
   tasks:
     - name: "Run role platform"
       ansible.builtin.include_role:
