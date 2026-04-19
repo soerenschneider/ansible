@@ -30,20 +30,37 @@
   when: sc_agent_config is defined
   tags: [sc-agent, sc-agent-configure]
   block:
-    - name: Create config directory
+    - name: "Create config directory"
       ansible.builtin.file:
         path: "{{ sc_agent_conf_dir }}"
-        state: directory
-        owner: root
-        group: root
+        state: "directory"
+        owner: "root"
+        group: "root"
         mode: "0700"
 
-    - name: Create conf.d entries
+    - name: "Create templates directory"
+      ansible.builtin.file:
+        path: "{{ sc_agent_templates_dir }}"
+        state: "directory"
+        owner: "root"
+        group: "root"
+        mode: "0700"
+
+    - name: "Create templates"
+      ansible.builtin.copy:
+        src: "files/{{ item.key }}"
+        dest: "{{ item.value }}"
+        owner: "root"
+        group: "root"
+        mode: "0640"
+      loop: "{{ sc_agent_templates | dict2items }}"
+
+    - name: "Create conf.d entries"
       ansible.builtin.copy:
         content: "{{ item.value | to_nice_yaml(indent=2) }}"
         dest: "{{ sc_agent_conf_dir }}/{{ item.key }}"
-        owner: root
-        group: root
+        owner: "root"
+        group: "root"
         mode: "0600"
       notify: "Restart sc-agent"
       with_dict: "{{ sc_agent_conf_d }}"

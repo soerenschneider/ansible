@@ -8,6 +8,9 @@
     mode: "0740"
   with_fileglob:
     - "templates/mariadb-initdb/*.j2"
+  when:
+    - mariadb_cluster_mysqld_exporter_password | default('') != ''
+    - mariadb_cluster_replication_password | default('') != ''
   register: mariadb_cluster_configure_task_initdb_scripts
   tags: [mariadb, mariadb-configure]
 
@@ -20,6 +23,9 @@
     mode: "0740"
   with_fileglob:
     - "{{ playbook_dir }}/templates/mariadb-initdb/*.j2"
+  when:
+    - mariadb_cluster_mysqld_exporter_password | default('') != ''
+    - mariadb_cluster_replication_password | default('') != ''
   register: mariadb_cluster_configure_task_playbook_initdb_scripts
   tags: [mariadb, mariadb-configure]
 
@@ -45,15 +51,14 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
+  when: mariadb_cluster_root_password | default('') != ''
   register: mariadb_cluster_configure_task_set_password_file
   tags: [mariadb, mariadb-configure]
 
 - name: Add my.cnf
   ansible.builtin.copy:
     content: |
-      [mariadb-admin]
-      user = {{ mariadb_cluster_root_user }}
-      password = {{ mariadb_cluster_root_password }}
+      !include /etc/mysql/conf.d/secure-password.cnf
       [mariadb]
       ssl_cert = /certs/tls.crt
       ssl_key = /certs/tls.key
@@ -66,7 +71,6 @@
       wsrep_cluster_name = {{ mariadb_cluster_galera_cluster_name }}
       wsrep_provider = /usr/lib/galera/libgalera_smm.so
       wsrep_sst_method=mariabackup
-      wsrep_sst_auth=sst_user:{{ mariadb_cluster_replication_password }}
       wsrep_node_incoming_address={{ inventory_hostname }}
       wsrep_node_address={{ inventory_hostname }}
       wsrep-node-name={{ inventory_hostname }}
@@ -85,6 +89,23 @@
     owner: "{{ mariadb_cluster_user }}"
     group: "{{ mariadb_cluster_group }}"
     mode: "0440"
+  register: mariadb_cluster_configure_task_set_my_cnf
+  tags: [mariadb, mariadb-configure]
+
+- name: Add secure-password.cnf
+  ansible.builtin.copy:
+    content: |
+      user = {{ mariadb_cluster_root_user }}
+      password = {{ mariadb_cluster_root_password }}
+      wsrep_sst_auth=sst_user:{{ mariadb_cluster_replication_password }}
+    dest: "{{ mariadb_cluster_base_dir }}/secure-password.cnf"
+    owner: "{{ mariadb_cluster_user }}"
+    group: "{{ mariadb_cluster_group }}"
+    mode: "0440"
+  when:
+    - mariadb_cluster_root_user | default('') != ''
+    - mariadb_cluster_root_password | default('') != ''
+    - mariadb_cluster_replication_password | default('') != ''
   register: mariadb_cluster_configure_task_set_my_cnf
   tags: [mariadb, mariadb-configure]
 

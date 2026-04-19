@@ -19,6 +19,7 @@
       - "{{ mariadb_cluster_storage_dir }}:/var/lib/mysql:Z"
       - "{{ mariadb_cluster_base_dir }}/password-root:/etc/mysql/password-root:ro"
       - "{{ mariadb_cluster_base_dir }}/my.cnf:/etc/mysql/conf.d/galera.cnf"
+      - "{{ mariadb_cluster_base_dir }}/secure-password.cnf:/etc/mysql/conf.d/secure-password.cnf:ro"
   tags: [mariadb, mariadb-recover]
 
 - name: Run healthcheck

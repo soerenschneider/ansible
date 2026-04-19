@@ -1,0 +1,5 @@
+[mariadb-admin]
+user = {{ .root_user }}
+password = {{ .root_password }}
+[galera]
+wsrep_sst_auth={{ .sst_user }}:{{ .sst_password }}

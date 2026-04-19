@@ -3,6 +3,7 @@
 sc_agent_version: v1.13.1
 
 sc_agent_conf_dir: "/etc/sc-agent/conf.d"
+sc_agent_templates_dir: "/etc/sc-agent/templates"
 
 sc_agent_config:
   config_dir: "{{ sc_agent_conf_dir }}"
@@ -12,3 +13,5 @@ sc_agent_conf_d:
   01-http.yaml:
     http:
       address: "{{ ansible_default_ipv4.address }}:9999"
+
+sc_agent_templates: {}

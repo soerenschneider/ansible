@@ -37,6 +37,21 @@
     _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}"
   tags: [keycloak, keycloak-install, deps, bootstrap]
 
+- name: Add secure-password.cnf
+  ansible.builtin.copy:
+    content: |
+      KC_DB_USERNAME: "{{ .user }}"
+      KC_DB_PASSWORD: "{{ .password }}"
+      KC_DB_PASSWORD: "{{ .password }}"
+    dest: "/etc/keycloak.env"
+    owner: "root"
+    group: "root"
+    mode: "0440"
+  when:
+    - keycloak_db_user | default('') != ''
+    - keycloak_db_password | default('') != ''
+  tags: [keycloak, keycloak-install, deps, bootstrap]
+
 - name: Run keycloak
   community.docker.docker_container:
     name: "{{ keycloak_container_name }}"
@@ -59,8 +74,6 @@
       KC_TRANSACTION_XA_ENABLED: "false"
       KC_TRANSACTION_JTA_ENABLED: "false"
       KC_DB_URL: "jdbc:mariadb://{{ keycloak_db_host }}:3306/{{ keycloak_db_database }}?useSSL=true&requireSSL=true&verifyServerCertificate=false"
-      KC_DB_USERNAME: "{{ keycloak_db_user }}"
-      KC_DB_PASSWORD: "{{ keycloak_db_password }}"
       KC_HTTP_ENABLED: "true"
       KC_PROXY_HEADERS: "xforwarded"
       DB_POOL_INITIAL_SIZE: "1"
@@ -69,6 +82,7 @@
       DB_POOL_MIN_SIZE: "1"
       KC_HOSTNAME: "https://{{ inventory_hostname }}"
       TZ: UTC
+    env_file: "/etc/keycloak.env"
     command:
       - "start"
     volumes:

@@ -1,0 +1,4 @@
+-- keycloak
+CREATE DATABASE IF NOT EXISTS {{ .database_name }};
+CREATE USER '{{ .user }}'@'%' IDENTIFIED BY '{{ .password }}';
+GRANT ALL PRIVILEGES ON {{ .database_name }}.* TO '{{ .user }}'@'%';
