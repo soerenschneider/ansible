@@ -1,13 +1,14 @@
 ---
-- name: Syncthing
-  when: ansible_facts['system'] == "Linux"
-  block:
-    - name: Load syncthing config...
-      ansible.builtin.include_vars:
-        file: "{{ inventory_path }}/group_vars/desktop/syncthing.yaml"
-      ignore_errors: false
-      tags: syncthing
+- name: Try to load syncthing config...
+  ansible.builtin.include_vars:
+    file: "{{ inventory_path }}/host_vars/{{ inventory_hostname }}/syncthing.yaml"
+  ignore_errors: true
+  register: desktop_syncthing_vars_result
+  tags: syncthing
 
+- name: Syncthing
+  when: ansible_facts['system'] == "Linux" and not desktop_syncthing_vars_result.failed
+  block:
     - name: Create folders
       become: false
       ansible.builtin.file:
