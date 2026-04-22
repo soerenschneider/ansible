@@ -17,6 +17,20 @@
       "automerge": true,
       "matchUpdateTypes": ["minor", "patch"]
     }
+    {
+      "matchDatasources": ["github-tags"],
+      "matchDepNames": ["golang/go"],
+      "extractVersion": "^go(?<version>.*)$",
+      "versioning": "semver"
+    },
+    {
+      "matchDatasources": ["github-tags"],
+      "matchDepNames": ["golang/go"],
+      "groupName": "Go binary updates",
+      "automerge": true,
+      "automergeType": "branch",
+      "ignoreTests": true
+    }
   ],
   "regexManagers": [
      {
