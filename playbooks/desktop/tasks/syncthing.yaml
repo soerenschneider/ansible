@@ -1,4 +1,9 @@
 ---
+- name: Print config file to Try
+  ansible.builtin.debug:
+    msg: "{{ inventory_path }}/host_vars/{{ inventory_hostname }}/syncthing.yaml"
+  tags: syncthing
+
 - name: Try to load syncthing config...
   ansible.builtin.include_vars:
     file: "{{ inventory_path }}/host_vars/{{ inventory_hostname }}/syncthing.yaml"
@@ -7,15 +12,15 @@
   tags: syncthing
 
 - name: Syncthing
-  when: ansible_facts['system'] == "Linux" and not desktop_syncthing_vars_result.failed
+  when: not desktop_syncthing_vars_result.failed
   block:
     - name: Create folders
       become: false
       ansible.builtin.file:
         state: directory
         path: "{{ item.path }}"
-        owner: "{{ ansible_user }}"
-        group: "{{ ansible_user }}"
+        owner: "{{ ansible_facts['user_id'] }}"
+        group: "{{ ansible_facts['user_id'] }}"
         mode: "0700"
       with_items: "{{ syncthing_folders }}"
       tags: syncthing
