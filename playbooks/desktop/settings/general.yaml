@@ -28,7 +28,7 @@ go_version: "1.26.1"
 
 go_install_dir: "/usr/local"
 go_binary_dir: "/usr/local/go/bin"
-go_releases_url: "https://go.dev/dl/?mode=json"
+go_releases_url: "https://go.dev/dl/?mode=json&include=all"
 
 sw_dir: "{{ user_home }}/sw"
 gitlab_dir: "{{ user_home }}/src/gitlab"
