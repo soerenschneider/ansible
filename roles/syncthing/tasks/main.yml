@@ -1,24 +1,39 @@
 ---
-- name: Install syncthing
+- name: "Install syncthing (Darwin)"
   ansible.builtin.package:
     name: syncthing
-  become: true
+  when: ansible_facts['system'] == "Darwin"
   tags: [syncthing]
 
-- name: Check if conf exists
-  ansible.builtin.stat:
-    path: /home/{{ syncthing_user }}/.config/syncthing/config.xml
-  register: _syncthing_config
-  tags: [syncthing, syncthing-configure]
+- name: Detect home of user
+  tags: [syncthing]
+  when: ansible_facts['system'] == "Linux"
+  block:
+    - name: "Install syncthing (Linux)"
+      ansible.builtin.package:
+        name: syncthing
+      become: true
 
-- name: Add config
-  ansible.builtin.file:
-    path: /home/{{ syncthing_user }}/.config/syncthing
-    state: directory
-    owner: "{{ syncthing_user }}"
-    group: "{{ syncthing_user }}"
-    mode: "0700"
-  tags: [syncthing, syncthing-configure]
+    - name: Get syncthing user info
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ syncthing_user }}"
+      register: syncthing_passwd
+
+    - name: Set syncthing home
+      ansible.builtin.set_fact:
+        syncthing_home: "{{ syncthing_passwd.ansible_facts.getent_passwd[syncthing_user][4] }}"
+
+- name: Set syncthing config dir
+  ansible.builtin.set_fact:
+    syncthing_config_dir: >-
+      {{ (ansible_facts['os_family'] == 'Darwin')
+        | ternary(
+            syncthing_home ~ '/Library/Application Support/Syncthing',
+            syncthing_home ~ '/.config/syncthing'
+          )
+      }}
+  tags: [syncthing]
 
 - name: "Set syncthing_local_devices variable"
   ansible.builtin.set_fact:
@@ -26,28 +41,40 @@
   with_items: "{{ syncthing_folders | default([]) }}"
   tags: [syncthing, syncthing-configure]
 
-- name: Make sure syncthing is stopped
+- name: "Make sure syncthing is stopped (Linux)"
   ansible.builtin.systemd:
     name: syncthing@{{ syncthing_user }}
     state: stopped
   become: true
+  when: ansible_facts['system'] == "Linux"
   tags: [syncthing, syncthing-configure]
 
-- name: Add config
+- name: "Make sure syncthing is stopped (Darwin)"
+  ansible.builtin.command: "brew services stop syncthing"
+  when: ansible_facts['system'] == "Darwin"
+  tags: [syncthing, syncthing-configure]
+
+- name: "Add config"
   ansible.builtin.template:
     src: syncthing-config.xml.j2
-    dest: /home/{{ syncthing_user }}/.config/syncthing/config.xml
+    dest: "{{ syncthing_config_dir }}/config.xml"
     owner: "{{ syncthing_user }}"
-    group: "{{ syncthing_user }}"
+    group: "{{ syncthing_group | default(syncthing_user) }}"
     mode: "0600"
   tags: [syncthing, syncthing-configure]
 
-- name: Enable and start syncthing
+- name: "Enable and start syncthing (Linux)"
   ansible.builtin.systemd:
     name: syncthing@{{ syncthing_user }}
     enabled: "{{ syncthing_enabled | default(true) }}"
     state: "{% if syncthing_enabled | default(true) %}started{% else %}stopped{% endif %}"
   become: true
+  when: ansible_facts['system'] == "Linux"
+  tags: [syncthing, syncthing-configure]
+
+- name: "Make sure syncthing is started (Darwin)"
+  ansible.builtin.command: "brew services start syncthing"
+  when: ansible_facts['system'] == "Darwin"
   tags: [syncthing, syncthing-configure]
 
 - name: "Run tasks metrics.yml"

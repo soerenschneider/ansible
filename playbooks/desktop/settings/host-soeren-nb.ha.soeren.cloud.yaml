@@ -4,3 +4,6 @@ location: ha
 use_wireguard: true
 wireguard_wg_net_name: mesh
 wg_enable_default: false
+
+syncthing_home: "/Users/soeren"
+syncthing_user: "soeren"

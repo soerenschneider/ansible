@@ -33,6 +33,17 @@
     chdir: "{{ github_dir }}/dotfiles"
   register: output
   changed_when: true
+  when: ansible_facts['system'] == "Linux"
+  tags: repos
+
+- name: "Install dotfiles (Mac OS)"
+  ansible.builtin.command: "bash ./install-macos.sh"
+  become: false
+  args:
+    chdir: "{{ github_dir }}/dotfiles"
+  register: output
+  changed_when: true
+  when: ansible_facts['system'] == "Darwin"
   tags: repos
 
 - name: "Install scripts"
