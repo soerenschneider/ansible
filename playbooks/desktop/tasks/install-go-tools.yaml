@@ -1,4 +1,10 @@
 ---
+- name: Install age
+  become: false
+  ansible.builtin.command: "{{ go_binary_dir }}/go install filippo.io/age/cmd/...@{{ age_version }}"
+  changed_when: true
+  tags: [age, go, packages]
+
 - name: Install cosign
   become: false
   ansible.builtin.command: "{{ go_binary_dir }}/go install github.com/sigstore/cosign/v3/cmd/cosign@{{ cosign_version }}"
