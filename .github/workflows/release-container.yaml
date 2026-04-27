@@ -22,7 +22,7 @@ jobs:
       packages: write
 
     steps:
-      - uses: "googleapis/release-please-action@v4"
+      - uses: "googleapis/release-please-action@v5"
         name: release
         id: release
         with:
