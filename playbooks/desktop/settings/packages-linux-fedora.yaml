@@ -230,3 +230,14 @@ install_packages:
   - hunspell-es-ES
   - hunspell-pt
   - sdcv
+  - ocrmypdf
+  - tesseract
+  ######################################
+  # Fedora release upgrade helpers
+  ######################################
+
+  - dracut-config-rescue
+  - rpmconf
+  - remove-retired-packages
+  - clean-rpm-gpg-pubkey
+  - symlinks
