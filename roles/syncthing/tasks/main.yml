@@ -51,6 +51,7 @@
 
 - name: "Make sure syncthing is stopped (Darwin)"
   ansible.builtin.command: "brew services stop syncthing"
+  changed_when: true
   when: ansible_facts['system'] == "Darwin"
   tags: [syncthing, syncthing-configure]
 
@@ -75,6 +76,7 @@
 - name: "Make sure syncthing is started (Darwin)"
   ansible.builtin.command: "brew services start syncthing"
   when: ansible_facts['system'] == "Darwin"
+  changed_when: true
   tags: [syncthing, syncthing-configure]
 
 - name: "Run tasks metrics.yml"

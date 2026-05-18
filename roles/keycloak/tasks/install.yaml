@@ -37,7 +37,7 @@
     _keycloak_user_string: "{{ getent_passwd['keycloak'][1] }}"
   tags: [keycloak, keycloak-install, deps, bootstrap]
 
-- name: Add secure-password.cnf
+- name: Add secure-password.cnf  # noqa jinja[invalid]
   ansible.builtin.copy:
     content: |
       KC_DB_USERNAME: "{{ .user }}"
