@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 
+FOLDER="{{ transmission_download_dir | default('/var/lib/transmission/complete') }}"
+
+# Delete empty directories, but never the root folder itself
+if [ -n "${FOLDER}" ]; then
+    find "${FOLDER}" -mindepth 1 -type d -empty -delete
+fi
+
 # https://github.com/soerenschneider/fetcharr
 HOST="{{ transmission_webhook_done_url }}"
 
 curl --connect-timeout 5 \
      --max-time 10 \
-     --retry 5 \
-     --retry-delay 5 \
-     --retry-max-time 40 \
+     --retry 20 \
+     --retry-max-time 900 \
      -X POST "${HOST}/webhook"
