@@ -3,8 +3,8 @@
   ansible.builtin.include_tasks: system_basics.yml
   tags: [base]
 
-- name: "Run tasks resilience.yml"
-  ansible.builtin.include_tasks: resilience.yml
+- name: "Run tasks sysctl.yml"
+  ansible.builtin.include_tasks: sysctl.yml
   tags: [base, base-resilience]
 
 - name: "Run tasks firewall_data.yml"

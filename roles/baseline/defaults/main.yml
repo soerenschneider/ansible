@@ -26,3 +26,10 @@ baseline_authorized_keys_soft: []
 
 # authorized_keys stored on hardware tokens (won't get automatically confined by 'from' on internal systems)
 baseline_authorized_keys_hw: []
+
+baseline_age_key_path: /etc/age/keys.txt
+baseline_age_bin: /usr/local/bin/age-keygen
+baseline_force_age_keygen: false
+
+baseline_linux_sysctl_congestion_control: "bbr"
+baseline_linux_sysctl_net_qdisc: "fq"

@@ -1,0 +1,24 @@
+---
+- name: "Auto reboot on kernel panic"
+  ansible.posix.sysctl:
+    name: "kernel.panic"
+    value: "{{ baseline_linux_sysctl_kernel_panic | default('10') }}"
+    sysctl_set: true
+  when: [ansible_system == "Linux"]
+  tags: [base, base-resilience]
+
+- name: "Set tcp congestion algorithm"
+  ansible.posix.sysctl:
+    name: "net.ipv4.tcp_congestion_control"
+    value: "{{ baseline_linux_sysctl_congestion_control }}"
+    sysctl_set: true
+  when: [ansible_system == "Linux"]
+  tags: [base, base-resilience]
+
+- name: "Set tcp congestion algorithm"
+  ansible.posix.sysctl:
+    name: "net.core.default_qdisc"
+    value: "{{ baseline_linux_sysctl_net_qdisc }}"
+    sysctl_set: true
+  when: [ansible_system == "Linux"]
+  tags: [base, base-resilience]

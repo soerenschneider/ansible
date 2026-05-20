@@ -1,0 +1,67 @@
+---
+- name: "Install age"
+  ansible.builtin.package:
+    name: "age"
+  tags: [base, age]
+
+- name: Ensure age binary is present
+  ansible.builtin.stat:
+    path: "{{ baseline_age_bin }}"
+  register: age_bin_stat
+  tags: [base, age]
+
+- name: Fail if age-keygen is not installed
+  ansible.builtin.fail:
+    msg: "age-keygen binary not found at {{ baseline_age_bin }}"
+  when: not age_bin_stat.stat.exists
+  tags: [base, age]
+
+- name: Check if age key already exists
+  ansible.builtin.stat:
+    path: "{{ baseline_age_key_path }}"
+  register: age_key_stat
+  tags: [base, age]
+
+- name: Ensure key directory exists
+  ansible.builtin.file:
+    path: "{{ baseline_age_key_path | dirname }}"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: "0700"
+  tags: [base, age]
+
+- name: Generate age key if missing or forced
+  ansible.builtin.command: "{{ baseline_age_bin }} -o {{ baseline_age_key_path }}"
+  args:
+    creates: "{{ baseline_age_key_path }}"
+  when: force_age_keygen or not age_key_stat.stat.exists
+  register: age_keygen_result
+  changed_when: true
+  no_log: true
+  tags: [base, age]
+
+- name: Set correct permissions on key file
+  ansible.builtin.file:
+    path: "{{ baseline_age_key_path }}"
+    owner: "root"
+    group: "root"
+    mode: "0600"
+  tags: [base, age]
+
+- name: Extract public key
+  ansible.builtin.shell: "grep '^# public key:' {{ baseline_age_key_path }} | awk '{print $4}'"
+  register: age_public_key
+  changed_when: false
+  tags: [base, age]
+
+- name: Register public key as fact
+  ansible.builtin.set_fact:
+    age_public_key: "{{ baseline_age_public_key.stdout }}"
+  tags: [base, age]
+
+- name: Print public key
+  ansible.builtin.debug:
+    msg: "Public key for {{ inventory_hostname }}: {{ baseline_age_public_key }}"
+  when: not ansible_check_mode
+  tags: [base, age]
