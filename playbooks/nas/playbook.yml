@@ -76,6 +76,11 @@
         name: fetcharr
       tags: always
 
+    - name: "Run tasks nas-mirror.yaml"
+      ansible.builtin.include_tasks: "tasks/nas-mirror.yaml"
+      when: nas_mirror_enabled | default(false)
+      tags: always
+
     - name: "Add template file"
       ansible.builtin.copy:
         content: "{{ fetcharr_webhook_template }}"

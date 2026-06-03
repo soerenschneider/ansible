@@ -1,0 +1,31 @@
+---
+- name: "Copy sync nas script"
+  ansible.builtin.copy:
+    src: "templates/nas-mirror.sh"
+    dest: "/usr/local/bin/nas-mirror.sh"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  tags: [nas-mirror]
+
+- name: "Install nas-mirror systemd units"
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "/etc/systemd/system/{{ item.dest }}"
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  loop:
+    - src: nas-mirror.service.j2
+      dest: nas-mirror.service
+    - src: nas-mirror.timer.j2
+      dest: nas-mirror.timer
+  notify: Reload systemd
+  tags: [nas-mirror]
+
+- name: Enable and start nas-mirror timer
+  ansible.builtin.systemd:
+    name: "nas-mirror.timer"
+    enabled: true
+    state: "started"
+  tags: [nas-mirror]

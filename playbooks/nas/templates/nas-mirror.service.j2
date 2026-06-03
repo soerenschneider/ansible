@@ -1,0 +1,11 @@
+[Unit]
+Description=Sync NAS
+
+[Service]
+Type=oneshot
+User={{ nas_mirror_user }}
+Group={{ nas_mirror_group }}
+{% if nas_mirror_bwlimit | default(0) > 0 %}
+Environment="BWLIMIT=nas_mirror_bwlimit"
+{% endif %}
+ExecStart=/usr/local/bin/nas-mirror.sh
