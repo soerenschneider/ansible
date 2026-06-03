@@ -5,47 +5,32 @@
   gather_facts: true
   vars:
     node_exporter_add_users: ["{{ nas_media_user }}"]
-    metrics_emitter_bins: /var/lib/metrics-emitter
-    node_exporter_systemd_whitelist: (acmevault.*|apparmor|cron|mpd|occult.*|ssh|ssh-key-signer|syncthing.*|smbd|unattended-upgrades)\.service
-    mpd_music_path: /srv/files/media/music
-    acmevault_client_config: "{{ acmevault_default_client_config }}"
-
-    # renovate: datasource=github-releases depName=rfjakob/gocryptfs versioning=semver-coerced
-    gocryptfs_version: v2.6.1
-
   tasks:
-    - name: Read specific settings file
-      ansible.builtin.include_vars:
-        file: settings-{{ fileserver_mode | default('passive') }}.yml
-      tags: [always]
-
-    - name: "Run role garage"
-      ansible.builtin.include_role:
-        name: "garage"
-      tags: always
-
-    - name: "Manage fileserver mode file"
-      ansible.builtin.file:
-        path: "{{ nas_fileserver_mode_active_file }}"
-        state: "{{ 'touch' if fileserver_mode == 'active' else 'absent' }}"
-        owner: "root"
-        group: "root"
-        mode: "0644"
-      tags: media
-
     - name: "Run role platform"
       ansible.builtin.include_role:
         name: platform
       tags: always
 
-    - name: "Run role navidrome"
-      ansible.builtin.include_role:
-        name: navidrome
+    - name: "Run tasks storage.yml"
+      ansible.builtin.include_tasks: "tasks/storage.yaml"
       tags: always
 
-    - name: "Run role jellyfin"
+    - name: "Run tasks media.yml"
+      ansible.builtin.include_tasks: "tasks/media.yaml"
+      tags: always
+
+    - name: "Run tasks webserver.yml"
+      ansible.builtin.include_tasks: "tasks/webserver.yaml"
+      tags: always
+
+    - name: "Run role samba"
       ansible.builtin.include_role:
-        name: jellyfin
+        name: samba
+      tags: always
+
+    - name: "Run role filebrowser"
+      ansible.builtin.include_role:
+        name: "filebrowser"
       tags: always
 
     - name: "Run role minio"
@@ -65,34 +50,6 @@
         mpd_output_device: "null"
       tags: always
 
-    - name: "Run role samba"
-      ansible.builtin.include_role:
-        name: samba
-      tags: always
-
-    - name: "Run role rclone"
-      ansible.builtin.include_role:
-        name: rclone
-      when: fileserver_mode | default('passive') == "active"
-      tags: always
-
-    - name: "Run role dufs"
-      ansible.builtin.include_role:
-        name: dufs
-      vars:
-        dufs_identifier: media
-        dufs_bind: "0.0.0.0"
-        dufs_port: 5000
-        dufs_allow_search: true
-        dufs_path_prefix: "/media"
-        dufs_serve_path: "/srv/files/media"
-      tags: always
-
-    - name: "Run role gocryptfs"
-      ansible.builtin.include_role:
-        name: gocryptfs
-      tags: always
-
     - name: "Run role restic"
       ansible.builtin.include_role:
         name: restic
@@ -102,14 +59,11 @@
     - name: "Run role magnetotactic"
       ansible.builtin.include_role:
         name: magnetotactic
-      when: fileserver_mode | default('passive') == "active"
       tags: always
 
     - name: "Run role occult"
       ansible.builtin.include_role:
         name: occult
-      vars:
-        occult_run_on_boot: "{{ fileserver_mode | default('passive') == 'active' }}"
       tags: always
 
     - name: "Run role syncthing"
@@ -117,14 +71,9 @@
         name: syncthing
       tags: always
 
-    - name: "Run tasks disk.yml"
-      ansible.builtin.include_tasks: tasks/disk.yml
-      tags: always
-
     - name: "Run role fetcharr"
       ansible.builtin.include_role:
         name: fetcharr
-      when: fileserver_mode | default('passive') == "active"
       tags: always
 
     - name: "Add template file"
@@ -137,53 +86,8 @@
       tags: [fetcharr, fetcharr-configure]
       when: fileserver_mode | default('passive') == "active"
 
-    - name: "Run tasks media.yml"
-      ansible.builtin.include_tasks: tasks/media.yml
-      tags: always
-
-    - name: "Run tasks verify_flacs.yml"
-      ansible.builtin.include_tasks: tasks/verify_flacs.yml
-      tags: always
-
-    - name: "Run tasks aliases.yml"
-      ansible.builtin.include_tasks: tasks/aliases.yml
-      tags: always
-
-    - name: "Run tasks webserver.yml"
-      ansible.builtin.include_tasks: tasks/webserver.yml
-      tags: always
-
-    - name: "Run role metrics_emitter"
-      ansible.builtin.include_role:
-        name: metrics_emitter
-      tags: always
-
-    - name: "Run role directory_exporter"
-      ansible.builtin.include_role:
-        name: directory_exporter
-      when: false
-      tags: always
-
-    - name: "Run tasks metrics.yml"
-      ansible.builtin.include_tasks: tasks/metrics.yml
-      tags: always
-
     - name: "Run tasks haproxy.yml"
-      ansible.builtin.include_tasks: tasks/haproxy.yml
-      tags: always
-
-    - name: "Install git-sync"
-      ansible.builtin.include_role:
-        name: "git_sync"
-      tags: always
-
-    - name: "Install git-server"
-      ansible.builtin.include_role:
-        name: "git_server"
-      tags: always
-
-    - name: "Run tasks wiki.yaml"
-      ansible.builtin.include_tasks: tasks/wiki.yaml
+      ansible.builtin.include_tasks: tasks/haproxy.yaml
       tags: always
   handlers:
     - name: "Mount_all_disks"
@@ -192,17 +96,17 @@
 
     - name: "Restart webserver"
       ansible.builtin.systemd:
-        state: restarted
-        name: nginx
+        state: "restarted"
+        name: "nginx"
 
     - name: "Restart haproxy"
       ansible.builtin.systemd:
-        state: restarted
-        name: haproxy
+        state: "restarted"
+        name: "haproxy"
       failed_when: false
 
     - name: "Restart samba"
       ansible.builtin.systemd:
-        state: restarted
+        state: "restarted"
         name: "{{ item }}"
       with_items: [smb, nmb]
