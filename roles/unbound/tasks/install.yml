@@ -14,10 +14,10 @@
 
     - name: Create systemd override directory
       ansible.builtin.file:
-        path: /etc/systemd/system/unbound.service.d
-        state: directory
-        owner: root
-        group: root
+        path: "/etc/systemd/system/unbound.service.d"
+        state: "directory"
+        owner: "root"
+        group: "root"
         mode: "0755"
 
     - name: Create override for unbound service
@@ -54,6 +54,15 @@
   failed_when: unbound_anchor.rc not in [0, 1]
   changed_when: true
   tags: [unbound, unbound-install]
+
+- name: "Create unbound conf.d dir"
+  ansible.builtin.file:
+    path: "{{ unbound_config_conf_d_dir }}"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0750"
+  tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
 
 - name: Create unbound database local.db
   ansible.builtin.template:
