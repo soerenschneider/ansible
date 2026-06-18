@@ -1,4 +1,24 @@
 ---
+- name: "Ensure kernel modules are loaded"
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - overlay
+    - br_netfilter
+  tags: [k0s, k0s-configure, k8s, kubernetes, sysctl]
+
+- name: "Persist kernel modules across reboots"
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k0s.conf
+    content: |
+      overlay
+      br_netfilter
+    owner: root
+    group: root
+    mode: "0644"
+  tags: [k0s, k0s-configure, k8s, kubernetes, sysctl]
+
 - name: "Kubernetes sysctl tuning"
   ansible.posix.sysctl:
     name: "{{ item.name }}"
