@@ -16,7 +16,7 @@
     {
       "automerge": true,
       "matchUpdateTypes": ["minor", "patch"]
-    }
+    },
     {
       "matchDatasources": ["github-tags"],
       "matchDepNames": ["golang/go"],
