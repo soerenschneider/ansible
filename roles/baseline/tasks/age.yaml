@@ -7,19 +7,19 @@
 - name: Ensure age binary is present
   ansible.builtin.stat:
     path: "{{ baseline_age_bin }}"
-  register: age_bin_stat
+  register: baseline_age_bin_stat
   tags: [base, age]
 
 - name: Fail if age-keygen is not installed
   ansible.builtin.fail:
     msg: "age-keygen binary not found at {{ baseline_age_bin }}"
-  when: not age_bin_stat.stat.exists
+  when: not baseline_age_bin_stat.stat.exists
   tags: [base, age]
 
 - name: Check if age key already exists
   ansible.builtin.stat:
     path: "{{ baseline_age_key_path }}"
-  register: age_key_stat
+  register: baseline_age_key_stat
   tags: [base, age]
 
 - name: Ensure key directory exists
@@ -35,8 +35,8 @@
   ansible.builtin.command: "{{ baseline_age_bin }} -o {{ baseline_age_key_path }}"
   args:
     creates: "{{ baseline_age_key_path }}"
-  when: force_age_keygen or not age_key_stat.stat.exists
-  register: age_keygen_result
+  when: force_age_keygen or not baseline_age_key_stat.stat.exists
+  register: baseline_age_keygen_result
   changed_when: true
   no_log: true
   tags: [base, age]
@@ -50,7 +50,9 @@
   tags: [base, age]
 
 - name: Extract public key
-  ansible.builtin.shell: "grep '^# public key:' {{ baseline_age_key_path }} | awk '{print $4}'"
+  ansible.builtin.shell:
+    cmd: "set -o pipefail && grep '^# public key:' {{ baseline_age_key_path }} | awk '{print $4}'"
+    executable: "/bin/bash"
   register: age_public_key
   changed_when: false
   tags: [base, age]
