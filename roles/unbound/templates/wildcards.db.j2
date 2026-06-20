@@ -1,0 +1,4 @@
+{% for wildcard_domain in unbound_wildcard_domains %}
+    local-zone: "{{ wildcard_domain.domain }}" redirect
+    local-data: "{{ wildcard_domain.domain }} 3600 IN A {{ wildcard_domain.record_a }}"
+{% endfor %}

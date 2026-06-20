@@ -60,27 +60,21 @@
     path: "{{ unbound_config_conf_d_dir }}"
     state: "directory"
     owner: "root"
-    group: "root"
+    group: "{{ unbound_config_group }}"
     mode: "0750"
   tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
 
-- name: Create unbound database local.db
+- name: "Create local unbound database"
   ansible.builtin.template:
-    src: "local.db.j2"
-    dest: "{{ unbound_config_conf_d_dir }}/local.db"
+    src: "{{ item }}.j2"
+    dest: "{{ unbound_config_conf_d_dir }}/{{ item }}"
     owner: "root"
     group: "{{ unbound_config_group }}"
     mode: "0644"
-  notify: "Restart unbound"
-  tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
-
-- name: Create unbound database virtual-ips.db
-  ansible.builtin.template:
-    src: "virtual-ips.db.j2"
-    dest: "{{ unbound_config_conf_d_dir }}/virtual-ips.db"
-    owner: "root"
-    group: "{{ unbound_config_group }}"
-    mode: "0644"
+  loop:
+    - "local.db"
+    - "virtual-ips.db"
+    - "wildcards.db"
   notify: "Restart unbound"
   tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
 
