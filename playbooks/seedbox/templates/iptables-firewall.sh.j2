@@ -98,7 +98,7 @@ fi
 if [ -f /sys/module/xt_geoip/refcnt ]; then
     log "Applying GeoIP-based firewall rules..."
     # Only serve ip-plz for German IPs
-    iptables -A INPUT -i "${INET_IFACE}" -p tcp --dport 8443 -m geoip --src-cc DE -j ACCEPT
+    iptables -A INPUT -i "${INET_IFACE}" -p tcp --dport 8443 -m geoip --src-cc DE,PT -j ACCEPT
     #iptables -A INPUT -i "${INET_IFACE}" -m geoip --src-cc DE,CH -j REJECT --reject-with icmp-host-prohibited
     # Allow outgoing TCP connections to Germany and Switzerland only for ssh, DNS and http(s), restrict otherwise
     iptables -A OUTPUT -o "${INET_IFACE}" -p tcp -m multiport --dports 22,53,80,443,853 -m geoip --dst-cc DE,CH -j ACCEPT
@@ -122,8 +122,10 @@ iptables -A OUTPUT -o "${INET_IFACE}" -j REJECT --reject-with icmp-host-prohibit
 
 iptables -A INPUT -i "${WG_IFACE}" -p icmp --icmp-type echo-request -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.2.0/24 -p tcp --dport 443 -j ACCEPT
-iptables -A INPUT -i "${WG_IFACE}" -s 192.168.64.0/24 -p tcp --dport 443 -j ACCEPT
-iptables -A INPUT -i "${WG_IFACE}" -s 192.168.65.0/24 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.64.1/26 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.65.0/26 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.72.0/26 -p tcp --dport 443 -j ACCEPT
+iptables -A INPUT -i "${WG_IFACE}" -s 192.168.73.0/26 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.100/27 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -s 192.168.200.200/32 -p tcp --dport 443 -j ACCEPT
 iptables -A INPUT -i "${WG_IFACE}" -p tcp -m multiport --dports 8405,9167,9443,9823 -j ACCEPT
