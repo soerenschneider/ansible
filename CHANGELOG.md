@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.2.1](https://github.com/soerenschneider/ansible/compare/v1.2.0...v1.2.1) (2026-07-24)
+
+
+### Bug Fixes
+
+* **deps:** update actions/checkout action to v6.0.3 ([#323](https://github.com/soerenschneider/ansible/issues/323)) ([55903fe](https://github.com/soerenschneider/ansible/commit/55903fe9c684c4a2767e49101d40ac17615bf68a))
+* **deps:** update actions/checkout action to v6.1.0 ([#374](https://github.com/soerenschneider/ansible/issues/374)) ([075ebed](https://github.com/soerenschneider/ansible/commit/075ebedb9a2b95add2a3b8a096105a64708bc021))
+* **deps:** update ansible/ansible-lint action to v26.6.0 ([#354](https://github.com/soerenschneider/ansible/issues/354)) ([78b26c6](https://github.com/soerenschneider/ansible/commit/78b26c6cffe821ee2c7c1630dcdd22f7c5219a97))
+* **deps:** update dependency ansible to v13.8.0 ([#333](https://github.com/soerenschneider/ansible/issues/333)) ([7446b84](https://github.com/soerenschneider/ansible/commit/7446b84a29923aa862e04e5eba8bffc48a678b35))
+* **deps:** update dependency ansible.posix to v2.2.1 ([#334](https://github.com/soerenschneider/ansible/issues/334)) ([8d93c87](https://github.com/soerenschneider/ansible/commit/8d93c870b9ceb58c6d08073ce1dd6ea98a755418))
+* **deps:** update dependency ansible.posix to v2.2.2 ([#365](https://github.com/soerenschneider/ansible/issues/365)) ([9f5c98a](https://github.com/soerenschneider/ansible/commit/9f5c98a86a2fb837ef638a422e0928012d87f405))
+* **deps:** update dependency community.crypto to v3.2.2 ([#324](https://github.com/soerenschneider/ansible/issues/324)) ([ec1fb58](https://github.com/soerenschneider/ansible/commit/ec1fb5859386db1a8c88d4606bc02d84680d932e))
+* **deps:** update dependency community.crypto to v3.3.0 ([#369](https://github.com/soerenschneider/ansible/issues/369)) ([d8f8819](https://github.com/soerenschneider/ansible/commit/d8f8819d1c6beae53e82b7a13a065a308fec8cd2))
+* **deps:** update dependency community.docker to v5.2.1 ([#325](https://github.com/soerenschneider/ansible/issues/325)) ([0b6408a](https://github.com/soerenschneider/ansible/commit/0b6408aa4c143d0b5ad33e547081d9ef4d993e8b))
+* **deps:** update dependency community.general to v12.6.2 ([#326](https://github.com/soerenschneider/ansible/issues/326)) ([63d4b1a](https://github.com/soerenschneider/ansible/commit/63d4b1a0a5e6d97f17f733f2562d178c9531c0c0))
+* **deps:** update dependency community.general to v12.6.3 ([#368](https://github.com/soerenschneider/ansible/issues/368)) ([0128128](https://github.com/soerenschneider/ansible/commit/01281281b75be5f9bd43112588d7651d9807579c))
+* **deps:** update dependency community.sops to v2.4.0 ([#335](https://github.com/soerenschneider/ansible/issues/335)) ([681086c](https://github.com/soerenschneider/ansible/commit/681086c3a1f1cdf394b3d29abc306bca374ff073))
+* **deps:** update dependency getsops/sops to v3.13.2 ([#336](https://github.com/soerenschneider/ansible/issues/336)) ([50db67c](https://github.com/soerenschneider/ansible/commit/50db67cf112e9a85bc0ce6a92208fd17dc7bf95e))
+* **deps:** update dependency golangci/golangci-lint to v2.12.2 ([#337](https://github.com/soerenschneider/ansible/issues/337)) ([2452839](https://github.com/soerenschneider/ansible/commit/24528397cf8cf041720d0f1032a71ff528fb9a91))
+* **deps:** update dependency gruntwork-io/terragrunt to v1.0.8 ([#327](https://github.com/soerenschneider/ansible/issues/327)) ([3de4a60](https://github.com/soerenschneider/ansible/commit/3de4a600fd7df567e54f75e2548014d6aed7e676))
+* **deps:** update dependency gruntwork-io/terragrunt to v1.1.0 ([#355](https://github.com/soerenschneider/ansible/issues/355)) ([b720650](https://github.com/soerenschneider/ansible/commit/b720650f0cbcdf278573ce796f717eb47f7a62f5))
+* **deps:** update dependency gruntwork-io/terragrunt to v1.1.1 ([#370](https://github.com/soerenschneider/ansible/issues/370)) ([e51f95a](https://github.com/soerenschneider/ansible/commit/e51f95a31bca34159826bb9b3a805f34ae458012))
+* **deps:** update dependency int128/kubelogin to v1.36.2 ([#328](https://github.com/soerenschneider/ansible/issues/328)) ([3a8b4c9](https://github.com/soerenschneider/ansible/commit/3a8b4c931fc9ed7b0e0282827c0b452ea227e18e))
+* **deps:** update dependency int128/kubelogin to v1.36.3 ([#372](https://github.com/soerenschneider/ansible/issues/372)) ([be80426](https://github.com/soerenschneider/ansible/commit/be804263767fc2288f049078f9c393eb29f84c8d))
+* **deps:** update dependency k0sproject/k0s to v1.36.2+k0s.0 ([#353](https://github.com/soerenschneider/ansible/issues/353)) ([b9217b3](https://github.com/soerenschneider/ansible/commit/b9217b32ff22e7bb144c115d7fe827fd7227f3f7))
+* **deps:** update dependency mikefarah/yq to v4.53.3 ([#329](https://github.com/soerenschneider/ansible/issues/329)) ([c6944ac](https://github.com/soerenschneider/ansible/commit/c6944ac9a2032948a04c8c540f666e7338aad236))
+* **deps:** update dependency nats-io/natscli to v0.4.0 ([#338](https://github.com/soerenschneider/ansible/issues/338)) ([629ef19](https://github.com/soerenschneider/ansible/commit/629ef190f54928937cb8ae7a97fa985dda401ceb))
+* **deps:** update dependency navidrome/navidrome to v0.62.0 ([#339](https://github.com/soerenschneider/ansible/issues/339)) ([c3cee7f](https://github.com/soerenschneider/ansible/commit/c3cee7fcdd40946a53bcc19f7abbbc632cc09312))
+* **deps:** update dependency navidrome/navidrome to v0.63.1 ([#362](https://github.com/soerenschneider/ansible/issues/362)) ([650a31d](https://github.com/soerenschneider/ansible/commit/650a31d03b3d8fc30c839b930ac0d504016fb017))
+* **deps:** update dependency navidrome/navidrome to v0.63.2 ([#366](https://github.com/soerenschneider/ansible/issues/366)) ([4f0bc8b](https://github.com/soerenschneider/ansible/commit/4f0bc8bb70e607306070a0377dc6e7d2e70ecf1c))
+* **deps:** update dependency openbao/openbao to v2.5.5 ([#330](https://github.com/soerenschneider/ansible/issues/330)) ([50bc568](https://github.com/soerenschneider/ansible/commit/50bc568bfe1294f57d62568595609b2fe4e90fd1))
+* **deps:** update dependency openbao/openbao to v2.6.1 ([#371](https://github.com/soerenschneider/ansible/issues/371)) ([4abfe20](https://github.com/soerenschneider/ansible/commit/4abfe20f476ab2b31eb21b713b21b264c1800978))
+* **deps:** update dependency pgsty/minio to release.2026-06-18t00-00-00z ([#340](https://github.com/soerenschneider/ansible/issues/340)) ([64aa609](https://github.com/soerenschneider/ansible/commit/64aa609c242d607cdd7dd7b9d189b496db0ed0b6))
+* **deps:** update dependency prometheus/alertmanager to v0.33.1 ([#341](https://github.com/soerenschneider/ansible/issues/341)) ([a4c5a38](https://github.com/soerenschneider/ansible/commit/a4c5a38ab71baa67e351557a007abed288a251e0))
+* **deps:** update dependency sigoden/dufs to v0.46.0 ([#342](https://github.com/soerenschneider/ansible/issues/342)) ([f05ae36](https://github.com/soerenschneider/ansible/commit/f05ae36857ca7617897626020ca2626fa39fc35e))
+* **deps:** update dependency sigstore/cosign to v3.1.1 ([#343](https://github.com/soerenschneider/ansible/issues/343)) ([f92231b](https://github.com/soerenschneider/ansible/commit/f92231b81bca055763594ca28583d24d4e3e59a1))
+* **deps:** update dependency sigstore/cosign to v3.1.2 ([#373](https://github.com/soerenschneider/ansible/issues/373)) ([bb42870](https://github.com/soerenschneider/ansible/commit/bb4287027d55aae560cd7d2ffadd8100148eb7f2))
+* **deps:** update dependency soerenschneider/ip-plz to v1.5.0 ([#344](https://github.com/soerenschneider/ansible/issues/344)) ([087f1ac](https://github.com/soerenschneider/ansible/commit/087f1ac6177e1d688d09045ad6f62f3034939616))
+* **deps:** update quay.io/keycloak/keycloak docker tag to v26.6.4 ([#331](https://github.com/soerenschneider/ansible/issues/331)) ([79b12b8](https://github.com/soerenschneider/ansible/commit/79b12b8c7f4a962bfd1e81f8fee9036b65101fb6))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.6.3 ([#332](https://github.com/soerenschneider/ansible/issues/332)) ([e64eb9c](https://github.com/soerenschneider/ansible/commit/e64eb9cc2364f6883507c2999dd224bbd18e6b15))
+* **deps:** update quay.io/phasetwo/keycloak-crdb docker tag to v26.6.4 ([#352](https://github.com/soerenschneider/ansible/issues/352)) ([38f353e](https://github.com/soerenschneider/ansible/commit/38f353ec7b984f4b50ede767f1325753da417d7b))
+* fix syntax ([7d010ba](https://github.com/soerenschneider/ansible/commit/7d010ba76acd42467fb3f7400619cc00aa47c81c))
+
 ## [1.2.0](https://github.com/soerenschneider/ansible/compare/v1.1.1...v1.2.0) (2026-06-20)
 
 
