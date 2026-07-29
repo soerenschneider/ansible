@@ -3,22 +3,26 @@
   ansible.posix.sysctl:
     name: "kernel.panic"
     value: "{{ baseline_linux_sysctl_kernel_panic | default('10') }}"
+    sysctl_file: "/etc/sysctl.d/90-baseline.conf"
     sysctl_set: true
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience]
+  tags: [base, base-resilience, sysctl]
 
 - name: "Set tcp congestion algorithm"
   ansible.posix.sysctl:
     name: "net.ipv4.tcp_congestion_control"
     value: "{{ baseline_linux_sysctl_congestion_control }}"
+    sysctl_file: "/etc/sysctl.d/90-baseline.conf"
     sysctl_set: true
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience]
+  tags: [base, base-resilience, sysctl]
 
 - name: "Set tcp congestion algorithm"
   ansible.posix.sysctl:
     name: "net.core.default_qdisc"
     value: "{{ baseline_linux_sysctl_net_qdisc }}"
+    sysctl_file: "/etc/sysctl.d/90-baseline.conf"
     sysctl_set: true
+    reload: true
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience]
+  tags: [base, base-resilience, sysctl]
