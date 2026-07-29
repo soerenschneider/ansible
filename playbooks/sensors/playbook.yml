@@ -5,77 +5,102 @@
   tasks:
     - name: "Run role platform"
       ansible.builtin.include_role:
-        name: platform
+        name: "platform"
       tags: always
 
-    - name: Add user to node_exporter group
+    - name: "Add user to node_exporter group"
       ansible.builtin.user:
         name: "{{ ansible_user }}"
-        groups: node_exporter
+        groups: "node_exporter"
         append: true
 
-    - name: Create user "sensor"
+    - name: "Create user 'sensor'"
       ansible.builtin.user:
-        name: sensor
-        groups: [i2c, gpio, dialout]
-      tags: user
+        name: "sensor"
+        groups: ["i2c", "gpio", "dialout"]
+      tags: [user, sensor, gobot]
 
-    - name: Adapt logrotate.conf
+    - name: "Install logrotate"
+      ansible.builtin.package:
+        name: "logrotate"
+
+    - name: "Copy logrotate.conf"
       ansible.builtin.copy:
-        src: logrotate.conf
-        dest: /etc/logrotate.conf
+        src: "logrotate.conf"
+        dest: "/etc/logrotate.conf"
         mode: "0640"
       register: _logrotate
       tags: [logrotate]
 
-    - name: Init Logrotate
+    - name: "Init Logrotate"
       tags: [logrotate]
       when: _logrotate is changed  # noqa: no-handler
       block:
-        - name: Run logrotate
-          ansible.builtin.command: logrotate /etc/logrotate.conf
+        - name: "Run logrotate"
+          ansible.builtin.command: "logrotate /etc/logrotate.conf"
           changed_when: true
 
-        - name: Restart logrotate
+        - name: "Restart logrotate"
           ansible.builtin.systemd:
-            name: logrotate
-            state: restarted
+            name: "logrotate"
+            state: "restarted"
 
     - name: "Run role gobot_pir"
       ansible.builtin.include_role:
-        name: gobot_pir
-      when: install_gobot_pir | default(true)
+        name: "gobot_pir"
+      when: false and install_gobot_pir | default(true)
       tags: always
 
     - name: "Run role gobot_bme280"
       ansible.builtin.include_role:
-        name: gobot_bme280
+        name: "gobot_bme280"
       when: install_gobot_bme280 | default(true)
       tags: always
 
     - name: "Run role gobot_lux"
       ansible.builtin.include_role:
-        name: gobot_lux
-      when: install_gobot_lux | default(true)
+        name: "gobot_lux"
+      when: false and install_gobot_lux | default(true)
       tags: always
 
-    - name: Disable powersave mode
-      ansible.builtin.lineinfile:
-        path: /etc/rc.local
-        regexp: ^iwconfig wlan0
-        insertbefore: ^exit
-        line: iwconfig wlan0 power off
+    - name: "Install wifi powersave-off unit"
+      ansible.builtin.copy:
+        dest: "/etc/systemd/system/wifi-powersave-off.service"
+        owner: "root"
+        group: "root"
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=Disable WiFi power management on wlan0
+          Requires=sys-subsystem-net-devices-wlan0.device
+          After=sys-subsystem-net-devices-wlan0.device
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          ExecStart=/usr/sbin/iw dev wlan0 set power_save off
+
+          [Install]
+          WantedBy=sys-subsystem-net-devices-wlan0.device
       tags: powersave
 
-    - name: Gather list of groups
+    - name: "Enable wifi powersave-off unit"
+      ansible.builtin.systemd_service:
+        name: "wifi-powersave-off.service"
+        enabled: true
+        state: "started"
+        daemon_reload: true
+      tags: powersave
+
+    - name: "Gather list of groups"
       ansible.builtin.shell: set -o pipefail && /usr/bin/getent group | awk -F":" '{print $1}'
       changed_when: false
       register: _existing_groups
       tags: user
 
-    - name: Add secondary groups to user
+    - name: "Add secondary groups to user"
       ansible.builtin.user:
-        name: sensor
+        name: "sensor"
         groups: "{{ item }}"
         append: true
       when: item in _existing_groups.stdout_lines
