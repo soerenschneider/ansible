@@ -18,6 +18,7 @@ User={{ip_plz_user }}
 Group={{ ip_plz_group }}
 LimitCPU=5%
 LimitMEMLOCK=100M
+StateDirectory=ip-plz
 CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE CAP_FSETID CAP_FOWNER CAP_SETGID CAP_SETUID CAP_SETPCAP
 {% if ip_plz_addr | length > 0 -%}
 Environment=IP_PLZ_ADDR="{{ ip_plz_addr }}"
@@ -31,6 +32,7 @@ Environment=IP_PLZ_TLS_CERT_FILE="{{ ip_plz_tls_cert_file }}"
 {% if ip_plz_tls_key_file | length > 0 -%}
 Environment=IP_PLZ_TLS_KEY_FILE="{{ ip_plz_tls_key_file }}"
 {% endif %}
+Environment=IP_PLZ_NAMED_CLIENTS_DB_FILE="/var/lib/ip-plz/ip-plz.db"
 
 SyslogIdentifier=ip-plz
 
