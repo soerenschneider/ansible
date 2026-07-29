@@ -24,6 +24,7 @@
     name: "{{ item.name }}"
     value: "{{ item.value }}"
     state: "present"
+    sysctl_file: "/etc/sysctl.d/99-k0s.conf"
     reload: true
   loop:
     - name: fs.inotify.max_user_watches
