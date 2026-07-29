@@ -5,7 +5,7 @@
 
 - name: "Run tasks sysctl.yml"
   ansible.builtin.include_tasks: sysctl.yml
-  tags: [base, base-resilience]
+  tags: [base, base-resilience, sysctl]
 
 - name: "Run tasks firewall_data.yml"
   ansible.builtin.include_tasks: firewall_data.yml
@@ -35,7 +35,9 @@
 
 - name: "Run tasks default_users.yml"
   ansible.builtin.include_tasks: default_users.yml
-  when: [default_users_enabled | default(false), default_users_name is defined, ansible_user != default_users_name]
+  when:
+    - baseline_default_users_name is defined
+    - baseline_default_users_name | length > 0
   tags: always
 
 - name: "Run tasks authorized_keys.yml"
