@@ -29,9 +29,3 @@
     name: vault_approle
   when: false and vault_approles | default([]) | length > 0
   tags: always
-
-- name: Including role 'vector'
-  ansible.builtin.include_role:
-    name: vector
-  when: ansible_architecture != 'armv6l'
-  tags: always

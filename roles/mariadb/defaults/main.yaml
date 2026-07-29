@@ -1,0 +1,23 @@
+---
+# renovate: datasource=docker depName=mariadb
+mariadb_image: "mariadb:12.0.2"
+
+# renovate: datasource=docker depName=prom/mysqld-exporter
+mariadb_mysqld_exporter_version: ""
+mariadb_mysqld_exporter_image: "prom/mysqld-exporter:v0.17.2"
+
+mariadb_user: "mariadb"
+mariadb_group: "mariadb"
+
+mariadb_root_user: "root"
+mariadb_replication_user: "replication"
+mariadb_base_dir: "/var/lib/mariadb"
+mariadb_storage_dir: "{{ mariadb_base_dir }}/data"
+mariadb_certs_dir: "{{ mariadb_base_dir }}/certs"
+mariadb_initdb_dir: "{{ mariadb_base_dir }}/initdb"
+
+mariadb_container_name: "mariadb"
+mariadb_docker_network: "mariadb"
+mariadb_certificate_paths:
+  - "{{ mariadb_certs_dir }}/ca.crt"
+  - "{{ mariadb_certs_dir }}/tls.crt"
