@@ -68,7 +68,7 @@
       ansible.builtin.set_fact:
         gobot_bme280_release_checksum: "{{ item.split(' ')[0] }}"
       when: [gobot_bme280_full_filename in item, (not gobot_bme280_local_binary.stat.exists or gobot_bme280_installed_version != gobot_bme280_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + gobot_bme280_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + gobot_bme280_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
