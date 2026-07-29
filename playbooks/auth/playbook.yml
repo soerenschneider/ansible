@@ -40,9 +40,15 @@
         name: "{{ keycloak_docker_network }}"
       tags: [docker, keycloak, postgres]
 
+    - name: "Include role 'mariadb'"
+      ansible.builtin.include_role:
+        name: "mariadb"
+      tags: always
+
     - name: "Include role 'mariadb_cluster'"
       ansible.builtin.include_role:
         name: "mariadb_cluster"
+      when: false  # TODO: Add differentiation
       tags: always
 
     - name: "Include role 'keycloak'"
