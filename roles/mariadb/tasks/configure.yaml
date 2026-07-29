@@ -1,0 +1,101 @@
+---
+- name: Create mariadb initdb scripts
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ mariadb_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_user }}"
+    mode: "0740"
+  with_fileglob:
+    - "templates/mariadb-initdb/*.j2"
+  when:
+    - mariadb_mysqld_exporter_password | default('') != ''
+    - mariadb_replication_password | default('') != ''
+  register: mariadb_configure_task_initdb_scripts
+  tags: [mariadb, mariadb-configure]
+
+- name: Create mariadb initdb scripts from playbook templates
+  ansible.builtin.template:
+    src: "{{ item }}"
+    dest: "{{ mariadb_initdb_dir }}/{{ item | basename | regex_replace('\\.j2$', '') }}"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_user }}"
+    mode: "0740"
+  with_fileglob:
+    - "{{ playbook_dir }}/templates/mariadb-initdb/*.j2"
+  when:
+    - mariadb_mysqld_exporter_password | default('') != ''
+    - mariadb_replication_password | default('') != ''
+  register: mariadb_configure_task_playbook_initdb_scripts
+  tags: [mariadb, mariadb-configure]
+
+- name: Create env file
+  ansible.builtin.copy:
+    content: |
+      MARIADB_ROOT_PASSWORD_FILE=/etc/mysql/password-root
+      MARIADB_CHARACTER_SET=utf8mb4
+      MARIADB_COLLATE=utf8mb4_unicode_520_ci
+      TZ=UTC
+    dest: "{{ mariadb_base_dir }}/env"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0440"
+  register: mariadb_configure_task_set_env
+  tags: [mariadb, mariadb-configure]
+
+- name: Create root password file
+  ansible.builtin.copy:
+    content: |
+      {{ mariadb_root_password }}
+    dest: "{{ mariadb_base_dir }}/password-root"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0440"
+  when: mariadb_root_password | default('') != ''
+  register: mariadb_configure_task_set_password_file
+  tags: [mariadb, mariadb-configure]
+
+- name: Add my.cnf
+  ansible.builtin.copy:
+    content: |
+      !include /etc/mysql/conf.d/secure-password.cnf
+      [mariadb]
+      ssl_cert = /certs/tls.crt
+      ssl_key = /certs/tls.key
+      require_secure_transport = ON
+      binlog_format = ROW
+      default_storage_engine=InnoDB
+      innodb_autoinc_lock_mode=2
+      [mariabackup]
+      ssl-verify-server-cert = false
+    dest: "{{ mariadb_base_dir }}/my.cnf"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0440"
+  register: mariadb_configure_task_set_my_cnf
+  tags: [mariadb, mariadb-configure]
+
+- name: Add secure-password.cnf
+  ansible.builtin.copy:
+    content: |
+      user = {{ mariadb_root_user }}
+      password = {{ mariadb_root_password }}
+    dest: "{{ mariadb_base_dir }}/secure-password.cnf"
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0440"
+  when:
+    - mariadb_root_user | default('') != ''
+    - mariadb_root_password | default('') != ''
+  register: mariadb_configure_task_set_my_cnf
+  tags: [mariadb, mariadb-configure]
+
+- name: Determine if mariadb config changed
+  ansible.builtin.set_fact:
+    mariadb_config_changed: >-
+      {{ mariadb_configure_task_initdb_scripts.changed
+         or mariadb_configure_task_playbook_initdb_scripts.changed
+         or mariadb_configure_task_set_env.changed
+         or mariadb_configure_task_set_password_file.changed
+         or mariadb_configure_task_set_my_cnf.changed }}
+  tags: [mariadb, mariadb-configure]

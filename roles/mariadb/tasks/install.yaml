@@ -1,0 +1,73 @@
+---
+- name: Create mariadb group
+  ansible.builtin.group:
+    name: "{{ mariadb_group }}"
+    system: true
+  register: mariadb_install_group
+  tags: [mariadb, exporter, mariadb-install, bootstrap]
+
+- name: Create mariadb user
+  ansible.builtin.user:
+    name: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    system: true
+  register: mariadb_install_user
+  tags: [mariadb, exporter, mariadb-install, bootstrap]
+
+- name: Create mariadb dir
+  ansible.builtin.file:
+    path: "{{ mariadb_base_dir }}"
+    state: directory
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0770"
+  register: mariadb_install_base_dir
+  tags: [mariadb, mariadb-install, bootstrap]
+
+- name: Create mariadb storage dir
+  ansible.builtin.file:
+    path: "{{ mariadb_storage_dir }}"
+    state: directory
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0770"
+  register: mariadb_install_storage_dir
+  tags: [mariadb, mariadb-install, bootstrap]
+
+- name: Create mariadb certs dir
+  ansible.builtin.file:
+    path: "{{ mariadb_certs_dir }}"
+    state: directory
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0770"
+  register: mariadb_install_certs_dir
+  tags: [mariadb, mariadb-install, bootstrap]
+
+- name: Create mariadb initdb dir
+  ansible.builtin.file:
+    path: "{{ mariadb_initdb_dir }}"
+    state: directory
+    owner: "{{ mariadb_user }}"
+    group: "{{ mariadb_group }}"
+    mode: "0770"
+  register: mariadb_install_initdb_dir
+  tags: [mariadb, mariadb-install, bootstrap]
+
+- name: Pull mariadb docker image
+  community.docker.docker_image_pull:
+    name: "{{ mariadb_image }}"
+  register: mariadb_install_container_image
+  tags: [mariadb, mariadb-install, bootstrap]
+
+- name: Determine if mariadb installation changed
+  ansible.builtin.set_fact:
+    mariadb_install_changed: >-
+      {{ mariadb_install_group.changed
+         or mariadb_install_user.changed
+         or mariadb_install_base_dir.changed
+         or mariadb_install_storage_dir.changed
+         or mariadb_install_certs_dir.changed
+         or mariadb_install_initdb_dir.changed
+         or mariadb_install_container_image.changed }}
+  tags: [mariadb, mariadb-install, bootstrap]

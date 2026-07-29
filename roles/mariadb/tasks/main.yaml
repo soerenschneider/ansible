@@ -1,0 +1,72 @@
+---
+- name: Install mariadb
+  ansible.builtin.include_tasks: install.yaml
+  tags: always
+
+- name: Configure mariadb
+  ansible.builtin.include_tasks: configure.yaml
+  tags: always
+
+- name: Get UID for generated user
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ mariadb_user }}"
+  tags: [mariadb, exporter, mariadb-recover]
+
+- name: Build user string
+  ansible.builtin.set_fact:
+    _mariadb_user_string: "{{ getent_passwd[mariadb_user][1] }}"
+  tags: [mariadb, exporter, mariadb-recover]
+
+- name: Create mariadb docker network
+  community.docker.docker_network:
+    name: "{{ mariadb_docker_network }}"
+  tags: [mariadb, mariadb-recover]
+
+- name: Stop mariadb container as config has been updated
+  community.docker.docker_container:
+    name: "{{ mariadb_container_name }}"
+    state: stopped
+  when: mariadb_set_config is defined and mariadb_set_config is changed and groups[mariadb_ansible_group] | length == mariadb_mariadb_running_and_stabilized_instances | default([]) | length
+  tags: [mariadb, mariadb-recover]
+
+- name: Run master with startdb sql
+  community.docker.docker_container:
+    name: "{{ mariadb_container_name }}"
+    image: "{{ mariadb_image }}"
+    user: "{{ _mariadb_user_string }}"
+    restart_policy: always
+    networks:
+      - name: "{{ mariadb_docker_network }}"
+        aliases:
+          - "{{ inventory_hostname }}"
+    log_driver: journald
+    ports: [0.0.0.0:3306:3306, 0.0.0.0:4444:4444, 0.0.0.0:4567:4567, 0.0.0.0:4568:4568]
+    env_file: "{{ mariadb_base_dir }}/env"
+    volumes:
+      - "{{ mariadb_certs_dir }}:/certs:ro"
+      - "{{ mariadb_storage_dir }}:/var/lib/mysql:Z"
+      - "{{ mariadb_base_dir }}/my.cnf:/etc/mysql/conf.d/galera.cnf:ro"
+      - "{{ mariadb_base_dir }}/secure-password.cnf:/etc/mysql/conf.d/secure-password.cnf:ro"
+      - "{{ mariadb_base_dir }}/password-root:/etc/mysql/password-root:ro"
+      - "{{ mariadb_initdb_dir }}/:/docker-entrypoint-initdb.d:ro"
+  tags: [mariadb]
+
+- name: Run mysqld exporter
+  community.docker.docker_container:
+    name: "mysqld-exporter"
+    image: "{{ mariadb_mysqld_exporter_image }}"
+    user: "{{ _mariadb_user_string }}"
+    restart_policy: "always"
+    networks:
+      - name: "{{ mariadb_docker_network }}"
+    env:
+      MYSQLD_EXPORTER_PASSWORD: "{{ mariadb_mysqld_exporter_password }}"
+    command: |
+      --mysqld.address={{ mariadb_container_name }}:3306
+      --mysqld.username=exporter
+      --tls.insecure-skip-verify
+      --log.level=debug
+    ports:
+      - "127.0.0.1:9104:9104"
+  tags: [mariadb, exporter, mysql]
