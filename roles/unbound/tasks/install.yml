@@ -72,6 +72,7 @@
     group: "{{ unbound_config_group }}"
     mode: "0644"
   loop:
+    - "blackhole.db"
     - "local.db"
     - "virtual-ips.db"
     - "wildcards.db"
