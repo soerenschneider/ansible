@@ -44,6 +44,7 @@
 - name: Confirm logind is actually running and not just unmasked
   ansible.builtin.command:
     cmd: systemctl is-active --quiet systemd-logind.service
+  # noqa: command-instead-of-module
   changed_when: false
   check_mode: false
   when: ansible_facts.service_mgr == 'systemd'

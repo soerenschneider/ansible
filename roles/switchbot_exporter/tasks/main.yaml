@@ -125,7 +125,7 @@
       ansible.builtin.systemd_service:
         name: bluetooth
         state: restarted
-      when: switchbot_exporter_bluez_conf.changed
+      when: switchbot_exporter_bluez_conf.changed  # noqa: no-handler
 
 - name: Create the service group
   become: true
