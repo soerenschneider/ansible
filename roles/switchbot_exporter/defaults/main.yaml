@@ -123,7 +123,7 @@ switchbot_exporter_config:
     # Set interval_seconds to your Prometheus scrape interval. The radio then
     # scans in short windows and switches off in between, and a window ends as
     # soon as every configured device has reported. 0 scans continuously.
-    #interval_seconds: 60
+    # interval_seconds: 60
     interval_seconds: 0
 
     # Maximum radio-on time per window. The sensors advertise every 5-10s and
@@ -171,8 +171,8 @@ switchbot_exporter_config:
   devices:
     - mac: "EB:6B:01:C6:2B:2C"
       name: "balcony"
-  # devices:
-  #   - mac: "EB:6B:01:C6:2B:2C"
-  #     name: garden
-  #   - mac: "AA:BB:CC:DD:EE:FF"
-  #     name: greenhouse
+# devices:
+#   - mac: "EB:6B:01:C6:2B:2C"
+#     name: garden
+#   - mac: "AA:BB:CC:DD:EE:FF"
+#     name: greenhouse

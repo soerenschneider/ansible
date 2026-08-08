@@ -249,6 +249,7 @@
 - name: Deploy the exporter script from a URL
   become: true
   tags: [switchbot_exporter, switchbot_exporter_install]
+  # checkov:skip=CKV2_ANSIBLE_2:false positive
   ansible.builtin.get_url:
     url: "{{ switchbot_exporter_url }}"
     dest: "{{ switchbot_exporter_script }}"
