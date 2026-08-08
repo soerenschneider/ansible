@@ -1,0 +1,178 @@
+---
+# defaults/main.yml — switchbot_exporter
+#
+# Override these in group_vars/host_vars. Everything here is safe to leave alone
+# except switchbot_exporter_config.devices, which you almost certainly want to set.
+
+# --------------------------------------------------------------------------- #
+# Where the exporter script comes from
+# --------------------------------------------------------------------------- #
+
+# Path resolved against the role's files/ directory. Drop the exporter script
+# there. Alternatively set switchbot_exporter_url to fetch it instead.
+switchbot_exporter_src: switchbot_exporter.py
+switchbot_exporter_url: ""
+# Required when using _url, so a corrupted or swapped download is caught.
+switchbot_exporter_checksum: ""
+
+# --------------------------------------------------------------------------- #
+# Filesystem layout
+# --------------------------------------------------------------------------- #
+
+switchbot_exporter_prefix: /opt/switchbot-exporter
+switchbot_exporter_config_dir: /etc/switchbot-exporter
+switchbot_exporter_venv: "{{ switchbot_exporter_prefix }}/venv"
+switchbot_exporter_script: "{{ switchbot_exporter_prefix }}/switchbot_exporter.py"
+switchbot_exporter_config_file: "{{ switchbot_exporter_config_dir }}/config.json"
+
+# --------------------------------------------------------------------------- #
+# Service identity
+# --------------------------------------------------------------------------- #
+
+switchbot_exporter_user: switchbot
+switchbot_exporter_group: switchbot
+switchbot_exporter_service: switchbot-exporter
+
+# The exporter reaches BlueZ over the system D-Bus, so what it needs is
+# permission to call org.bluez methods -- which on most distributions means
+# membership of the 'bluetooth' group. It does NOT need CAP_NET_RAW: raw HCI
+# sockets are only required by libraries that bypass bluetoothd. Groups that do
+# not exist on the target are dropped automatically.
+switchbot_exporter_supplementary_groups:
+  - bluetooth
+
+# Left empty deliberately. Only populate this if you switch to a BLE stack that
+# talks to the controller directly instead of through bluetoothd.
+switchbot_exporter_ambient_capabilities: []
+
+# --------------------------------------------------------------------------- #
+# Python dependencies
+# --------------------------------------------------------------------------- #
+
+# Installed into a virtualenv rather than system-wide: modern Debian and Fedora
+# mark the system interpreter as externally managed (PEP 668) and refuse pip
+# installs into it.
+switchbot_exporter_pip_packages:
+  - "bleak>=3.0,<4"
+  - "prometheus-client>=0.19,<1"
+
+switchbot_exporter_pip_upgrade: false   # set true to move within the pins above
+
+# --------------------------------------------------------------------------- #
+# BlueZ
+# --------------------------------------------------------------------------- #
+
+switchbot_exporter_manage_bluetooth_service: true
+
+# Passive scanning needs BlueZ's Advertisement Monitor API, which most builds
+# only expose when bluetoothd runs with experimental features enabled. Without
+# it, passive mode registers successfully and then silently delivers nothing.
+# Derived from the configured scan mode so that asking for passive also gets you
+# the prerequisite. Set false to leave /etc/bluetooth/main.conf untouched.
+#
+# Note this restarts bluetoothd, which drops any active Bluetooth connections.
+switchbot_exporter_bluez_experimental: >-
+  {{ switchbot_exporter_config.scan.mode | default('active') in ['passive', 'auto'] }}
+switchbot_exporter_bluez_config: /etc/bluetooth/main.conf
+
+# --------------------------------------------------------------------------- #
+# Post-install verification
+# --------------------------------------------------------------------------- #
+
+# Polls /metrics after starting. Worth keeping on: it catches a service that
+# starts cleanly and then fails to bind or crashes on first scan.
+switchbot_exporter_verify: true
+switchbot_exporter_verify_retries: 12
+switchbot_exporter_verify_delay: 5
+
+# Fail the play if the exporter is serving but has not decoded a single
+# advertisement yet. Off by default because a genuinely out-of-range sensor
+# would then fail every run, which is a monitoring problem rather than a
+# deployment one.
+switchbot_exporter_verify_readings: false
+
+# --------------------------------------------------------------------------- #
+# Exporter configuration
+# --------------------------------------------------------------------------- #
+#
+# Rendered verbatim to config.json. Written as YAML so you get comments, which
+# the JSON the exporter reads cannot have.
+#
+# Find your sensors' addresses with:
+#   sudo /opt/switchbot-exporter/venv/bin/python \
+#        /opt/switchbot-exporter/switchbot_exporter.py --example-config
+# and the SwitchBot app under Settings > Device Info > BLE MAC.
+
+switchbot_exporter_config:
+  listen: "0.0.0.0:9865"
+
+  # BlueZ adapter, e.g. hci0. null selects the first one found.
+  adapter: null
+
+  log:
+    level: warning
+
+  scan:
+    # active  : works everywhere. Solicits a scan response from the sensor for
+    #           every advertisement, which costs the sensor a little battery.
+    # passive : receive only, never transmits. Needs the experimental flag above
+    #           and fails loudly if this bleak build cannot request it.
+    # auto    : starts passive, falls back to active if it produces nothing.
+    mode: auto
+
+    # Set interval_seconds to your Prometheus scrape interval. The radio then
+    # scans in short windows and switches off in between, and a window ends as
+    # soon as every configured device has reported. 0 scans continuously.
+    #interval_seconds: 60
+    interval_seconds: 0
+
+    # Maximum radio-on time per window. The sensors advertise every 5-10s and
+    # frames get lost outdoors, so allow several intervals.
+    window_seconds: 25
+
+    max_empty_windows: 3
+
+    # Keep above three scan intervals, or one missed window expires the metrics.
+    stale_after_seconds: 300
+
+    watchdog_timeout_seconds: 120
+
+  mqtt:
+    # Publishes every decoded reading as JSON. Independent of Prometheus: a
+    # broker outage is counted in switchbot_mqtt_errors_total and never affects
+    # scraping.
+    enabled: false
+    host: localhost
+    port: 1883
+    username: null
+    # Prefer password_file over an inline password so the secret is not in this
+    # file, which the service group can read. Ansible Vault the referenced file,
+    # or drop it there out of band.
+    password_file: null
+    tls: false
+    client_id: switchbot-exporter
+    # State goes to {topic_prefix}/{device}/state; availability to
+    # {topic_prefix}/status via an MQTT last will, so subscribers notice an
+    # ungraceful exit rather than trusting a stale retained value.
+    topic_prefix: switchbot
+    qos: 0
+    retain: true
+    # Also publish each numeric field to its own topic, for subscribers that
+    # would rather not parse JSON.
+    individual_topics: false
+    # Publishes Home Assistant MQTT discovery so the sensors appear on their own
+    # with correct units, device classes and expire_after.
+    discovery: true
+    discovery_prefix: homeassistant
+
+  # Leave empty to export every SwitchBot meter in range, at the cost of
+  # full-length scan windows: without a known device set there is no completion
+  # condition for a window to stop early on.
+  devices:
+    - mac: "EB:6B:01:C6:2B:2C"
+      name: "balcony"
+  # devices:
+  #   - mac: "EB:6B:01:C6:2B:2C"
+  #     name: garden
+  #   - mac: "AA:BB:CC:DD:EE:FF"
+  #     name: greenhouse

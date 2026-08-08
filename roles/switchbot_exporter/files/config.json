@@ -1,0 +1,53 @@
+{
+  "_about": "SwitchBot BLE exporter. JSON has no comments, so keys starting with '_' are ignored and can be used for notes.",
+  "listen": "0.0.0.0:9865",
+  "_adapter": "BlueZ adapter such as 'hci0'. null picks the first one found.",
+  "adapter": null,
+  "log": {
+    "level": "info"
+  },
+  "scan": {
+    "_mode": "active | passive | auto. Passive never transmits, so it does not solicit a scan response from the sensor, and it filters in the controller. It needs BlueZ >= 5.56 with experimental features enabled and silently delivers nothing otherwise, so 'auto' tries passive and falls back to active if it sees no data. Passive and duty cycling combine; they are independent.",
+    "mode": "active",
+    "_interval_seconds": "Seconds between scan windows; set this to your Prometheus scrape interval. 0 scans continuously.",
+    "interval_seconds": 60,
+    "_window_seconds": "Maximum radio-on time per window. The sensor advertises every 5-10s and frames get lost, so allow several intervals. Windows end early once every listed device has reported.",
+    "window_seconds": 25,
+    "max_empty_windows": 3,
+    "_stale_after_seconds": "Drop a device's metrics after this long without a reading. Keep it above three scan intervals.",
+    "stale_after_seconds": 300,
+    "_watchdog_timeout_seconds": "Continuous mode only.",
+    "watchdog_timeout_seconds": 120
+  },
+  "mqtt": {
+    "_about": "Publishes every decoded reading as JSON. A broker outage never affects Prometheus scraping; failures are counted in switchbot_mqtt_errors_total.",
+    "enabled": false,
+    "host": "localhost",
+    "port": 1883,
+    "username": null,
+    "_password_file": "Preferred over 'password' so the secret stays out of this file, which the service group can read.",
+    "password_file": null,
+    "tls": false,
+    "client_id": "switchbot-exporter",
+    "_topic_prefix": "State is published to {topic_prefix}/{device}/state, and availability to {topic_prefix}/status via a last will so subscribers notice an ungraceful exit.",
+    "topic_prefix": "switchbot",
+    "qos": 0,
+    "retain": true,
+    "_individual_topics": "Also publish each field to its own topic, for subscribers that would rather not parse JSON.",
+    "individual_topics": false,
+    "_discovery": "Publish Home Assistant MQTT discovery so the sensors appear automatically with correct units and device classes. expire_after is derived from scan.stale_after_seconds.",
+    "discovery": true,
+    "discovery_prefix": "homeassistant"
+  },
+  "_devices": "Omit or leave empty to export every SwitchBot meter in range, at the cost of full-length scan windows.",
+  "devices": [
+    {
+      "mac": "EB:6B:01:C6:2B:2C",
+      "name": "garden"
+    },
+    {
+      "mac": "AA:BB:CC:DD:EE:FF",
+      "name": "greenhouse"
+    }
+  ]
+}

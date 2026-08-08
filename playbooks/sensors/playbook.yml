@@ -14,11 +14,27 @@
         groups: "node_exporter"
         append: true
 
-    - name: "Create user 'sensor'"
-      ansible.builtin.user:
-        name: "sensor"
-        groups: ["i2c", "gpio", "dialout"]
-      tags: [user, sensor, gobot]
+    - name: "Enable sensor support"
+      tags: [user, sensor, gobot, i2c]
+      block:
+        - name: "Create user 'sensor'"
+          ansible.builtin.user:
+            name: "sensor"
+            groups: ["i2c", "gpio", "dialout"]
+
+        - name: "Install packages"
+          ansible.builtin.package:
+            name:
+              - "python3-smbus"
+              - "i2c-tools"
+
+        - name: "Enable i2c"
+          ansible.builtin.lineinfile:
+            path: "/boot/firmware/config.txt"
+            regexp: '^\s*#?\s*dtparam=i2c_arm=.*$'
+            line: 'dtparam=i2c_arm=on'
+            insertafter: EOF
+            state: present
 
     - name: "Install logrotate"
       ansible.builtin.package:
@@ -44,6 +60,11 @@
           ansible.builtin.systemd:
             name: "logrotate"
             state: "restarted"
+
+    - name: "Run role switchbot_exporter"
+      ansible.builtin.include_role:
+        name: "switchbot_exporter"
+      tags: always
 
     - name: "Run role gobot_pir"
       ansible.builtin.include_role:

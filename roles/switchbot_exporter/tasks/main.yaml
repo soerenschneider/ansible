@@ -1,0 +1,419 @@
+---
+# tasks/main.yml — switchbot_exporter
+#
+# Installs the SwitchBot BLE Prometheus exporter as a hardened systemd service.
+#
+# Usable as a role (roles/switchbot_exporter/tasks/main.yml) or included directly
+# with include_tasks. It deliberately uses no handlers so that both work: a
+# handler defined in a role is unavailable to an included task file, and the
+# explicit restart-at-the-end below is easier to reason about anyway.
+#
+# Ordering matters here. The config is validated by the exporter itself before it
+# is put in place, and again before the service starts, so a bad config can never
+# take down a working service.
+
+- name: Preflight checks
+  tags: [switchbot_exporter, switchbot_exporter_config]
+  block:
+    - name: Assert a supported OS family
+      ansible.builtin.assert:
+        that: ansible_facts.os_family in ['Debian', 'RedHat', 'Archlinux', 'Suse']
+        fail_msg: >-
+          Unsupported OS family {{ ansible_facts.os_family }}. Add its package
+          names to switchbot_exporter_packages below and remove this assertion.
+        quiet: true
+
+    - name: Assert the exporter source is resolvable
+      ansible.builtin.assert:
+        that: switchbot_exporter_src | length > 0 or switchbot_exporter_url | length > 0
+        fail_msg: >-
+          Set switchbot_exporter_src (a file in the role's files/ directory) or
+          switchbot_exporter_url.
+        quiet: true
+
+    - name: Assert a checksum accompanies a URL download
+      ansible.builtin.assert:
+        that: switchbot_exporter_checksum | length > 0
+        fail_msg: >-
+          switchbot_exporter_url is set, so switchbot_exporter_checksum is
+          required. An unverified download of the code that runs as a service is
+          not something this role will do for you.
+        quiet: true
+      when: switchbot_exporter_url | length > 0
+
+    - name: Assert configured devices look sane
+      ansible.builtin.assert:
+        that:
+          - item.mac is defined
+          # 'is match' returns a real boolean. regex_search returns the matched
+          # string, which ansible-core 2.19+ rejects as a broken conditional --
+          # meaning a *valid* MAC would have failed the play.
+          - item.mac is match('([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$')
+        fail_msg: "Device entry {{ item }} needs a valid 'mac'."
+        quiet: true
+      loop: "{{ switchbot_exporter_config.devices | default([]) }}"
+      loop_control:
+        label: "{{ item.mac | default(item) }}"
+
+    - name: Warn when duty cycling has no devices to stop early on
+      ansible.builtin.debug:
+        msg: >-
+          scan.interval_seconds is {{ switchbot_exporter_config.scan.interval_seconds }}
+          but no devices are configured, so every scan window will run for the
+          full {{ switchbot_exporter_config.scan.window_seconds }}s. List your
+          sensors to get the early-stop behaviour that makes duty cycling
+          worthwhile.
+      when:
+        - switchbot_exporter_config.scan.interval_seconds | default(0) | int > 0
+        - switchbot_exporter_config.devices | default([]) | length == 0
+
+- name: Install system packages
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_packages]
+  ansible.builtin.package:
+    name: "{{ switchbot_exporter_packages }}"
+    state: present
+  vars:
+    # python3-packaging is not a dependency of the exporter itself. The
+    # ansible.builtin.pip module imports it on the target to compare version
+    # specifiers, and minimal images such as DietPi omit it -- which surfaces as a
+    # confusing "Failed to import the required Python library (packaging)" from a
+    # task that has nothing to do with packaging.
+    switchbot_exporter_packages: >-
+      {{
+        {
+          'Debian': ['python3', 'python3-venv', 'python3-packaging',
+                     'bluez', 'libcap2-bin'],
+          'RedHat': ['python3', 'python3-packaging', 'bluez', 'libcap'],
+          'Archlinux': ['python', 'python-packaging', 'bluez', 'bluez-utils',
+                        'libcap'],
+          'Suse': ['python3', 'python3-packaging', 'bluez', 'libcap-progs'],
+        }[ansible_facts.os_family]
+      }}
+  register: switchbot_exporter_pkg
+  retries: 3
+  delay: 5
+  until: switchbot_exporter_pkg is succeeded
+
+- name: Enable and start bluetoothd
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_bluez]
+  ansible.builtin.systemd_service:
+    name: bluetooth
+    enabled: true
+    state: started
+  when: switchbot_exporter_manage_bluetooth_service | bool
+
+- name: Enable BlueZ experimental features for passive scanning
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_bluez]
+  when: switchbot_exporter_bluez_experimental | bool
+  block:
+    - name: Set Experimental = true in the BlueZ config
+      ansible.builtin.lineinfile:
+        path: "{{ switchbot_exporter_bluez_config }}"
+        # Matches the key whether it is absent, present, or commented out, which
+        # is how the various distribution defaults ship it.
+        regexp: '^\s*#?\s*Experimental\s*='
+        line: "Experimental = true"
+        insertafter: '^\s*\[General\]'
+        state: present
+        backup: true
+      register: switchbot_exporter_bluez_conf
+
+    - name: Restart bluetoothd to pick up the experimental flag
+      ansible.builtin.systemd_service:
+        name: bluetooth
+        state: restarted
+      when: switchbot_exporter_bluez_conf.changed
+
+- name: Create the service group
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_user]
+  ansible.builtin.group:
+    name: "{{ switchbot_exporter_group }}"
+    system: true
+    state: present
+
+- name: Resolve which supplementary groups actually exist
+  become: true
+  # Tagged for every consumer below. A partial run such as
+  # --tags switchbot_exporter_service must not skip this and then reference an
+  # undefined fact.
+  tags:
+    - switchbot_exporter
+    - switchbot_exporter_user
+    - switchbot_exporter_service
+  ansible.builtin.getent:
+    database: group
+  changed_when: false
+
+- name: Determine the supplementary groups this host actually has
+  tags:
+    - switchbot_exporter
+    - switchbot_exporter_user
+    - switchbot_exporter_service
+  ansible.builtin.set_fact:
+    # Groups the distribution does not define are dropped, rather than letting
+    # systemd refuse to start the unit later. Computed once and reused.
+    switchbot_exporter_effective_groups: >-
+      {{ switchbot_exporter_supplementary_groups
+         | select('in', ansible_facts.getent_group | default({}))
+         | list }}
+
+- name: Create the service user
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_user]
+  ansible.builtin.user:
+    name: "{{ switchbot_exporter_user }}"
+    group: "{{ switchbot_exporter_group }}"
+    groups: "{{ switchbot_exporter_effective_groups }}"
+    append: true
+    system: true
+    shell: /usr/sbin/nologin
+    create_home: false
+    home: "{{ switchbot_exporter_prefix }}"
+    state: present
+
+- name: Create directories
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - path: "{{ switchbot_exporter_prefix }}"
+      mode: "0755"
+    - path: "{{ switchbot_exporter_config_dir }}"
+      group: "{{ switchbot_exporter_group }}"
+      mode: "0750"
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Confirm the pip module's own dependency is importable
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter | default('/usr/bin/python3') }}"
+      - -c
+      - import packaging
+  changed_when: false
+  failed_when: false
+  register: switchbot_exporter_packaging
+
+- name: Fail clearly if packaging is still missing
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.assert:
+    that: switchbot_exporter_packaging.rc == 0
+    fail_msg: >-
+      ansible.builtin.pip needs the 'packaging' module in
+      {{ ansible_python_interpreter | default('/usr/bin/python3') }} on the target
+      and it is still absent after installing packages. Install it by hand
+      ("apt-get install python3-packaging", or "pip install --break-system-packages
+      packaging"), or point ansible_python_interpreter at an interpreter that has
+      it. Retrying will not help: this failure is deterministic.
+    quiet: true
+
+- name: Create the virtualenv and install Python dependencies
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.pip:
+    name: "{{ switchbot_exporter_pip_packages }}"
+    state: "{{ 'latest' if switchbot_exporter_pip_upgrade | bool else 'present' }}"
+    virtualenv: "{{ switchbot_exporter_venv }}"
+    virtualenv_command: "python3 -m venv"
+  register: switchbot_exporter_pip
+  # Retries cover transient PyPI failures, which are common on a slow link. The
+  # guard above catches the deterministic cases first so they fail immediately
+  # rather than after three identical attempts.
+  retries: 3
+  delay: 5
+  until: switchbot_exporter_pip is succeeded
+
+- name: Deploy the exporter script from the role
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.copy:
+    src: "{{ switchbot_exporter_src }}"
+    dest: "{{ switchbot_exporter_script }}"
+    owner: root
+    group: root
+    mode: "0755"
+  register: switchbot_exporter_script_copy
+  when: switchbot_exporter_url | length == 0
+
+- name: Deploy the exporter script from a URL
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_install]
+  ansible.builtin.get_url:
+    url: "{{ switchbot_exporter_url }}"
+    dest: "{{ switchbot_exporter_script }}"
+    checksum: "{{ switchbot_exporter_checksum }}"
+    owner: root
+    group: root
+    mode: "0755"
+  register: switchbot_exporter_script_download
+  when: switchbot_exporter_url | length > 0
+
+- name: Write the exporter configuration
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_config]
+  ansible.builtin.copy:
+    # Authored as YAML for the comments, delivered as the JSON the exporter reads.
+    content: "{{ switchbot_exporter_config | to_nice_json }}\n"
+    dest: "{{ switchbot_exporter_config_file }}"
+    owner: root
+    group: "{{ switchbot_exporter_group }}"
+    mode: "0640"
+    # The exporter validates its own config against a temporary copy. Ansible
+    # only moves the file into place if this exits zero, so an invalid config
+    # cannot reach a running service.
+    validate: >-
+      {{ switchbot_exporter_venv }}/bin/python {{ switchbot_exporter_script }}
+      --config %s --check-config
+    backup: true
+  register: switchbot_exporter_config_copy
+
+- name: Install the systemd unit
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_service]
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ switchbot_exporter_service }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible. Local edits will be overwritten.
+      [Unit]
+      Description=SwitchBot BLE Prometheus exporter
+      Documentation=file://{{ switchbot_exporter_script }}
+      After=bluetooth.service dbus.service
+      Wants=bluetooth.service
+      # bluetoothd owning the adapter is a hard requirement, not a nicety.
+      Requires=dbus.service
+
+      [Service]
+      Type=exec
+      User={{ switchbot_exporter_user }}
+      Group={{ switchbot_exporter_group }}
+      {% if switchbot_exporter_effective_groups %}
+      SupplementaryGroups={{ switchbot_exporter_effective_groups | join(' ') }}
+      {% endif %}
+
+      # Belt and braces: the config was already validated at deploy time, but this
+      # also catches a hand-edited file before it takes the service down.
+      ExecStartPre={{ switchbot_exporter_venv }}/bin/python {{ switchbot_exporter_script }} --config {{ switchbot_exporter_config_file }} --check-config
+      ExecStart={{ switchbot_exporter_venv }}/bin/python {{ switchbot_exporter_script }} --config {{ switchbot_exporter_config_file }}
+
+      Restart=always
+      RestartSec=10
+      # Do not let a crash loop hammer bluetoothd.
+      StartLimitIntervalSec=300
+      StartLimitBurst=5
+
+      # Hardening. The exporter reads a config file, talks to the system D-Bus
+      # and serves HTTP; it writes nothing and needs no devices of its own.
+      NoNewPrivileges=yes
+      ProtectSystem=strict
+      ProtectHome=yes
+      PrivateTmp=yes
+      PrivateDevices=yes
+      ProtectKernelTunables=yes
+      ProtectKernelModules=yes
+      ProtectKernelLogs=yes
+      ProtectControlGroups=yes
+      ProtectClock=yes
+      ProtectProc=invisible
+      RestrictNamespaces=yes
+      RestrictRealtime=yes
+      RestrictSUIDSGID=yes
+      LockPersonality=yes
+      SystemCallFilter=@system-service
+      SystemCallErrorNumber=EPERM
+      # BLE work happens inside bluetoothd, so this process needs no capabilities.
+      CapabilityBoundingSet={{ switchbot_exporter_ambient_capabilities | join(' ') }}
+      {% if switchbot_exporter_ambient_capabilities %}
+      AmbientCapabilities={{ switchbot_exporter_ambient_capabilities | join(' ') }}
+      {% endif %}
+      # AF_UNIX for D-Bus, AF_INET/AF_INET6 for the metrics endpoint.
+      RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+      [Install]
+      WantedBy=multi-user.target
+  register: switchbot_exporter_unit
+
+- name: Reload systemd and enable the service
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_service]
+  ansible.builtin.systemd_service:
+    name: "{{ switchbot_exporter_service }}"
+    daemon_reload: "{{ switchbot_exporter_unit.changed }}"
+    enabled: true
+    state: started
+
+- name: Restart the exporter when anything it depends on changed
+  become: true
+  tags: [switchbot_exporter, switchbot_exporter_service]
+  ansible.builtin.systemd_service:
+    name: "{{ switchbot_exporter_service }}"
+    state: restarted
+  when: >-
+    switchbot_exporter_unit.changed
+    or switchbot_exporter_config_copy.changed
+    or switchbot_exporter_pip.changed
+    or (switchbot_exporter_script_copy.changed | default(false))
+    or (switchbot_exporter_script_download.changed | default(false))
+
+- name: Verify the exporter is serving metrics
+  tags: [switchbot_exporter, switchbot_exporter_verify]
+  when: switchbot_exporter_verify | bool
+  block:
+    - name: Poll the metrics endpoint
+      ansible.builtin.uri:
+        # Bind addresses of 0.0.0.0 or :: are not connectable, so probe loopback.
+        url: >-
+          http://{{ '127.0.0.1' if switchbot_exporter_bind_host in ['0.0.0.0', '::', '']
+                    else switchbot_exporter_bind_host }}:{{ switchbot_exporter_bind_port }}/metrics
+        return_content: true
+      register: switchbot_exporter_probe
+      retries: "{{ switchbot_exporter_verify_retries | int }}"
+      delay: "{{ switchbot_exporter_verify_delay | int }}"
+      until:
+        - switchbot_exporter_probe.status | default(0) == 200
+        - "'switchbot_exporter_build_info' in (switchbot_exporter_probe.content | default(''))"
+      changed_when: false
+      vars:
+        switchbot_exporter_bind_host: "{{ switchbot_exporter_config.listen | regex_replace(':[0-9]+$', '') }}"
+        switchbot_exporter_bind_port: "{{ switchbot_exporter_config.listen | regex_search('([0-9]+)$') }}"
+
+    - name: Report what the exporter can currently hear
+      ansible.builtin.debug:
+        msg: >-
+          {{ switchbot_exporter_service }} is serving metrics.
+          Devices in range: {{ switchbot_exporter_in_range }}.
+          Scan mode in use: {{ 'passive' if switchbot_exporter_passive == '1.0' else 'active' }}.
+      vars: &probe_vars
+        switchbot_exporter_in_range: >-
+          {{ switchbot_exporter_probe.content
+             | regex_search('^switchbot_devices_in_range (\S+)$', '\1', multiline=True)
+             | first | default('unknown') }}
+        switchbot_exporter_passive: >-
+          {{ switchbot_exporter_probe.content
+             | regex_search('^switchbot_scan_passive (\S+)$', '\1', multiline=True)
+             | first | default('0.0') }}
+
+    - name: Fail if no sensor has been heard yet
+      ansible.builtin.assert:
+        that: switchbot_exporter_in_range | float > 0
+        fail_msg: >-
+          The exporter is running but has not decoded a single SwitchBot
+          advertisement. Check that the configured MAC addresses are right, that
+          the sensors have batteries, and that they are in range. Setting
+          log.level to debug will show what it is actually hearing.
+        quiet: true
+      vars: *probe_vars
+      when: switchbot_exporter_verify_readings | bool
