@@ -1,6 +1,13 @@
 ---
+- name: "Ensure datacenter is defined"
+  ansible.builtin.assert:
+    that:
+      - datacenter is defined
+      - datacenter | string | length > 0
+    fail_msg: "The 'datacenter' variable must be defined and non-empty."
+  tags: [firewall, base]
+
 - name: "Collect and transform firewall rules"
-  when: datacenter | default('') | length > 0
   tags: [firewall, base]
   block:
     - name: Assemble list of fw_tags
