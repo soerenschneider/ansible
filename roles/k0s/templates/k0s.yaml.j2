@@ -8,8 +8,10 @@ spec:
 {{ k0s_extra_args | to_nice_yaml(indent=2) | indent(6, true) }}
 {% endif %}
   network:
+{% if k0s_network_provider | default("") | length > 0 %}
     provider: custom
-    podCIDR: "10.244.0.0/16"
-    serviceCIDR: "10.96.0.0/12"
+{% endif %}
+    podCIDR: "{{ k0s_network_pod_cidr }}"
+    serviceCIDR: "{{ k0s_network_service_cidr }}"
     kubeProxy:
-      disabled: true
+      disabled: {{ k0s_network_kube_proxy_disabled }}
