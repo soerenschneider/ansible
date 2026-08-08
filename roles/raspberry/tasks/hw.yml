@@ -6,37 +6,100 @@
     name: bluetooth
   tags: [raspberry, bluetooth]
 
-- name: Set Bluetooth hw status to {% if raspberry_enable_bluetooth %}enabled{% else %}disabled{% endif %}
+- name: "Set Bluetooth hw status"
   ansible.builtin.lineinfile:
-    path: /boot/config.txt
+    path: "/boot/firmware/config.txt"
     insertafter: EOF
-    line: dtoverlay=pi3-disable-bt
+    line: dtoverlay=disable-bt
     state: "{% if raspberry_enable_bluetooth %}absent{% else %}present{% endif %}"
   when: raspberry_enable_bluetooth is defined
+  notify: Reboot required for firmware change
   tags: [raspberry, bluetooth, hw]
 
-- name: Set LEDs status to {% if raspberry_enable_leds %}enabled{% else %}disabled{% endif %}
+- name: "Set LEDs status"
   ansible.builtin.lineinfile:
-    path: /boot/config.txt
+    path: "/boot/firmware/config.txt"
     insertafter: EOF
     line: "{{ item }}"
     state: "{% if raspberry_enable_leds %}absent{% else %}present{% endif %}"
-  when: raspberry_enable_leds is defined
   with_items: [dtparam=act_led_trigger=none, dtparam=act_led_activelow=on]
+  notify: Reboot required for firmware change
   tags: [raspberry, leds, hw]
 
-- name: Set WiFi hardware to {% if raspberry_disable_wifi %}disabled{% else %}enabled{% endif %}
+- name: "Disable HDMI"
   ansible.builtin.lineinfile:
-    path: /boot/config.txt
+    path: "/boot/firmware/config.txt"
     insertafter: EOF
-    line: dtoverlay=pi3-disable-wifi
-    state: "{% if raspberry_disable_wifi %}present{% else %}absent{% endif %}"
-  when: raspberry_disable_wifi is defined
+    line: "dtoverlay=vc4-kms-v3d,nohdmi"
+    state: "{% if raspberry_enable_hdmi %}absent{% else %}present{% endif %}"
+  notify: Reboot required for firmware change
+  tags: [raspberry, leds, hw]
+
+- name: "Set WiFi hardware status"
+  ansible.builtin.lineinfile:
+    path: "/boot/firmware/config.txt"
+    insertafter: EOF
+    line: dtoverlay=disable-wifi
+    state: "{% if raspberry_enable_wifi %}absent{% else %}present{% endif %}"
+  notify: Reboot required for firmware change
   tags: [raspberry, wifi, hw]
 
-- name: Disable swap
-  ansible.builtin.systemd:
-    name: dphys-swapfile.service
-    state: stopped
-    enabled: false
-  tags: [raspberry, base]
+# ---------------------------------------------------------------------------
+# Serial / UART via raspi-config -- non-DietPi only
+# ---------------------------------------------------------------------------
+# DietPi has no raspi-config; tasks/dietpi.yml drives dietpi-set_hardware
+# instead. One `when` on the block covers all four tasks rather than repeating
+# the guard on each, and a skipped block leaves
+# raspberry_raspbian_serial_helper undefined -- which main.yml handles via
+# chained defaults.
+#
+# WARNING: raspi-config nonint arguments are INVERTED relative to how they read.
+# 0 means enable, 1 means disable. Hence `0 if enable_serial else 1`, which is
+# the opposite of every other ternary in this role.
+#
+# raspberry_enable_serial drives the argument rather than gating the task, so
+# state is asserted in both directions on every run. If raspi-config is absent,
+# main.yml's generic fallbacks take over.
+
+- name: Manage the serial console with raspi-config
+  when: not (raspberry_is_dietpi | bool)
+  tags: [raspberry, serial, hw]
+  block:
+    - name: Look for the raspi-config helper
+      ansible.builtin.stat:
+        path: /usr/bin/raspi-config
+      register: raspberry_raspi_config_bin
+
+    # raspi-config split its serial handling at some point: current versions
+    # expose do_serial_hw (enable_uart in config.txt) and do_serial_cons
+    # (console= in cmdline.txt) separately, while older ones expose only a
+    # combined do_serial. Probe rather than assume.
+    - name: Determine which serial subcommands raspi-config supports
+      ansible.builtin.command:
+        cmd: grep -c -e do_serial_cons -e do_serial_hw /usr/bin/raspi-config
+      register: raspberry_raspi_config_probe
+      changed_when: false
+      check_mode: false
+      failed_when: false
+      when: raspberry_raspi_config_bin.stat.exists
+
+    - name: Select the raspi-config serial subcommands
+      ansible.builtin.set_fact:
+        raspberry_raspi_config_serial_cmds: >-
+          {{ ['do_serial_hw', 'do_serial_cons']
+             if (raspberry_raspi_config_probe.stdout | default('0') | int) > 0
+             else ['do_serial'] }}
+      when: raspberry_raspi_config_bin.stat.exists
+
+    - name: Set the serial hardware and console state using raspi-config
+      ansible.builtin.command:
+        cmd: >-
+          raspi-config nonint {{ item }}
+          {{ 0 if (raspberry_enable_serial | default(true) | bool) else 1 }}
+      become: true
+      loop: "{{ raspberry_raspi_config_serial_cmds | default([]) }}"
+      register: raspberry_raspbian_serial_helper
+      changed_when: raspberry_raspbian_serial_helper.rc == 0
+      failed_when: false
+      when: raspberry_raspi_config_bin.stat.exists
+      notify: Reboot required for firmware change

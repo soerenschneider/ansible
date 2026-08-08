@@ -1,0 +1,190 @@
+---
+# roles/raspberry/tasks/swap.yaml
+#
+# Disable swap and keep it disabled on Debian-family systems:
+#   * Raspberry Pi OS / Raspbian -> dphys-swapfile.service + /etc/dphys-swapfile
+#   * DietPi                     -> dietpi-set_swapfile + dietpi.txt (/var/swap or zram)
+#   * Debian                     -> swap partition or /swapfile listed in /etc/fstab
+#   * Ubuntu (incl. RPi images)  -> /swap.img in /etc/fstab, zram on some images
+#
+# Tunables live in roles/raspberry/defaults/main.yml:
+#   raspberry_swap_mask_units, raspberry_swap_remove_files,
+#   raspberry_swap_files_to_remove, raspberry_swap_purge_dphys
+
+- name: "Swap | Only Debian-family targets are supported"
+  ansible.builtin.assert:
+    that: ansible_facts.os_family == "Debian"
+    fail_msg: "Unsupported OS family: {{ ansible_facts.os_family }}"
+    quiet: true
+  tags: [raspberry, swap]
+
+- name: "Swap | Collect installed systemd units"
+  ansible.builtin.service_facts: {}
+  tags: [raspberry, swap]
+
+- name: "Swap | Look for distro-specific swap helpers"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /boot/dietpi.txt
+    - /boot/firmware/dietpi.txt
+    - /boot/dietpi/func/dietpi-set_swapfile
+    - /boot/firmware/dietpi/func/dietpi-set_swapfile
+    - /etc/dphys-swapfile
+  register: raspberry_swap_helpers
+  tags: [raspberry, swap]
+
+- name: "Swap | Remember which helpers exist"
+  ansible.builtin.set_fact:
+    raspberry_swap_paths: "{{ raspberry_swap_helpers.results | selectattr('stat.exists') | map(attribute='item') | list }}"
+  tags: [raspberry, swap]
+
+- name: "Swap | Resolve DietPi paths"
+  ansible.builtin.set_fact:
+    raspberry_swap_dietpi_txt: "{{ raspberry_swap_paths | select('search', 'dietpi\\.txt$') | first | default('') }}"
+    raspberry_swap_dietpi_helper: "{{ raspberry_swap_paths | select('search', 'dietpi-set_swapfile$') | first | default('') }}"
+  tags: [raspberry, swap]
+
+- name: "Swap | Check what is currently swapping"
+  ansible.builtin.command: swapon --noheadings --show=NAME
+  changed_when: false
+  register: raspberry_swap_active
+  tags: [raspberry, swap]
+
+# --------------------------------------------------------------------------
+# DietPi: let DietPi's own helper do the work, otherwise dietpi-update,
+# dietpi-drive_manager or dietpi-software will happily recreate the swap file.
+# --------------------------------------------------------------------------
+- name: "Swap | DietPi"
+  when: raspberry_swap_dietpi_txt | length > 0
+  tags: [raspberry, swap]
+  block:
+    - name: "Swap | DietPi | Pin AUTO_SETUP_SWAPFILE_SIZE to 0"
+      ansible.builtin.lineinfile:
+        path: "{{ raspberry_swap_dietpi_txt }}"
+        regexp: '^[[:blank:]]*#?[[:blank:]]*AUTO_SETUP_SWAPFILE_SIZE='
+        line: "AUTO_SETUP_SWAPFILE_SIZE=0"
+        state: present
+        backup: true
+
+    - name: "Swap | DietPi | Disable and delete swap via dietpi-set_swapfile"
+      ansible.builtin.command: "{{ raspberry_swap_dietpi_helper }} 0"
+      register: raspberry_swap_dietpi_result
+      changed_when: raspberry_swap_dietpi_result.rc == 0
+      when:
+        - raspberry_swap_dietpi_helper | length > 0
+        - raspberry_swap_active.stdout | trim | length > 0
+
+# --------------------------------------------------------------------------
+# Raspberry Pi OS / Raspbian and anything else carrying dphys-swapfile
+# --------------------------------------------------------------------------
+- name: "Swap | dphys-swapfile"
+  when: "'dphys-swapfile.service' in (ansible_facts.services | default({}))"
+  tags: [raspberry, swap]
+  block:
+    - name: "Swap | dphys-swapfile | Set CONF_SWAPSIZE=0"
+      ansible.builtin.lineinfile:
+        path: /etc/dphys-swapfile
+        regexp: '^[[:blank:]]*#?[[:blank:]]*CONF_SWAPSIZE='
+        line: "CONF_SWAPSIZE=0"
+        state: present
+        backup: true
+      when: "'/etc/dphys-swapfile' in raspberry_swap_paths"
+
+    - name: "Swap | dphys-swapfile | swapoff and remove the swap file"
+      ansible.builtin.command: dphys-swapfile swapoff
+      register: raspberry_swap_dphys_result
+      changed_when: raspberry_swap_dphys_result.rc == 0
+      failed_when: false
+      when: raspberry_swap_active.stdout | trim | length > 0
+
+    - name: "Swap | dphys-swapfile | Stop, disable and mask the unit"
+      ansible.builtin.systemd_service:
+        name: dphys-swapfile.service
+        state: stopped
+        enabled: false
+        masked: "{{ raspberry_swap_mask_units | default(true) | bool }}"
+
+    - name: "Swap | dphys-swapfile | Purge the package (optional)"
+      ansible.builtin.apt:
+        name: dphys-swapfile
+        state: absent
+        purge: true
+      when: raspberry_swap_purge_dphys | default(false) | bool
+
+# --------------------------------------------------------------------------
+# zram-based swap (Armbian, some Ubuntu images, DietPi with location=zram)
+# --------------------------------------------------------------------------
+- name: "Swap | Disable zram swap units that exist on this host"
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: stopped
+    enabled: false
+    masked: "{{ raspberry_swap_mask_units | default(true) | bool }}"
+  loop:
+    - zramswap.service
+    - zram-config.service
+    - armbian-zram-config.service
+    - systemd-zram-setup@zram0.service
+  when: item in (ansible_facts.services | default({}))
+  tags: [raspberry, swap]
+
+- name: "Swap | Drop zram-generator swap config"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/zram-generator.conf
+    - /usr/lib/systemd/zram-generator.conf
+  register: raspberry_swap_zram_conf
+  tags: [raspberry, swap]
+
+# --------------------------------------------------------------------------
+# Generic: fstab entries (swap partitions, /swapfile, /swap.img, ...)
+# --------------------------------------------------------------------------
+- name: "Swap | Comment out every swap entry in /etc/fstab"
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^(?![[:blank:]]*#)([[:blank:]]*\S+[[:blank:]]+\S+[[:blank:]]+swap[[:blank:]]+.*)$'
+    replace: '#\1'
+    backup: true
+  register: raspberry_swap_fstab
+  tags: [raspberry, swap]
+
+- name: "Swap | swapoff --all"
+  ansible.builtin.command: swapoff --all
+  register: raspberry_swap_off
+  changed_when: raspberry_swap_off.rc == 0
+  when: raspberry_swap_active.stdout | trim | length > 0
+  tags: [raspberry, swap]
+
+- name: "Swap | Reload systemd so generated *.swap units disappear"
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: raspberry_swap_fstab.changed or raspberry_swap_zram_conf.changed
+  tags: [raspberry, swap]
+
+- name: "Swap | Remove leftover swap files"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ raspberry_swap_files_to_remove | default(['/var/swap', '/swapfile', '/swap.img', '/var/swapfile']) }}"
+  when: raspberry_swap_remove_files | default(true) | bool
+  tags: [raspberry, swap]
+
+# --------------------------------------------------------------------------
+# Verify
+# --------------------------------------------------------------------------
+- name: "Swap | Re-check active swap"
+  ansible.builtin.command: swapon --noheadings --show=NAME
+  changed_when: false
+  register: raspberry_swap_verify
+  tags: [raspberry, swap]
+
+- name: "Swap | Assert swap is gone"
+  ansible.builtin.assert:
+    that: raspberry_swap_verify.stdout | trim | length == 0
+    success_msg: "No active swap."
+    fail_msg: "Still active: {{ raspberry_swap_verify.stdout_lines | default([]) | join(', ') }}"
+    quiet: true
+  tags: [raspberry, swap]

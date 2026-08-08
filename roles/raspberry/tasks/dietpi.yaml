@@ -1,0 +1,76 @@
+---
+# tasks/dietpi.yml -- included from main.yml when raspberry_is_dietpi is true.
+# The include's `when` is inherited, so no is_dietpi guards appear here.
+
+- name: Read the DietPi version (informational, and useful for version gating)
+  ansible.builtin.slurp:
+    src: /boot/dietpi/.version
+  register: raspberry_dietpi_version_raw
+  failed_when: false
+  tags: [raspberry, dietpi]
+
+- name: Parse the DietPi core version
+  ansible.builtin.set_fact:
+    raspberry_dietpi_version: >-
+      {{ (raspberry_dietpi_version_raw.content | b64decode
+          | regex_search('G_DIETPI_VERSION_CORE=(\d+)', '\1') | first) ~ '.' ~
+         (raspberry_dietpi_version_raw.content | b64decode
+          | regex_search('G_DIETPI_VERSION_SUB=(\d+)', '\1') | first) }}
+  when: raspberry_dietpi_version_raw.content is defined
+  tags: [raspberry, dietpi]
+
+# ---------------------------------------------------------------------------
+# systemd-logind
+# ---------------------------------------------------------------------------
+# DietPi masks logind by default to save RAM. Unmasking and starting in one
+# task works because the module unmasks before applying `state`. daemon_reload
+# is set because removing the /dev/null mask symlink does not always prompt
+# systemd to reload its unit cache on its own.
+#
+# Do NOT add `enabled: true`. systemd-logind.service is a static unit with no
+# [Install] section (dbus-activated, pulled in by pam_systemd), so
+# systemctl enable on it fails.
+
+- name: Unmask and start systemd-logind
+  ansible.builtin.systemd_service:
+    name: systemd-logind.service
+    masked: false
+    state: started
+    daemon_reload: true
+  become: true
+  when: ansible_facts.service_mgr == 'systemd'
+  tags: [raspberry, dietpi]
+
+- name: Confirm logind is actually running and not just unmasked
+  ansible.builtin.command:
+    cmd: systemctl is-active --quiet systemd-logind.service
+  changed_when: false
+  check_mode: false
+  when: ansible_facts.service_mgr == 'systemd'
+  tags: [raspberry, dietpi]
+
+# ---------------------------------------------------------------------------
+# Serial / UART
+# ---------------------------------------------------------------------------
+# dietpi-set_hardware edits BOTH config.txt and cmdline.txt, which hand-editing
+# config.txt alone does not. raspberry_enable_serial drives the subcommand
+# rather than gating the task, so state is asserted in both directions on every
+# run. If the helper is missing, main.yml's generic fallbacks take over.
+#
+# Verify the subcommand name against your DietPi version before relying on it.
+
+- name: Set the serial console state using DietPi's own helper
+  ansible.builtin.command:
+    cmd: >-
+      /boot/dietpi/func/dietpi-set_hardware serialconsole
+      {{ 'enable' if (raspberry_enable_serial | default(true) | bool) else 'disable' }}
+  become: true
+  register: raspberry_dietpi_serial_helper
+  changed_when: raspberry_dietpi_serial_helper.rc == 0
+  failed_when: false
+  when:
+    - raspberry_dietpi_markers.results
+      | selectattr('item', 'search', 'dietpi-set_hardware')
+      | selectattr('stat.exists') | list | length > 0
+  notify: Reboot required for firmware change
+  tags: [raspberry, dietpi]

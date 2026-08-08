@@ -1,0 +1,4 @@
+---
+- name: "Reboot required for firmware change"
+  ansible.builtin.reboot:
+    msg: "config.txt or cmdline.txt changed -- reboot required to take effect."

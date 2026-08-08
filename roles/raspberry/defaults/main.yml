@@ -1,9 +1,25 @@
 ---
+raspberry_boot_config_path: "/boot/firmware/config.txt"
+raspberry_boot_cmdline_path: "/boot/firmware/cmdline.txt"
+
 raspberry_passwordless_sudo: true
 raspberry_ramdisk_log: true
+
 raspberry_enable_bluetooth: false
 raspberry_enable_leds: false
-raspberry_disable_wifi: false
+raspberry_enable_wifi: true
+raspberry_enable_hdmi: false
+raspberry_enable_serial: false
+raspberry_serial_baud: 115200
 
 raspberry_user_groups: []
 raspberry_user: {}
+
+raspberry_swap_mask_units: true          # mask units so an apt upgrade can't re-enable them
+raspberry_swap_remove_files: true        # delete the swap file after swapoff
+raspberry_swap_purge_dphys: false        # apt purge dphys-swapfile instead of just masking
+raspberry_swap_files_to_remove:
+  - /var/swap      # DietPi
+  - /swapfile      # Debian
+  - /swap.img      # Ubuntu
+  - /var/swapfile

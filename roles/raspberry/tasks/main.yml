@@ -1,8 +1,131 @@
 ---
-- name: Set hardware parameters
-  ansible.builtin.include_tasks: hw.yml
-  when: ansible_distribution != "Ubuntu"
+# ---------------------------------------------------------------------------
+# Detection
+# ---------------------------------------------------------------------------
+# DietPi reports ID=debian in /etc/os-release, so ansible_facts.distribution
+# says "Debian" and cannot be used to identify it. Check for the marker files
+# DietPi installs instead. /boot/dietpi lives on the rootfs and is distinct
+# from the Raspberry Pi firmware partition at /boot/firmware.
+
+- name: Look for DietPi marker files
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /boot/dietpi/.version
+    - /boot/dietpi.txt
+    - /boot/dietpi/func/dietpi-set_hardware
+  register: raspberry_dietpi_markers
   tags: always
+
+# tags: always matters here. The dispatch below branches on this fact in both
+# directions, so if detection were skipped by a --tags run the fact would be
+# undefined -- and a `not raspberry_is_dietpi` guard would then evaluate true on
+# a DietPi host, including the wrong file.
+- name: Record whether this host is DietPi
+  ansible.builtin.set_fact:
+    raspberry_is_dietpi: >-
+      {{ raspberry_dietpi_markers.results
+         | selectattr('stat.exists') | list | length > 0 }}
+    cacheable: true
+  tags: always
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+# dietpi.yml is gated; the `when` on an include is inherited by every task
+# inside, so that file carries no is_dietpi guards of its own. raspbian.yml is
+# generic and runs unconditionally.
+
+- name: Configure DietPi hosts
+  ansible.builtin.include_tasks: dietpi.yaml
+  when: raspberry_is_dietpi | bool
+  tags: always
+
+# raspbian.yml is generic and runs for every host, DietPi included. The
+# raspi-config tasks inside it carry their own not-DietPi guard.
+- name: Apply generic boot configuration
+  ansible.builtin.include_tasks: hw.yml
+  tags: always
+
+# ---------------------------------------------------------------------------
+# Serial / UART -- generic fallbacks
+# ---------------------------------------------------------------------------
+# Only one of the two helper registers is ever defined, depending on which file
+# ran above. Chained-undefined access resolves to the given default, so no
+# `is defined` guards are needed.
+
+- name: Record whether a native helper managed the serial console
+  ansible.builtin.set_fact:
+    raspberry_serial_helper_used: >-
+      {{ (raspberry_dietpi_serial_helper.rc | default(1) == 0)
+         or (raspberry_raspbian_serial_helper.results | default([])
+             | selectattr('rc', 'defined')
+             | selectattr('rc', 'equalto', 0) | list | length > 0) }}
+  tags: [raspberry, dietpi, serial]
+
+# The regexp matches a commented-out key as well, so `#enable_uart=1` is
+# replaced in place rather than leaving a duplicate below it. With no match at
+# all, lineinfile appends at EOF. (No [all] header is emitted -- verified
+# unnecessary on these hosts. If a conditional section ever appears at the end
+# of config.txt, revisit this.)
+- name: Set UART state in the Raspberry Pi firmware config
+  ansible.builtin.lineinfile:
+    path: "{{ raspberry_boot_config_path }}"
+    regexp: '^\s*#?\s*enable_uart\s*=.*$'
+    line: "enable_uart={{ 1 if (raspberry_enable_serial | default(true) | bool) else 0 }}"
+    state: present
+    create: false
+    backup: true
+  become: true
+  when: not (raspberry_serial_helper_used | bool)
+  notify: Reboot required for firmware change
+  tags: [raspberry, dietpi, serial]
+
+# enable_uart alone is not enough: cmdline.txt carries the console= token, and a
+# stale one points the kernel at a UART the firmware never brought up.
+#
+# cmdline.txt is a single space-separated line, so this is a remove/add pair
+# rather than one declarative task:
+#
+#   remove: strips the token plus its preceding whitespace, leaving no double
+#           space regardless of whether it sat first, middle, or last.
+#   add:    the negative lookahead means the regexp stops matching once the
+#           token is present, so it is a no-op on later runs. With backrefs and
+#           no match, lineinfile leaves the file untouched. The
+#           \s*(\S.*\S|\S)\s* capture trims both ends, which also normalises
+#           any pre-existing stray whitespace.
+#
+# Caveat of a default baud: a host running a NON-default rate (e.g.
+# console=ttyAMA0,9600) is normalised to raspberry_serial_baud on the round
+# trip. To preserve it, slurp cmdline.txt first and set raspberry_serial_baud
+# from a regex_search of the existing token.
+
+- name: Remove the serial console from the kernel command line
+  ansible.builtin.replace:
+    path: "{{ raspberry_boot_cmdline_path }}"
+    regexp: '\s*\bconsole=(?:serial0|ttyAMA0|ttyS0),\d+\b'
+    replace: ''
+    backup: true
+  become: true
+  when:
+    - not (raspberry_enable_serial | default(true) | bool)
+    - not (raspberry_serial_helper_used | bool)
+  notify: Reboot required for firmware change
+  tags: [raspberry, dietpi, serial]
+
+- name: Add the serial console to the kernel command line
+  ansible.builtin.lineinfile:
+    path: "{{ raspberry_boot_cmdline_path }}"
+    regexp: '^(?!.*\bconsole=serial0\b)\s*(\S.*\S|\S)\s*$'
+    line: '\1 console=serial0,{{ raspberry_serial_baud | default(115200) }}'
+    backrefs: true
+    backup: true
+  become: true
+  when:
+    - raspberry_enable_serial | default(true) | bool
+    - not (raspberry_serial_helper_used | bool)
+  notify: Reboot required for firmware change
+  tags: [raspberry, dietpi, serial]
 
 - name: Delete microsoft stuff
   ansible.builtin.include_tasks: microsoft.yml
@@ -12,13 +135,6 @@
   ansible.builtin.package:
     name: avahi-daemon
     state: absent
-  tags: [raspberry, base]
-
-- name: Disable swap
-  ansible.builtin.systemd:
-    name: dphys-swapfile.service
-    state: stopped
-    enabled: false
   tags: [raspberry, base]
 
 - name: Log to ramdisk
