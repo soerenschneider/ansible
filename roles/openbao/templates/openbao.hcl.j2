@@ -1,0 +1,311 @@
+{#-
+  ============================================================================
+  OpenBao server configuration — managed by Ansible
+  roles/openbao/templates/openbao.hcl.j2
+
+  Verified against the OpenBao 2.6.x configuration reference.
+
+  IMPORTANT — no disable_mlock here, deliberately.
+  mlock was REMOVED in OpenBao 2.0.0 and disable_mlock is obsolete. The parser
+  still accepts `disable_mlock = true` (it does nothing), but it ERRORS OUT
+  IMMEDIATELY if set to `false`. So a Vault config carried over with
+  `disable_mlock = false` will refuse to start. Protect key material from swap
+  at the systemd layer instead — the shipped unit sets MemorySwapMax=0.
+  ============================================================================
+-#}
+{%- macro hcl(v) -%}
+{%- if v is boolean -%}{{ v | string | lower }}
+{%- elif v is number -%}{{ v }}
+{%- else -%}"{{ v }}"
+{%- endif -%}
+{%- endmacro -%}
+# ============================================================================
+# Managed by Ansible — do not edit by hand. Changes will be overwritten.
+# Node: {{ inventory_hostname }}
+# ============================================================================
+
+cluster_name = "{{ openbao_cluster_name }}"
+
+# Advertised addresses. Must be reachable by clients (api_addr) and by peer
+# nodes (cluster_addr). OpenBao ignores the scheme on cluster_addr — peer
+# traffic always uses TLS with its own internal key/cert.
+api_addr     = "{{ openbao_api_addr }}"
+cluster_addr = "{{ openbao_cluster_addr }}"
+
+ui = {{ openbao_ui | default(false) | bool | string | lower }}
+
+# ----------------------------------------------------------------------------
+# Storage — Integrated Storage (Raft)
+# ----------------------------------------------------------------------------
+storage "raft" {
+  path    = "{{ openbao_raft_path }}"
+  node_id = "{{ openbao_raft_node_id }}"
+
+  # The default timing is tuned for minimal servers (equivalent to 5).
+  # The docs recommend 1 for production servers: faster leader failure
+  # detection and elections, at the cost of more network and CPU.
+  performance_multiplier = {{ openbao_raft_performance_multiplier | default(1) | int }}
+
+  autopilot_reconcile_interval = "{{ openbao_raft_autopilot_reconcile_interval | default('10s') }}"
+  autopilot_update_interval    = "{{ openbao_raft_autopilot_update_interval | default('2s') }}"
+{% if openbao_raft_trailing_logs is defined %}
+  trailing_logs = {{ openbao_raft_trailing_logs | int }}
+{% endif %}
+{% if openbao_raft_snapshot_threshold is defined %}
+  snapshot_threshold = {{ openbao_raft_snapshot_threshold | int }}
+{% endif %}
+{% if openbao_raft_snapshot_interval is defined %}
+  snapshot_interval = {{ openbao_raft_snapshot_interval | int }}
+{% endif %}
+{% if openbao_raft_max_entry_size is defined %}
+  max_entry_size = {{ openbao_raft_max_entry_size | int }}
+{% endif %}
+{% if openbao_raft_max_transaction_size is defined %}
+  max_transaction_size = {{ openbao_raft_max_transaction_size | int }}
+{% endif %}
+{% if openbao_raft_retry_join_as_non_voter | default(false) | bool %}
+  retry_join_as_non_voter = true
+{% endif %}
+{#- Peers: every cluster member except this node. Nodes locate the leader
+    through these stanzas. With a Shamir seal, joined nodes still need to be
+    unsealed manually. -#}
+{% for peer in openbao_raft_peers | default([]) %}
+{% if peer.api_addr != openbao_api_addr %}
+
+  retry_join {
+{% if peer.auto_join is defined %}
+    auto_join = "{{ peer.auto_join }}"
+{% if peer.auto_join_scheme is defined %}
+    auto_join_scheme = "{{ peer.auto_join_scheme }}"
+{% endif %}
+{% if peer.auto_join_port is defined %}
+    auto_join_port = {{ peer.auto_join_port | int }}
+{% endif %}
+{% else %}
+    leader_api_addr = "{{ peer.api_addr }}"
+{% endif %}
+{% if peer.leader_tls_servername | default(openbao_raft_leader_tls_servername) is defined and (peer.leader_tls_servername | default(openbao_raft_leader_tls_servername | default(''))) %}
+    leader_tls_servername = "{{ peer.leader_tls_servername | default(openbao_raft_leader_tls_servername) }}"
+{% endif %}
+{% if openbao_raft_leader_ca_cert_file is defined %}
+    leader_ca_cert_file = "{{ openbao_raft_leader_ca_cert_file }}"
+{% endif %}
+{% if openbao_raft_leader_client_cert_file is defined %}
+    leader_client_cert_file = "{{ openbao_raft_leader_client_cert_file }}"
+    leader_client_key_file  = "{{ openbao_raft_leader_client_key_file }}"
+{% endif %}
+  }
+{% endif %}
+{% endfor %}
+}
+
+# ----------------------------------------------------------------------------
+# Primary API listener
+# ----------------------------------------------------------------------------
+listener "tcp" {
+  address         = "{{ openbao_listen_address | default('0.0.0.0:8200') }}"
+  cluster_address = "{{ openbao_cluster_listen_address | default('0.0.0.0:8201') }}"
+
+{% if openbao_tls_disable | default(false) | bool %}
+  # WARNING: TLS disabled. Only acceptable when a sidecar or mesh proxy
+  # terminates TLS on loopback. Never expose this listener directly.
+  tls_disable = true
+{% else %}
+  tls_disable   = false
+  tls_cert_file = "{{ openbao_tls_cert_file }}"
+  tls_key_file  = "{{ openbao_tls_key_file }}"
+
+  tls_min_version = "{{ openbao_tls_min_version | default('tls12') }}"
+  tls_max_version = "{{ openbao_tls_max_version | default('tls13') }}"
+{% if openbao_tls_cipher_suites | default('') %}
+  # Only consulted for TLS 1.2 and earlier; Go ignores it when 1.3 negotiates.
+  tls_cipher_suites = "{{ openbao_tls_cipher_suites }}"
+{% endif %}
+{% if openbao_tls_require_client_cert | default(false) | bool %}
+  # mTLS. Mutually exclusive with tls_disable_client_certs — never set both.
+  tls_require_and_verify_client_cert = true
+  tls_client_ca_file                = "{{ openbao_tls_client_ca_file }}"
+{% endif %}
+{% endif %}
+
+  # Request limits and timeouts
+  http_read_header_timeout = "{{ openbao_http_read_header_timeout | default('10s') }}"
+  http_read_timeout        = "{{ openbao_http_read_timeout | default('30s') }}"
+  http_idle_timeout        = "{{ openbao_http_idle_timeout | default('5m') }}"
+  http_write_timeout       = "{{ openbao_http_write_timeout | default('0') }}"
+  max_request_size         = {{ openbao_max_request_size | default(33554432) | int }}
+  max_request_duration     = "{{ openbao_max_request_duration | default('90s') }}"
+{% if openbao_max_request_json_memory is defined %}
+  max_request_json_memory  = {{ openbao_max_request_json_memory | int }}
+{% endif %}
+{% if openbao_max_request_json_strings is defined %}
+  max_request_json_strings = {{ openbao_max_request_json_strings | int }}
+{% endif %}
+
+  # Defaulted to true upstream (rekey since 2.5.0, generate-root since 2.5.3).
+  # Pinned explicitly so an older binary does not silently expose them.
+  disable_unauthed_rekey_endpoints         = {{ openbao_disable_unauthed_rekey_endpoints | default(true) | bool | string | lower }}
+  disable_unauthed_generate_root_endpoints = {{ openbao_disable_unauthed_generate_root_endpoints | default(true) | bool | string | lower }}
+
+{% if openbao_trusted_proxy_cidrs | default([]) %}
+  # Behind a load balancer: trust XFF only from these sources so audit logs
+  # record the real client IP. Rejects XFF from anywhere else.
+  x_forwarded_for_authorized_addrs      = "{{ openbao_trusted_proxy_cidrs | join(',') }}"
+  x_forwarded_for_hop_skips             = {{ openbao_x_forwarded_for_hop_skips | default(0) | int }}
+  x_forwarded_for_reject_not_authorized = true
+  x_forwarded_for_reject_not_present    = {{ openbao_x_forwarded_for_reject_not_present | default(true) | bool | string | lower }}
+{% endif %}
+
+  telemetry {
+{% if openbao_metrics_listener_enabled | default(false) | bool %}
+    # Metrics are served on the dedicated listener below, so keep API clients
+    # from scraping them here.
+    disallow_metrics = true
+{% else %}
+    unauthenticated_metrics_access = {{ openbao_unauthenticated_metrics_access | default(false) | bool | string | lower }}
+{% endif %}
+  }
+
+  profiling {
+    unauthenticated_pprof_access = {{ openbao_unauthenticated_pprof_access | default(false) | bool | string | lower }}
+  }
+
+  custom_response_headers {
+    "default" = {
+{% for name, values in openbao_response_headers | default({'Strict-Transport-Security': ['max-age=31536000', 'includeSubDomains'], 'X-Content-Type-Options': ['nosniff'], 'X-Frame-Options': ['DENY'], 'Referrer-Policy': ['no-referrer']}) | dictsort %}
+      "{{ name }}" = [{{ values | map('to_json') | join(', ') }}],
+{% endfor %}
+    },
+  }
+}
+
+{% if openbao_metrics_listener_enabled | default(false) | bool %}
+# ----------------------------------------------------------------------------
+# Dedicated metrics listener — serves ONLY /v1/sys/metrics and blocks all
+# other API requests. Bind this to an internal/management address.
+# ----------------------------------------------------------------------------
+listener "tcp" {
+  address = "{{ openbao_metrics_listen_address | default('127.0.0.1:9101') }}"
+
+{% if openbao_metrics_tls_disable | default(true) | bool %}
+  tls_disable = true
+{% else %}
+  tls_disable   = false
+  tls_cert_file = "{{ openbao_metrics_tls_cert_file | default(openbao_tls_cert_file) }}"
+  tls_key_file  = "{{ openbao_metrics_tls_key_file | default(openbao_tls_key_file) }}"
+{% endif %}
+
+  telemetry {
+    metrics_only                   = true
+    unauthenticated_metrics_access = {{ openbao_metrics_unauthenticated | default(true) | bool | string | lower }}
+{% if openbao_metrics_path | default('') %}
+    metrics_path = "{{ openbao_metrics_path }}"
+{% endif %}
+  }
+}
+{% endif %}
+
+{% if openbao_seal | default({}) %}
+# ----------------------------------------------------------------------------
+# Auto-unseal
+# ----------------------------------------------------------------------------
+seal "{{ openbao_seal.type }}" {
+{% for key, value in openbao_seal.config | default({}) | dictsort %}
+  {{ key }} = {{ hcl(value) }}
+{% endfor %}
+}
+{% else %}
+# No seal stanza: Shamir (manual unseal). Nodes joining via retry_join must
+# be unsealed by hand. Configure openbao_seal for auto-unseal.
+{% endif %}
+
+# ----------------------------------------------------------------------------
+# Declarative audit devices (OpenBao-specific)
+#
+# Devices declared here are created on the active node at startup and on
+# SIGHUP, so auditing is in place from the moment the node is unsealed rather
+# than depending on a post-init API call. Removing a stanza removes the
+# device, so the config must be identical across all servers. Paths must be
+# unique and cannot duplicate an API-created device.
+# ----------------------------------------------------------------------------
+{% for device in openbao_audit_devices | default([{'type': 'file', 'path': 'file/', 'description': 'Primary file audit device', 'options': {'file_path': '/var/log/openbao/audit.log', 'mode': '0600'}}]) %}
+audit "{{ device.type }}" "{{ device.path }}" {
+{% if device.description is defined %}
+  description = "{{ device.description }}"
+{% endif %}
+{% if device.local is defined %}
+  local = {{ device.local | bool | string | lower }}
+{% endif %}
+  options {
+{% for key, value in device.options | default({}) | dictsort %}
+    {{ key }} = "{{ value }}"
+{% endfor %}
+  }
+}
+{% endfor %}
+
+{% if openbao_user_lockout | default({}) %}
+# ----------------------------------------------------------------------------
+# Brute-force protection for failed logins
+# ----------------------------------------------------------------------------
+{% for method, settings in openbao_user_lockout | dictsort %}
+user_lockout "{{ method }}" {
+{% for key, value in settings | dictsort %}
+  {{ key }} = {{ hcl(value) }}
+{% endfor %}
+}
+{% endfor %}
+{% endif %}
+
+# ----------------------------------------------------------------------------
+# Telemetry
+# ----------------------------------------------------------------------------
+telemetry {
+{% for key, value in openbao_telemetry | default({'prometheus_retention_time': '30s', 'disable_hostname': true}) | dictsort %}
+  {{ key }} = {{ hcl(value) }}
+{% endfor %}
+}
+
+# ----------------------------------------------------------------------------
+# Logging
+# ----------------------------------------------------------------------------
+log_level  = "{{ openbao_log_level | default('info') }}"
+log_format = "{{ openbao_log_format | default('json') }}"
+{% if openbao_log_file | default('') %}
+log_file             = "{{ openbao_log_file }}"
+log_rotate_duration  = "{{ openbao_log_rotate_duration | default('24h') }}"
+log_rotate_max_files = {{ openbao_log_rotate_max_files | default(30) | int }}
+{% if openbao_log_rotate_bytes is defined %}
+log_rotate_bytes = {{ openbao_log_rotate_bytes | int }}
+{% endif %}
+{% endif %}
+{% if openbao_log_requests_level | default('') %}
+log_requests_level = "{{ openbao_log_requests_level }}"
+{% endif %}
+
+# ----------------------------------------------------------------------------
+# Leases and request handling
+# ----------------------------------------------------------------------------
+default_lease_ttl            = "{{ openbao_default_lease_ttl | default('768h') }}"
+max_lease_ttl                = "{{ openbao_max_lease_ttl | default('768h') }}"
+default_max_request_duration = "{{ openbao_default_max_request_duration | default('90s') }}"
+
+# ----------------------------------------------------------------------------
+# Hardening — these all default to false upstream; pinned to make the posture
+# explicit and to prevent an inherited config from turning them on.
+# ----------------------------------------------------------------------------
+
+{% if openbao_disable_standby_reads is defined %}
+disable_standby_reads = {{ openbao_disable_standby_reads | bool | string | lower }}
+{% endif %}
+{% if openbao_plugin_directory | default('') %}
+
+plugin_directory = "{{ openbao_plugin_directory }}"
+{% endif %}
+{% if openbao_extra_config | default('') %}
+
+# ----------------------------------------------------------------------------
+# Site-specific additions (openbao_extra_config)
+# ----------------------------------------------------------------------------
+{{ openbao_extra_config }}
+{% endif %}

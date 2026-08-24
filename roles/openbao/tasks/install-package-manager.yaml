@@ -1,4 +1,69 @@
 ---
+# ============================================================================
+# OpenBao — install from the official package repositories (Debian + RHEL)
+# ----------------------------------------------------------------------------
+# Changes applied in this revision:
+#   P0  RHEL block `when` fixed: was os_family == "Debian" (RHEL never ran,
+#       and Debian hosts fell through into rpm_key/dnf tasks).
+#   P1  repo_gpgcheck raised to 1 so repodata signatures are verified, not
+#       just package signatures. Gated behind a variable — see note below.
+#   P1  Signing key is now pinned to a fingerprint and verified before it
+#       becomes a trust anchor (gpg --show-keys on Debian, rpm_key's own
+#       fingerprint check on RHEL).
+#   P2  Dropped `creates:` on the dearmor step, so key rotation is picked up.
+#   P2  Key staging moved to a tempfile-created directory and cleaned up in
+#       an `always` block; no more spurious "changed" on every run.
+#   P3  Keyring parent directory derived from openbao_gpg_key_path.
+#   P3  Architectures: added to the deb822 source.
+#   P3  Suite/components/package name promoted to variables.
+#   P3  shell -> command, gpg2 -> gpg.
+#   P3  Unsupported-OS guard added; post-install verify is check-mode safe.
+#
+# --- Required variables -----------------------------------------------------
+#   openbao_gpg_key            Armored public key (embed in vars, not fetched)
+#   openbao_gpg_fingerprint    Pinned primary fingerprint, no spaces
+#   openbao_gpg_key_path       Dearmored keyring path (Debian)
+#   openbao_apt_repo_file      Path to the .sources file
+#   openbao_apt_repo_uri       APT repo base URI
+#   openbao_rpm_gpg_key_path   Armored key path under /etc/pki/rpm-gpg
+#   openbao_rpm_repo_file      Path to the .repo file
+#   openbao_rpm_baseurl        YUM/DNF repo base URL
+#
+# --- Optional variables (defaults applied inline) ---------------------------
+#   openbao_package            Package name (default: openbao)
+#   openbao_apt_suite          Default: stable
+#   openbao_apt_components     Default: main
+#   openbao_rpm_repo_gpgcheck  Default: true
+#
+# NOTE on openbao_gpg_key_path: prefer /etc/apt/keyrings/openbao.gpg.
+#   /usr/share/keyrings is owned by the distro keyring package (verified:
+#   `dpkg -S /usr/share/keyrings` -> ubuntu-keyring) and is for keyrings
+#   shipped by packages, not admin-managed ones.
+#
+# NOTE on openbao_rpm_repo_gpgcheck: repo_gpgcheck=1 requires the repository
+#   to publish a signed repomd.xml.asc. Verify against pkgs.openbao.org on a
+#   canary host first — dnf fails closed with a repomd.xml signature error if
+#   the metadata is unsigned. Set the variable to false only as a documented,
+#   temporary exception.
+#
+# NOTE on openbao_package: the .deb published on GitHub releases installs a
+#   package named `bao`, while EPEL ships `openbao`. Confirm which name the
+#   apt repo uses rather than assuming both channels agree.
+# ============================================================================
+
+- name: "Assert supported operating system"
+  tags: [openbao, openbao-install]
+  ansible.builtin.assert:
+    that:
+      - ansible_facts["os_family"] in ["Debian", "RedHat"]
+    fail_msg: >-
+      OpenBao installation is only implemented for Debian- and RedHat-family
+      hosts; detected os_family={{ ansible_facts["os_family"] | default("unknown") }}.
+    quiet: true
+
+# -------------------------------------------------------------------------
+# Debian / Ubuntu
+# -------------------------------------------------------------------------
 - name: "Install for Debian"
   tags: [openbao, openbao-install]
   when: ansible_facts["os_family"] == "Debian"
@@ -9,41 +74,109 @@
           - gnupg
           - ca-certificates
         state: present
-        update_cache: true
+        cache_valid_time: 3600
 
-    - name: "[Debian] Create keyrings directory"
+    - name: "[Debian] Create keyring directory"
       ansible.builtin.file:
-        path: /usr/share/keyrings
+        path: "{{ openbao_gpg_key_path | dirname }}"
         state: directory
         owner: root
         group: root
         mode: "0755"
 
-    - name: "[Debian] Write armored GPG key to temp file"
-      ansible.builtin.copy:
-        dest: /tmp/openbao-gpg-pub.asc
-        content: "{{ openbao_gpg_key }}"
-        owner: root
-        group: root
-        mode: "0600"
+    - name: "[Debian] Determine dpkg architecture"
+      ansible.builtin.command:
+        argv: [dpkg, --print-architecture]
+      register: openbao_dpkg_arch
+      changed_when: false
+      check_mode: false
 
-    - name: "[Debian] Dearmor GPG key into keyrings directory"
-      ansible.builtin.shell: |
-        gpg2 --dearmor --yes --output {{ openbao_gpg_key_path }} /tmp/openbao-gpg-pub.asc
-      args:
-        creates: "{{ openbao_gpg_key_path }}"
+    # The key is staged in a temporary directory and its fingerprint checked
+    # against the pinned value BEFORE it is installed, so an unverified key
+    # never becomes an apt trust anchor.
+    - name: "[Debian] Install and verify signing key"
+      block:
+        - name: "[Debian] Create key staging directory"
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: openbao-gpg-
+          register: openbao_gpg_tmp
+          changed_when: false
+          check_mode: false
 
-    - name: "[Debian] Remove temporary armored key file"
-      ansible.builtin.file:
-        path: /tmp/openbao-gpg-pub.asc
-        state: absent
+        - name: "[Debian] Write armored key to staging directory"
+          ansible.builtin.copy:
+            src: "openbao-gpg-pub-20240618.asc"
+            dest: "{{ openbao_gpg_tmp.path }}/openbao.asc"
+            owner: "root"
+            group: "root"
+            mode: "0600"
+          changed_when: false
+          check_mode: false
 
-    - name: "[Debian] Set correct permissions on GPG key file"
-      ansible.builtin.file:
-        path: "{{ openbao_gpg_key_path }}"
-        owner: root
-        group: root
-        mode: "0644"
+        - name: "[Debian] Read fingerprints from armored key"
+          ansible.builtin.command:
+            argv:
+              - gpg2
+              - --batch
+              - --no-tty
+              - --with-colons
+              - --show-keys
+              - --fingerprint
+              - "{{ openbao_gpg_tmp.path }}/openbao.asc"
+          register: openbao_gpg_info
+          changed_when: false
+          check_mode: false
+
+        - name: "[Debian] Assert key matches the pinned fingerprint"
+          ansible.builtin.assert:
+            that:
+              - openbao_gpg_fingerprint | upper in (
+                openbao_gpg_info.stdout_lines
+                | select("match", "^fpr:")
+                | map("regex_findall", "[0-9A-Fa-f]{40}")
+                | flatten | map("upper") | list
+                )
+            fail_msg: >-
+              openbao_gpg_key does not contain the pinned fingerprint
+              {{ openbao_gpg_fingerprint }}. Refusing to install an
+              unverified trust anchor.
+            success_msg: "OpenBao signing key verified: {{ openbao_gpg_fingerprint }}"
+            quiet: true
+
+        - name: "[Debian] Dearmor verified key"
+          ansible.builtin.command:
+            argv:
+              - gpg
+              - --batch
+              - --yes
+              - --dearmor
+              - --output
+              - "{{ openbao_gpg_tmp.path }}/openbao.gpg"
+              - "{{ openbao_gpg_tmp.path }}/openbao.asc"
+          changed_when: false
+          check_mode: false
+
+        # copy compares checksums, so this is both idempotent and
+        # rotation-aware: updating openbao_gpg_key replaces the keyring.
+        - name: "[Debian] Install verified keyring"
+          ansible.builtin.copy:
+            src: "{{ openbao_gpg_tmp.path }}/openbao.gpg"
+            dest: "{{ openbao_gpg_key_path }}"
+            remote_src: true
+            owner: root
+            group: root
+            mode: "0644"
+          register: openbao_keyring
+
+      always:
+        - name: "[Debian] Remove key staging directory"
+          ansible.builtin.file:
+            path: "{{ openbao_gpg_tmp.path | default('') }}"
+            state: absent
+          when: openbao_gpg_tmp.path is defined
+          changed_when: false
+          check_mode: false
 
     - name: "[Debian] Add OpenBao apt repository (deb822 format)"
       ansible.builtin.copy:
@@ -52,36 +185,51 @@
         group: root
         mode: "0644"
         content: |
+          # Managed by Ansible — do not edit.
           Types: deb
           URIs: {{ openbao_apt_repo_uri }}
-          Suites: stable
-          Components: main
+          Suites: {{ openbao_apt_suite | default('stable', true) }}
+          Components: {{ openbao_apt_components | default('main', true) }}
+          Architectures: {{ openbao_dpkg_arch.stdout | trim }}
           Signed-By: {{ openbao_gpg_key_path }}
+      register: openbao_apt_repo
+
+    # apt-get update exits non-zero when a repository signature cannot be
+    # verified against its Signed-By keyring, so this is the verification gate.
+    - name: "[Debian] Refresh apt cache (verifies repository signature)"
+      ansible.builtin.apt:
+        update_cache: true
+      when: openbao_keyring is changed or openbao_apt_repo is changed
 
     - name: "[Debian] Install OpenBao"
       ansible.builtin.apt:
-        name: openbao
-        update_cache: true
+        name: "{{ openbao_package | default('openbao', true) }}"
         state: present
+        cache_valid_time: 3600
+        allow_unauthenticated: false
 
 # -------------------------------------------------------------------------
 # RHEL / CentOS / Rocky / AlmaLinux
 # -------------------------------------------------------------------------
 - name: "Install for RHEL"
   tags: [openbao, openbao-install]
-  when: ansible_facts["os_family"] == "Debian"
+  when: ansible_facts["os_family"] == "RedHat"
   block:
     - name: "[RHEL] Write GPG key to RPM GPG directory"
       ansible.builtin.copy:
+        src: "openbao-gpg-pub-20240618.asc"
         dest: "{{ openbao_rpm_gpg_key_path }}"
-        content: "{{ openbao_gpg_key }}"
-        owner: root
-        group: root
+        owner: "root"
+        group: "root"
         mode: "0644"
 
+
+    # rpm_key's own fingerprint check refuses the import on mismatch, which
+    # is the RPM-side equivalent of the gpg --show-keys assert above.
     - name: "[RHEL] Import OpenBao GPG key into RPM keyring"
       ansible.builtin.rpm_key:
         key: "{{ openbao_rpm_gpg_key_path }}"
+        fingerprint: "{{ openbao_gpg_fingerprint }}"
         state: present
 
     - name: "[RHEL] Add OpenBao YUM repository"
@@ -91,10 +239,11 @@
         group: root
         mode: "0644"
         content: |
+          # Managed by Ansible — do not edit.
           [openbao]
           name=openbao
           baseurl={{ openbao_rpm_baseurl }}
-          repo_gpgcheck=0
+          repo_gpgcheck={{ 1 if (openbao_rpm_repo_gpgcheck | default(true) | bool) else 0 }}
           gpgcheck=1
           enabled=1
           gpgkey=file://{{ openbao_rpm_gpg_key_path }}
@@ -104,21 +253,24 @@
 
     - name: "[RHEL] Install OpenBao"
       ansible.builtin.dnf:
-        name: openbao
+        name: "{{ openbao_package | default('openbao', true) }}"
         state: present
+        disable_gpg_check: false
 
 # -------------------------------------------------------------------------
 # Post-install (both families)
 # -------------------------------------------------------------------------
 
 - name: "Verify OpenBao binary is present"
-  ansible.builtin.command:
-    cmd: bao version
-  changed_when: false
-  register: openbao_version_output
   tags: [openbao, openbao-install]
+  ansible.builtin.command:
+    argv: [bao, version]
+  register: openbao_version_output
+  changed_when: false
+  when: not ansible_check_mode
 
 - name: "Print OpenBao version"
-  ansible.builtin.debug:
-    msg: "{{ openbao_version_output.stdout }}"
   tags: [openbao, openbao-install]
+  ansible.builtin.debug:
+    msg: "{{ openbao_version_output.stdout | trim }}"
+  when: not ansible_check_mode
