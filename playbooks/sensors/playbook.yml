@@ -117,7 +117,7 @@
       ansible.builtin.shell: set -o pipefail && /usr/bin/getent group | awk -F":" '{print $1}'
       changed_when: false
       register: _existing_groups
-      tags: user
+      tags: [user, sensor]
 
     - name: "Add secondary groups to user"
       ansible.builtin.user:
@@ -126,4 +126,4 @@
         append: true
       when: item in _existing_groups.stdout_lines
       with_items: [vault_pki]
-      tags: user
+      tags: [user, sensor]
