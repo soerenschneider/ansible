@@ -19,10 +19,7 @@ input_cache {
 }
 {% endif -%}
 
-log_file            "/var/log/mpd.log"
-#pid_file           "/var/run/mpd/pid"
-#state_file         "/var/lib/mpd/state"
-#sticker_file       "/var/lib/mpd/sticker.sql"
+log_file            "syslog"
 ###############################################################################
 
 # General music daemon options ################################################
@@ -30,11 +27,10 @@ user                    "{{ mpd_user | default('mpd') }}"
 group                   "audio"
 bind_to_address         "{{ mpd_bind_address | default('any') }}"
 port                    "{{ mpd_bind_port | default(6600) }}"
-log_level               "secure"
+log_level               "notice"
 gapless_mp3_playback    "no"
 metadata_to_use         "artist,album,title,track,name,genre,date,composer,performer,disc"
-auto_update             "yes"
-auto_update_depth       "7"
+auto_update             "no"
 save_absolute_paths_in_playlists    "no"
 
 ###############################################################################
