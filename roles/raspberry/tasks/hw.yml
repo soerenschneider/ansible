@@ -1,9 +1,17 @@
 ---
+- name: Check if bluetooth service exists
+  ansible.builtin.systemd:
+    name: bluetooth
+  register: _raspberry_bluetooth_service
+  failed_when: false
+  changed_when: false
+
 - name: Setting bluetooth support
   ansible.builtin.systemd:
     state: "{% if raspberry_enable_bluetooth %}started{% else %}stopped{% endif %}"
     enabled: "{{ raspberry_enable_bluetooth }}"
     name: bluetooth
+  when: bluetooth_service.status.LoadState | default('not-found') != 'not-found'
   tags: [raspberry, bluetooth]
 
 - name: "Set Bluetooth hw status"
