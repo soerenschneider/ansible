@@ -39,7 +39,7 @@ table ip global {
             udp . 123 : accept
         }
 
-        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
+        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport { 9093, 9191, 9192 } accept
         ip saddr 192.168.0.0/16 tcp dport { 9094, 9093 } accept
         ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
