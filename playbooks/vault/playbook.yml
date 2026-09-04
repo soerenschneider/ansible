@@ -1,6 +1,6 @@
 ---
-- name: Setup vault cluster
-  hosts: vault
+- name: "Setup OpenBAO cluster"
+  hosts: "openbao"
   become: true
   vars:
     openbao_dir: "/etc/openbao.d"
@@ -19,7 +19,7 @@
         name: "platform"
       tags: always
 
-    - name: Add credentials
+    - name: "Add credentials"
       tags: [acme, cert]
       block:
         - name: "Create aws dir"
