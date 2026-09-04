@@ -127,22 +127,21 @@
   notify: Reboot required for firmware change
   tags: [raspberry, dietpi, serial]
 
-- name: Delete microsoft stuff
+- name: "Delete microsoft junk"
   ansible.builtin.include_tasks: microsoft.yml
   tags: always
 
-- name: Delete avahi-daemon
+- name: "Remove package avahi-daemon"
   ansible.builtin.package:
-    name: avahi-daemon
-    state: absent
+    name: "avahi-daemon"
+    state: "absent"
   tags: [raspberry, base]
 
 - name: Log to ramdisk
   ansible.posix.mount:
-    path: /var/log
-    src: tmpfs
-    fstype: tmpfs
-    opts: defaults,noatime,nosuid,nodev,noexec,size=48m,mode=0755
-    state: present
-  when: raspberry_ramdisk_log | default(true)
+    path: "/var/log"
+    src: "tmpfs"
+    fstype: "tmpfs"
+    opts: "defaults,noatime,nosuid,nodev,noexec,size=48m,mode=0755"
+    state: "{% if raspberry_ramdisk_log and not raspberry_is_dietpi %}present{% else %}absent{% endif %}"
   tags: [raspberry, base]
