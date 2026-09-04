@@ -4,9 +4,9 @@ cosign_version: v3.1.3
 # renovate: datasource=github-releases depName=antonmedv/fx
 fx_version: "39.2.0"
 # renovate: datasource=github-releases depName=mikefarah/yq
-yq_version: v4.53.3
+yq_version: v4.53.6
 # renovate: datasource=github-releases depName=golangci/golangci-lint
-golangci_lint_version: v2.12.2
+golangci_lint_version: v2.13.2
 # renovate: datasource=github-releases depName=gsamokovarov/jump
 jump_version: "v0.67.0"
 # renovate: datasource=github-releases depName=int128/kubelogin
@@ -16,15 +16,15 @@ kubectx_version: v0.11.0
 # renovate: datasource=github-releases depName=getsops/sops
 sops_version: v3.13.3
 # renovate: datasource=github-releases depName=gruntwork-io/terragrunt
-terragrunt_version: v1.1.3
+terragrunt_version: v1.1.4
 # renovate: datasource=github-releases depName=soerenschneider/sc
-sc_version: v1.10.0
+sc_version: v1.11.0
 # renovate: datasource=github-releases depName=nats-io/natscli
 nats_version: v0.4.0
 # renovate: datasource=github-releases depName=mathismqn/godeez
-godeez_version: v1.5.0
+godeez_version: v1.5.1
 # renovate: datasource=github-releases depName=FiloSottile/age
-age_version: "v1.3.1"
+age_version: v1.3.2
 # renovate: datasource=github-tags depName=golang/go
 go_version: "1.26.1"
 
