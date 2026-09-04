@@ -1,4 +1,23 @@
 ---
+# Rename the default distro user (e.g. dietpi / raspbian) to a desired user.
+#
+# Assumptions:
+#   * This task file runs with privilege escalation available (become configured
+#     by the caller, or the explicit `become: true` on the tasks below).
+#   * The current default user can already sudo (true for stock dietpi/raspbian).
+#   * `baseline_default_users_name` is the desired username.
+#
+# Key fixes vs. the original:
+#   * Won't delete the account it just switched to (old==new guard + rename gate).
+#   * Re-runnable: if inventory already points at the new user, all destructive
+#     steps become no-ops.
+#   * Reboots while still connected as the OLD user, so the switch doesn't depend
+#     on the brand-new user's sudo before we've proven it works.
+#   * Fails EARLY (before any destructive step) if the new user won't have a way
+#     to sudo after the switch.
+#   * Removes the old home directory (remove: true), fixes the misleading
+#     "missing keys" message, and drops the no-op become_user on the slurp.
+
 - name: Assert the desired username is set
   ansible.builtin.assert:
     that:
@@ -13,19 +32,20 @@
     baseline_rename_needed: "{{ ansible_user != baseline_default_users_name }}"
   tags: [base, default_users]
 
-- name: Allow passwordless sudo for all 'sudo' group members
+- name: Allow/refuse passwordless sudo for all 'sudo' group members
   ansible.builtin.lineinfile:
-    path: /etc/sudoers
-    state: present
-    regexp: ^%sudo
+    path: "/etc/sudoers"
+    state: "{% if baseline_default_users_passwordless_sudo | bool %}present{% else %}absent{% endif %}"
+    regexp: "^%sudo"
     line: "%sudo ALL=(ALL) NOPASSWD: ALL"
-    validate: visudo -cf %s
+    validate: "visudo -cf %s"
   become: true
-  when: baseline_default_users_passwordless_sudo | default(false) | bool
   tags: [base, default_users]
 
 # The new user is created without a password. If we're going to switch the
 # connection to it and then reboot/delete as that user, it MUST be able to sudo.
+# Fail here (nothing destructive has happened yet) rather than half-migrate.
+# If you instead set a password on the user task below, remove this assert.
 - name: Ensure the new user will be able to sudo after the switch
   ansible.builtin.assert:
     that:
@@ -39,6 +59,9 @@
   when: baseline_rename_needed | bool
   tags: [base, default_users]
 
+# Don't assume /home/<user>: read the real home from passwd. getent_passwd
+# returns the fields after the username, so index 4 is the home directory
+# (name:passwd:uid:gid:gecos:HOME:shell -> [passwd, uid, gid, gecos, home, shell]).
 - name: Look up the old user in the passwd database
   ansible.builtin.getent:
     database: passwd
@@ -124,6 +147,16 @@
     ansible_user: "{{ baseline_default_users_name }}"
   when: baseline_rename_needed | bool
   tags: [base, default_users]
+
+# CRITICAL: set_fact only changes the variable; Ansible keeps reusing the cached
+# connection built for the old user. Without this reset, every task below still
+# runs over the OLD user's SSH session -- so the moment we delete the old user,
+# its sudo dies with "you do not exist in the passwd database". reset_connection
+# tears the cached connection down so the next task reconnects as the new user.
+# Note: meta tasks ignore `when`, so this runs every time -- harmless on no-op
+# runs, where it just reconnects as the same user.
+- name: Drop the cached connection so we reconnect as the new user
+  ansible.builtin.meta: reset_connection
 
 # Prove the new user can connect AND sudo before we delete anything. If this
 # fails, the old user is still intact and recoverable.

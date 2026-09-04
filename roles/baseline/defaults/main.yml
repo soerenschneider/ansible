@@ -33,3 +33,5 @@ baseline_force_age_keygen: false
 
 baseline_linux_sysctl_congestion_control: "bbr"
 baseline_linux_sysctl_net_qdisc: "fq"
+
+baseline_default_users_passwordless_sudo: true

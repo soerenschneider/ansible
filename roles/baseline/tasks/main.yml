@@ -16,21 +16,37 @@
   when: ansible_system == "Linux"
   tags: [base, base-packages]
 
-- name: "Run tasks journald.yaml"
-  ansible.builtin.include_tasks: journald.yaml
-  when: ansible_system == "Linux"
-  tags: [base, logs, logging, journald, systemd]
-
 - name: "Run tasks firewall_rules"
   ansible.builtin.include_tasks: firewall_rules_{{ ansible_os_family | lower }}.yml
-  when: [ansible_system != "OpenBSD", not inventory_hostname.startswith("k8s-"), ufw_enabled | default(true)]
+  when: [not inventory_hostname.startswith("k8s-"), ufw_enabled | default(true)]
   ignore_errors: true  # noqa: ignore-errors
   tags: [base, firewall]
+
+- name: Read the device tree model
+  ansible.builtin.slurp:
+    src: /proc/device-tree/model
+  register: _baseline_dt_model
+  failed_when: false
+  changed_when: false
+  tags: always
+
+- name: Detect Raspberry Pi hardware
+  ansible.builtin.set_fact:
+    _baseline_is_raspberry_pi: >-
+      {{ (_baseline_dt_model.content | default('') | b64decode) is search('Raspberry Pi') }}
+  tags: always
+
+- name: "Run tasks journald.yaml"
+  ansible.builtin.include_tasks: journald.yaml
+  when:
+    - ansible_system == "Linux"
+    - not _baseline_is_raspberry_pi
+  tags: [base, logs, logging, journald, systemd]
 
 - name: "Include role raspberry"
   ansible.builtin.include_role:
     name: raspberry
-  when: [ansible_system == "Linux", ansible_lsb.id is defined, ansible_lsb.id == "Raspbian" or "raspi" in ansible_kernel | lower]
+  when: _baseline_is_raspberry_pi | bool
   tags: always
 
 - name: "Run tasks default_users.yml"
@@ -38,6 +54,7 @@
   when:
     - baseline_default_users_name is defined
     - baseline_default_users_name | length > 0
+    - ansible_user != baseline_default_users_name
   tags: always
 
 - name: "Run tasks authorized_keys.yml"
