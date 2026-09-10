@@ -27,6 +27,9 @@
             name:
               - "python3-smbus"
               - "i2c-tools"
+              - "bluez"
+              - "bluez-firmware"
+              - "pi-bluetooth"
 
         - name: "Enable i2c"
           ansible.builtin.lineinfile:
