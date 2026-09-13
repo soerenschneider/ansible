@@ -4,10 +4,6 @@ flush ruleset
 
 include "{{ nftables_variables_file }}"
 
-define WG_ROADWARRIORS = { 192.168.200.100, 192.168.200.101, 192.168.200.102 }
-define WG_CLIENTS = { 192.168.65.0/24, $LOCAL_KODI, $LOCAL_DEVICE_SOEREN_WORK }
-define NET_LOCAL = 192.168.64.0/21
-
 table ip global {
     chain inbound_world {
         # accepting ping (icmp-echo-request) for diagnostic purposes.
@@ -36,10 +32,9 @@ table ip global {
             udp . 123 :  accept
         }
 
-        # todo: add variable for devices to tighten this rule
-        ip saddr { $NET_DD_USERS, $POOL_MEDIA_TVBOXES } tcp dport { 80, 445, 6600, 9999 } accept
-        # TODO
-        ip saddr { $LOCAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN, $LOCAL_DEVICE_SOEREN } tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
+        # allow access to haproxy that serves HA media and mpd
+        ip saddr { $NET_DD_USERS, $POOL_MEDIA_TVBOXES, $POOL_MEDIA_MPD } tcp dport { 80, 445, 6600 } accept
+        ip saddr $NET_SERVERS ip saddr @tag_prometheus tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
     }
 
     chain inbound_wg {
@@ -54,8 +49,6 @@ table ip global {
             udp . 67    : accept,
             udp . 123   : accept
         }
-
-        ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
     }
 
     chain inbound {
@@ -90,18 +83,28 @@ table ip global {
         # Allow traffic from established and related packets, drop invalid
         ct state vmap { established : accept, related : accept, invalid : drop }
 
+        ip saddr 192.168.64.0/21 oifname "wg0" ip daddr { 192.168.200.1, 192.168.200.5 } udp dport 53 accept
+
         # allow desktop to access management network
         iifname "vlan64" ip saddr $POOL_USERS_SOEREN ip saddr @tag_desktop ip daddr $NET_MANAGEMENT accept
         # accept all traffic from vlan64 expect to management network
-        iifname "vlan64" ip saddr $NET_USERS daddr != $NET_MANAGEMENT accept
+        iifname "vlan64" ip saddr $NET_USERS ip daddr @tag_kubernetes tcp dport 443 accept
+        iifname "vlan64" ip saddr $NET_USERS ip daddr $POOL_MEDIA_MPD tcp dport 6600 accept
+        
+        
+        iifname "vlan64" ip saddr $NET_USERS ip daddr != $NET_MANAGEMENT accept
 
         # allow prometheus to scrape node exporter port
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { "vlan66", "vlan67", "vlan70", "wg0" } tcp dport 9100 accept
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { "vlan66", "vlan67", "vlan70", "wg0" } tcp dport { 9100, 9443, 15283 } accept
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname {"vlan66", "wg0" } ip daddr { $POOL_IOT_PI_ZERO } tcp dport { 9191, 9192, 9194, 9865 } accept
         # allow local nas to fetch data from seedbox
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas ip daddr 192.168.200.5 port 22 accept
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr 192.168.200.5 tcp dport 22 accept
+        # allow local nas to talk to remote syncthing
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr @tag_nas tcp dport 22000 accept
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr @tag_nas udp dport 22000 accept
 
         # allow all members of vlan to talk to mqtt server
-        iifname "vlan66" ip saddr $NET_IOT oifname "vlan65" ip daddr $NET_SERVERS @tag_mqtt tcp dport { 1883, 8883 } accept
+        iifname "vlan66" ip saddr $NET_IOT oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_mqtt tcp dport { 1883, 8883 } accept
         # allow raspberry PIs to talk to openbao
         iifname "vlan66" ip saddr $POOL_IOT_PI_ZERO oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
 
@@ -110,13 +113,14 @@ table ip global {
         # let raspberry pis talk to openbao cluster
         iifname "vlan67" ip saddr $POOL_MEDIA_MPD oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
 
-        iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK @tag_soeren oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
 
         # allow cam access from soeren and ines over wireguard
         iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_soeren oifname "vlan69" ip daddr $NET_CAM accept
         iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_ines   oifname "vlan69" ip daddr $NET_CAM accept
 
         # allow seedbox to talk to fetcharr
+        # TODO: add tag for ch
         iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
         # allow seedbox to talk to kubernetes services
         iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
@@ -131,7 +135,7 @@ table ip global {
         iifname { "vlan69" } ip saddr 192.168.69.50 ip daddr != 192.168.0.0/16 accept
 
         # the rest is dropped by the above policy
-        log prefix "drop-fwd " limit rate 1/minute
+        #log prefix "drop-fwd " limit rate 1/minute
     }
 
     chain postrouting {

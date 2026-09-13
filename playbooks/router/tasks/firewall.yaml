@@ -47,6 +47,14 @@
       failed_when: _nft_file_sha != _nft_file_cmp_sha
       when: _stat_nft_cmp_file.stat.exists
 
+- name: Install nftables ruleset
+  ansible.builtin.template:
+    src: "nftables.conf-{{ location }}.j2"
+    dest: "{{ nft_file }}"
+    validate: "nft -c -f %s"
+  notify: Reload nftables
+  tags: [firewall]
+
 - name: Add NFT firewall conf
   ansible.builtin.template:
     src: nftables.conf-{{ location }}.j2
