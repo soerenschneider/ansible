@@ -6,27 +6,43 @@ option ms-classless-static-routes code 249 = array of integer 8;
 
 {% for network in networks[location].devices %}
 {% if network.dhcp is defined %}
+# {{ network.name | default(network.device) | default('unnamed') }}{% if network.vlantag is defined %} (vlan {{ network.vlantag }}){% endif %}
+
 subnet {{ network.address | ansible.utils.ipaddr('network') }} netmask {{ network.address | ansible.utils.ipaddr('netmask') }} {
-    option routers {{ network['dhcp'].routers | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }};
-    option domain-name-servers {{ network['dhcp'].dns | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }}; 
-{% if network.ntp is defined %}
+    option routers {{ network.dhcp.routers | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }};
+    option domain-name-servers {{ network.dhcp.dns | default([network.address | ansible.utils.ipaddr('address')]) | join(", ") }};
+{% if network.ntp | default(false) %}
     option ntp-servers {{ network.address | ansible.utils.ipaddr('address') }};
 {% endif %}
-{% if network.dhcp.static_routes is defined and network.dhcp.static_routes | length > 0 %}
+{% if network.dhcp.static_routes | default([]) | length > 0 %}
     option rfc3442-classless-static-routes {{ network.dhcp.static_routes | join(",  ") }};
     option ms-classless-static-routes      {{ network.dhcp.static_routes | join(",  ") }};
 {% endif %}
 
-    range {{ network['dhcp'].from }} {{ network['dhcp'].to }};
+    range {{ network.dhcp.from }} {{ network.dhcp.to }};
 }
+
 {% endif %}
 {% endfor %}
+###############################################################################
+# static reservations
+###############################################################################
+{% for network in networks[location].devices %}
+{% set pools = network.pools | default({}) %}
+{% if pools %}
 
-{% for host in local_hosts[location] | default([]) %}
+# --- {{ network.name | default(network.device) | default('unnamed') }}{% if network.vlantag is defined %} (vlan {{ network.vlantag }}){% endif %} ---
+{% for pool_name, pool in pools | dictsort %}
+
+# pool {{ pool_name }} -- {{ pool.cidr | default('NO CIDR') }}
+{% for hostname, host in (pool.hosts | default({})) | dictsort %}
 {% if host.physical is defined %}
-host {{ host.host }} {
+host {{ hostname }} {
     fixed-address {{ host.logical }};
     hardware ethernet {{ host.physical }};
 }
+{% endif %}
+{% endfor %}
+{% endfor %}
 {% endif %}
 {% endfor %}

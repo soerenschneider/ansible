@@ -1,44 +1,89 @@
-{% for loc in (local_hosts | dict2items | selectattr('key', '==', location) | list) + (local_hosts | dict2items | selectattr('key', '!=', location) | list) -%}
-#############################################################################################
-# Datacenter {{ loc.key }}
-#############################################################################################
-{% for network_domain in network_domains %}
-# {{ network_domain }}
-# hosts
-{% for host in loc.value %}
-    local-data: "{{ host.host }}.{{ loc.key }}.{{ network_domain }}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
-    local-data-ptr: "{{ host.logical }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
+{#
+    Unbound local-data, generated from `networks`.
+
+    Shape this expects:
+
+      networks[<site>].devices[]              list of interfaces
+        .name / .device / .vlantag
+        .pools{}                              pool name -> pool
+          .cidr                               (informational here, used by asserts)
+          .hosts{}                            hostname -> host
+            .logical                          required
+            .ttl                              optional, default 3600
+            .services[]                       {port, name}
+            .ha_srv_records[]                 {port, name}
+            .ha_records[]                     bare names
+            .aliases[]                        site-scoped
+            .global_aliases[]                 domain-scoped
+
+    Rendered with ansible.builtin.template defaults (trim_blocks: yes,
+    lstrip_blocks: no), so block tags sit at column 0.
+#}
+{% macro host_records(hostname, host, site, domain) %}
+{% set ttl = host.ttl | default(60) %}
+{% set fqdn = hostname ~ '.' ~ site ~ '.' ~ domain %}
+    local-data: "{{ fqdn }}. {{ ttl }} IN A {{ host.logical }}"
+    local-data-ptr: "{{ host.logical }} {{ fqdn }}"
 {% for service in host.services | default([]) %}
-    local-data: "{{ service.name }}.{{ loc.key }}.{{network_domain}}. {{ host.ttl | default(3600) }} IN SRV 0 10 {{ service.port }} {{ host.host }}.{{ loc.key }}.{{network_domain }}"
+    local-data: "{{ service.name }}.{{ site }}.{{ domain }}. {{ ttl }} IN SRV 0 10 {{ service.port }} {{ fqdn }}"
 {% endfor %}
 {% for record in host.ha_srv_records | default([]) %}
-    local-data: "{{ record.name }}.{{network_domain}}. {{ host.ttl | default(3600) }} IN SRV 0 10 {{ record.port }} {{ host.host }}.{{ loc.key }}.{{ network_domain }}"
+    local-data: "{{ record.name }}.{{ domain }}. {{ ttl }} IN SRV 0 10 {{ record.port }} {{ fqdn }}"
 {% endfor %}
 {% for record in host.ha_records | default([]) %}
-    local-data: "{{ record }}.{{network_domain}}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
+    local-data: "{{ record }}.{{ domain }}. {{ ttl }} IN A {{ host.logical }}"
 {% endfor %}
 {% for alias in host.aliases | default([]) %}
-    # alias {{ alias }} for {{ host.host }}
-    local-data: "{{ alias }}.{{ loc.key }}.{{ network_domain }}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
+    # alias {{ alias }} for {{ hostname }}
+    local-data: "{{ alias }}.{{ site }}.{{ domain }}. {{ ttl }} IN A {{ host.logical }}"
 {% endfor %}
 {% for alias in host.global_aliases | default([]) %}
-    # alias {{ alias }} for {{ host.host }}
-    local-data: "{{ alias }}.{{ network_domain }}. {{ host.ttl | default(3600) }} IN A {{ host.logical }}"
+    # global alias {{ alias }} for {{ hostname }}
+    local-data: "{{ alias }}.{{ domain }}. {{ ttl }} IN A {{ host.logical }}"
+{% endfor %}
+{% endmacro %}
+{#
+    Local site first, so its records are emitted before the remote ones.
+#}
+{% set ordered_sites = (networks | dict2items | selectattr('key', 'equalto', location) | list)
+                     + (networks | dict2items | rejectattr('key', 'equalto', location) | list) %}
+{% for domain in network_domains %}
+###############################################################################
+# domain {{ domain }}
+###############################################################################
+{% for entry in ordered_sites %}
+{% set site = entry.key %}
+
+#------------------------------------------------------------------------------
+# site {{ site }}{% if site == location %} (local){% endif %}
+
+#------------------------------------------------------------------------------
+{% for device in entry.value.devices | default([]) %}
+{% set pools = device.pools | default({}) %}
+{% if pools %}
+
+    # {{ device.name | default(device.device) | default('unnamed') }}{% if device.vlantag is defined %} (vlan {{ device.vlantag }}){% endif %}{% if device.address is defined %} {{ device.address }}{% endif %}
+
+{% for pool_name, pool in pools | dictsort %}
+    # pool {{ pool_name }} -- {{ pool.cidr | default('NO CIDR') }}
+{% for hostname, host in (pool.hosts | default({})) | dictsort %}
+{{ host_records(hostname, host, site, domain) }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+{% endfor %}
 {% endfor %}
 
-{% endfor %}
-{% endfor %}
-
-{% endfor %}
-    # end local hosts
-
-    # start additional hosts
-{% for host in additional_hosts | default([]) -%}
+#------------------------------------------------------------------------------
+# additional hosts ({{ domain }})
+#------------------------------------------------------------------------------
+{% for host in additional_hosts | default([]) %}
 {% if host.ip is defined %}
     local-data: "{{ host.dns }}. {{ host.ttl | default(3600) }} IN A {{ host.ip }}"
 {% endif %}
 {% for service in host.services | default([]) %}
-    local-data: "{{ service.name }}.{{network_domain}}. {{ host.ttl | default(3600) }} IN SRV 0 10 {{ service.port }} {{ host.dns }}"
+    local-data: "{{ service.name }}.{{ domain }}. {{ host.ttl | default(60) }} IN SRV 0 10 {{ service.port }} {{ host.dns }}"
 {% endfor %}
 {% endfor %}
-    # end additional hosts
+
+{% endfor %}

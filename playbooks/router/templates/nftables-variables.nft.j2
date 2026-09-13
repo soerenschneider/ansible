@@ -13,9 +13,6 @@ define ALL_{{ tag | upper }} = { {% for item in combined_tags %}{{ item }}{% if 
 {% endif %}
 {% endfor %}
 
-define DEV_PRIVATE = enp2s0
-define DEV_WORLD = {{ networks[location].uplink.device }}
-
 define ROOTSERVERS = { {% for ip in enclave_ips | dict2items %}{{ ip.value }}{% if not loop.last %}, {% endif %}{% endfor %} }
 
 define NET_PRIVATE = 192.168.0.0/16
@@ -24,3 +21,103 @@ define WG_NET = {192.168.2.0/24, 192.168.65.0/21, 192.168.72.0/21, 192.168.200.2
 
 define WG_IF = wg0
 define WIREGUARD_PORT = 12686
+
+{#
+    nftables variable definitions, derived from `networks`.
+
+    Naming scheme -- every name carries the site, so a router can reference
+    remote networks as easily as its own:
+
+      VLAN_<SITE>_<SEG>              vlan tag            64
+      NET_<SITE>_<SEG>               segment prefix      192.168.64.0/24
+      IP_<SITE>_<SEG>                router's own addr   192.168.64.1
+      POOL_<SITE>_<SEG>_<POOL>       pool prefix         192.168.65.128/29
+      DHCP_<SITE>_<SEG>              dhcp scope          192.168.64.225-192.168.64.254
+      NET_<SITE>                     all segments, merged
+      NET_ALL                        every segment everywhere, merged
+
+    Then unqualified aliases for the local site ({{ location }}), so rules
+    about "here" stay readable:
+
+      NET_SERVERS = $NET_{{ location | upper }}_SERVERS
+
+    Rendered with ansible.builtin.template defaults (trim_blocks: yes).
+#}
+{% macro n(s) %}{{ s | replace('-', '_') | upper }}{% endmacro %}
+{% set site_nets = [] %}
+###############################################################################
+# interfaces
+###############################################################################
+define DEV_WORLD = {{ networks[location].uplink.device }}
+define DEV_PRIVATE = { {{ networks[location].devices | map(attribute='device') | reject('equalto', networks[location].uplink.device) | unique | join(', ') }} }
+
+{% for site, net in networks | dictsort %}
+{% set segs = net.devices | default([]) | selectattr('address', 'defined') | list %}
+{% if segs %}
+###############################################################################
+# site {{ site }}{% if site == location %} (local){% endif %}
+
+###############################################################################
+{% set cidrs = [] %}
+{% for dev in segs %}
+{% set seg = dev.name | default(dev.device) | default('unnamed') %}
+{% set cidr = dev.address | ansible.utils.ipaddr('subnet') %}
+{{- cidrs.append(cidr) or '' -}}
+
+# {{ seg }}{% if dev.device is defined %} on {{ dev.device }}{% endif %}
+
+{% if dev.vlantag is defined %}
+define VLAN_{{ n(site) }}_{{ n(seg) }} = {{ dev.vlantag }}
+{% endif %}
+define NET_{{ n(site) }}_{{ n(seg) }} = {{ cidr }}
+define IP_{{ n(site) }}_{{ n(seg) }} = {{ dev.address | ansible.utils.ipaddr('address') }}
+{% if dev.dhcp is defined %}
+define DHCP_{{ n(site) }}_{{ n(seg) }} = {{ dev.dhcp.from }}-{{ dev.dhcp.to }}
+{% endif %}
+{% for pname, pool in (dev.pools | default({})) | dictsort %}
+{% if pool.cidr is defined %}
+define POOL_{{ n(site) }}_{{ n(seg) }}_{{ n(pname) }} = {{ pool.cidr }}
+{% endif %}
+{% endfor %}
+
+{% endfor %}
+define NET_{{ n(site) }} = { {{ cidrs | ansible.utils.cidr_merge | join(', ') }} }
+{{- site_nets.extend(cidrs) or '' -}}
+
+{% endif %}
+{% endfor %}
+###############################################################################
+# aggregates
+###############################################################################
+define NET_ALL = { {{ site_nets | ansible.utils.cidr_merge | join(', ') }} }
+
+###############################################################################
+# local aliases for {{ location }}
+###############################################################################
+define NET_LOCAL = $NET_{{ n(location) }}
+{% for dev in networks[location].devices | default([]) | selectattr('address', 'defined') %}
+{% set seg = dev.name | default(dev.device) | default('unnamed') %}
+{% if dev.vlantag is defined %}
+define VLAN_{{ n(seg) }} = $VLAN_{{ n(location) }}_{{ n(seg) }}
+define IF_{{ n(seg) }} = {{ dev.device }}.{{ dev.vlantag }}
+{% endif %}
+define NET_{{ n(seg) }} = $NET_{{ n(location) }}_{{ n(seg) }}
+define IP_{{ n(seg) }} = $IP_{{ n(location) }}_{{ n(seg) }}
+{% for pname, pool in (dev.pools | default({})) | dictsort %}
+{% if pool.cidr is defined %}
+define POOL_{{ n(seg) }}_{{ n(pname) }} = $POOL_{{ n(location) }}_{{ n(seg) }}_{{ n(pname) }}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+###############################################################################
+# static, from group_vars
+###############################################################################
+{% for name, value in (firewall.scalars | default({})) | dictsort %}
+define {{ name }} = {{ value }}
+{% endfor %}
+{% for name, members in (firewall.sets | default({})) | dictsort %}
+{% if members | length > 0 %}
+define {{ name }} = { {{ members | join(', ') }} }
+{% endif %}
+{% endfor %}

@@ -29,18 +29,17 @@ table ip global {
 
         # allow DHCP, DNS and SSH from the private network
         ip saddr $NET_PRIVATE ip protocol . th dport vmap {
-            tcp . 22 : accept,
-            udp . 53 : accept,
-            tcp . 53 : accept,
-            tcp . 8080 : accept,
-            udp . 67 : accept,
-            udp . 123 : accept
+            tcp . 22 :   accept,
+            tcp . 53 :   accept,
+            udp . 53 :   accept,
+            udp . 67 :   accept,
+            udp . 123 :  accept
         }
 
         # todo: add variable for devices to tighten this rule
-        ip saddr { 192.168.0.0/16, 192.168.64.0/24 } tcp dport { 80, 445, 6600, 9999 } accept
+        ip saddr { $NET_DD_USERS, $POOL_MEDIA_TVBOXES } tcp dport { 80, 445, 6600, 9999 } accept
+        # TODO
         ip saddr { $LOCAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN, $LOCAL_DEVICE_SOEREN } tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
-        ip saddr $NET_PRIVATE tcp dport 22 accept
     }
 
     chain inbound_wg {
@@ -50,18 +49,13 @@ table ip global {
         # allow DHCP, DNS and SSH from the private network
         ip protocol . th dport vmap {
             tcp . 22    : accept,
-            udp . 53    : accept,
             tcp . 53    : accept,
-            tcp . 1080  : accept,
+            udp . 53    : accept,
             udp . 67    : accept,
             udp . 123   : accept
         }
 
-        ip saddr 192.168.200.0/24  tcp dport 5201 accept
-        ip saddr 192.168.200.0/24  udp dport 5201 accept
         ip saddr { $GLOBAL_PROMETHEUS_SERVER, $GLOBAL_DEVICE_SOEREN } tcp dport 9093 accept
-        ip saddr 192.168.0.0/16 tcp dport { 9094, 9093 } accept
-        ip saddr 192.168.0.0/16 udp dport { 9094 } accept
     }
 
     chain inbound {
@@ -73,16 +67,16 @@ table ip global {
         # allow loopback traffic, anything else jump to chain for further evaluation
         iifname vmap {
         lo : accept,
-            $DEV_WORLD : jump inbound_world,
-            $WG_IF : jump inbound_wg,
-            $DEV_PRIVATE : jump inbound_private,
-            "vlan64": jump inbound_private,
-            "vlan65": jump inbound_private,
-            "vlan66": jump inbound_private,
-            "vlan67": jump inbound_private,
-            "vlan68": jump inbound_private,
-            "vlan69": jump inbound_private,
-            "vlan70": jump inbound_private
+            $DEV_WORLD:   jump inbound_world,
+            $WG_IF:       jump inbound_wg,
+            $DEV_PRIVATE: jump inbound_private,
+            "vlan64":     jump inbound_private,
+            "vlan65":     jump inbound_private,
+            "vlan66":     jump inbound_private,
+            "vlan67":     jump inbound_private,
+            "vlan68":     jump inbound_private,
+            "vlan69":     jump inbound_private,
+            "vlan70":     jump inbound_private
         }
 
         # the rest is dropped by the above policy
@@ -90,54 +84,315 @@ table ip global {
 
     chain forward {
         type filter hook forward priority 0; policy drop;
+        # anti spoofing
+        fib saddr . iif oif missing drop
 
         # Allow traffic from established and related packets, drop invalid
         ct state vmap { established : accept, related : accept, invalid : drop }
 
-        iifname "vlan64" ip saddr 192.168.64.5 ip daddr 192.168.70.0/24 accept
-        iifname "vlan64" ip saddr 192.168.64.133 ip daddr 192.168.70.0/24 accept
-        iifname "vlan64" ip daddr != 192.168.70.0/24 accept
-        iifname "vlan65" oifname { "vlan65", "vlan66", "vlan67" } accept
-        iifname "vlan65" ip saddr $LOCAL_K8S_WORKER oifname { "wg0" } ip daddr 192.168.200.5 tcp dport 9091 accept
-        iifname "vlan65" ip saddr $LOCAL_FILESERVER ip daddr { 192.168.200.1, 192.168.200.5} accept
-        iifname "vlan66" ip saddr { $LOCAL_SENSORS, $LOCAL_TASMOTA, $LOCAL_K8S_WORKER } oifname { "vlan65" } ip daddr 192.168.65.0/24 tcp dport { 1883, 8883 } accept
-        iifname "vlan66" ip saddr { $LOCAL_SENSORS } oifname { "vlan65", "wg0" } ip daddr { $LOCAL_VAULT_SERVER, $GLOBAL_VAULT_SERVER } tcp dport 443 accept
-        iifname "vlan66" ip saddr { $LOCAL_SENSORS } oifname { "vlan65", "wg0" } ip daddr { 192.168.2.3, 192.168.73.1} tcp dport 53 accept
-        iifname "vlan67" oifname { "vlan65", "vlan66" } accept
-        iifname "vlan67" ip saddr 192.168.67.15 oifname "vlan64" ip daddr 192.168.64.5 tcp dport { 27036, 27037 } accept
-        iifname "vlan67" ip saddr 192.168.67.15 oifname "vlan64" ip daddr 192.168.64.5 udp dport { 27031, 27036 } accept
-        # TODO: this is horrible, add vars
-        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.2.216, 192.168.2.227, 192.168.2.229, 192.168.65.12, 192.168.2.253, 192.168.65.27, 192.168.65.32, 192.168.65.33,  192.168.73.34, 192.168.65.250, $LOCAL_VAULT_SERVER, $GLOBAL_VAULT_SERVER } accept
-        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65", "vlan67" } ip daddr { 192.168.200.1, 192.168.200.5, 192.168.0.0/16, 192.168.67.0/24, 192.168.2.0/24, 192.168.65.0/24, 192.168.73.0/24 } tcp dport 22 accept
-        iifname "vlan68" ip saddr $LOCAL_DEVICE_SOEREN_WORK oifname { "wg0", "vlan65" } ip daddr { 192.168.65.0/24, 192.168.2.0/24, 192.168.73.0/24 } tcp dport { 3000, 6443, 22000 } accept
-        iifname "vlan70" oifname { "vlan65", "vlan66" } accept
-        iifname "wg0"    ip saddr $WG_ROADWARRIORS          oifname { "vlan65", "vlan67", "vlan68" } accept
+        # allow desktop to access management network
+        iifname "vlan64" ip saddr $POOL_USERS_SOEREN ip saddr @tag_desktop ip daddr $NET_MANAGEMENT accept
+        # accept all traffic from vlan64 expect to management network
+        iifname "vlan64" ip saddr $NET_USERS daddr != $NET_MANAGEMENT accept
 
-        ip saddr 192.168.200.0/24  iifname $WG_IF tcp dport 5201 accept
-        ip saddr 192.168.200.0/24  iifname $WG_IF udp dport 5201 accept
+        # allow prometheus to scrape node exporter port
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { "vlan66", "vlan67", "vlan70", "wg0" } tcp dport 9100 accept
+        # allow local nas to fetch data from seedbox
+        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas ip daddr 192.168.200.5 port 22 accept
+
+        # allow all members of vlan to talk to mqtt server
+        iifname "vlan66" ip saddr $NET_IOT oifname "vlan65" ip daddr $NET_SERVERS @tag_mqtt tcp dport { 1883, 8883 } accept
+        # allow raspberry PIs to talk to openbao
+        iifname "vlan66" ip saddr $POOL_IOT_PI_ZERO oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+
+        # let media boxes talk to nas
+        iifname "vlan67" ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname "vlan65" ip daddr @tag_nas tcp dport { 80, 443 } accept
+        # let raspberry pis talk to openbao cluster
+        iifname "vlan67" ip saddr $POOL_MEDIA_MPD oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+
+        iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK @tag_soeren oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+
+        # allow cam access from soeren and ines over wireguard
+        iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_soeren oifname "vlan69" ip daddr $NET_CAM accept
+        iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_ines   oifname "vlan69" ip daddr $NET_CAM accept
 
         # allow seedbox to talk to fetcharr
-        ip saddr 192.168.200.5    iifname $WG_IF  oifname "vlan65" ip daddr $LOCAL_FILESERVER        tcp dport {{ fetcharr_webhook_port }} accept
-        # allow router.ez.soeren.cloud to talk to media
-        ip saddr { 192.168.200.2, 192.168.200.4 } iifname $WG_IF oifname "vlan65" ip daddr $LOCAL_FILESERVER        tcp dport { 80, 443 } accept
-        ip saddr 192.168.200.1    iifname $WG_IF  oifname "vlan65" accept
-        ip saddr 192.168.200.5    iifname $WG_IF  oifname "vlan65" ip daddr $LOCAL_K8S_WORKER        tcp dport 443 accept
+        iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
+        # allow seedbox to talk to kubernetes services
+        iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+        # allow routers over wireguard to talk to nas
+        iifname $WG_IF ip saddr { 192.168.200.2, 192.168.200.4 } oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
 
-        # connections from the internal net to the internet or to other
-        # internal nets are allowed
-        # route
-        iifname { "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan70" } ip daddr != 192.168.0.0/16 accept
+        # deny internet to selected hosts
+        ip saddr @tag_nointernet oifname $DEV_WORLD counter drop
+        # allow forwarding
+        iifname { "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan70" } oifname $DEV_WORLD ip saddr != @tag_nointernet counter accept
+        # allow android tablet to talk to internet
         iifname { "vlan69" } ip saddr 192.168.69.50 ip daddr != 192.168.0.0/16 accept
-        ip saddr $WG_CLIENTS iifname { "vlan65", "vlan67" } accept
-        ip saddr $WG_NET iifname $WG_IF accept
-        #iifname wg0 ip daddr 192.168.2.0/24 accept
 
         # the rest is dropped by the above policy
+        log prefix "drop-fwd " limit rate 1/minute
     }
 
     chain postrouting {
         type nat hook postrouting priority 100; policy accept;
         # masquerade private IP addresses
         ip saddr $NET_LOCAL oifname $DEV_WORLD masquerade
+    }
+
+
+{#
+    nftables tag sets, derived from `fw_tags`.
+
+    Named sets rather than defines, because a tag is legitimately empty at
+    some sites (`babycam` at ez) and `define X = { }` does not parse, while
+    a named set with no elements is valid. They are also updatable at
+    runtime with `nft add element inet filter tag_foo { 1.2.3.4 }`.
+
+    Named sets must live inside the table that references them, so include
+    this inside `table inet filter { ... }`.
+
+    A host's effective tags are the union of four sources:
+
+      device.fw_tags            every host on that segment
+      pool.fw_tags              every host in that pool
+      host.fw_tags              that host
+      floating device fw_tags   matched by MAC, so a roaming device carries
+                                its tags to every address it appears under
+
+    ...then expanded through `firewall_tag_groups` (tag -> implied tags),
+    resolved transitively.
+
+    NOTE: lookups use dict.get(key, default) rather than the `extract`
+    filter. `extract` returns an undefined value for a missing key, which
+    propagates as an UndefinedMarker through the rest of the expression on
+    Ansible 2.19+; `reject('none')` does not catch it, because undefined is
+    not None.
+
+    Usage:
+      iifname $WG_IF ip saddr @tag_prometheus ip daddr $IP_PT_SERVERS accept
+      ip saddr $POOL_DD_SERVERS_VMS ip saddr @tag_prometheus accept
+
+    Rendered with ansible.builtin.template defaults (trim_blocks: yes).
+#}
+{#- --------------------------------------------------------------------- -#}
+{#- 1. Transitive closure of tag composition.                             -#}
+{#- --------------------------------------------------------------------- -#}
+{% set groups = firewall_tag_groups | default({}) %}
+{% set closure = {} %}
+{% for tag, implied in groups.items() %}
+{{- closure.update({tag: implied | flatten | unique | list}) or '' -}}
+{% endfor %}
+{% for _pass in range(8) %}
+{% for tag in closure.keys() | list %}
+{% set acc = closure.get(tag, []) %}
+{% set expanded = [] %}
+{{- expanded.extend(acc) or '' -}}
+{% for t in acc %}
+{{- expanded.extend(closure.get(t, [])) or '' -}}
+{% endfor %}
+{{- closure.update({tag: expanded | unique | list}) or '' -}}
+{% endfor %}
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 2. MAC -> tags, for devices that move between sites.                   -#}
+{#- --------------------------------------------------------------------- -#}
+{% set floating = {} %}
+{% for dname, fdev in (network_floating_devices | default({})).items() %}
+{% if fdev.fw_tags is defined and fdev.mac is defined %}
+{{- floating.update({fdev.mac | lower: fdev.fw_tags | flatten | unique | list}) or '' -}}
+{% endif %}
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 3. Flatten hosts with their effective tags.                            -#}
+{#- --------------------------------------------------------------------- -#}
+{% set hosts = [] %}
+{% for site, net in networks | dictsort %}
+{% for dev in net.devices | default([]) %}
+{% set seg = dev.name | default(dev.device) | default('unnamed') %}
+{% for pname, pool in (dev.pools | default({})) | dictsort %}
+{% for hname, host in (pool.hosts | default({})) | dictsort %}
+{% set own = [] %}
+{{- own.extend(dev.fw_tags | default([]) | flatten) or '' -}}
+{{- own.extend(pool.fw_tags | default([]) | flatten) or '' -}}
+{{- own.extend(host.fw_tags | default([]) | flatten) or '' -}}
+{{- own.extend(floating.get(host.physical | default('') | lower, [])) or '' -}}
+{% if own | length > 0 %}
+{% set eff = [] %}
+{{- eff.extend(own) or '' -}}
+{% for t in own | unique %}
+{{- eff.extend(closure.get(t, [])) or '' -}}
+{% endfor %}
+{{- hosts.append({
+      'site': site,
+      'segment': seg,
+      'pool': pname,
+      'name': hname,
+      'ip': host.logical | default(''),
+      'tags': eff | unique | sort,
+    }) or '' -}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% set used_tags = hosts | map(attribute='tags') | flatten | unique | list %}
+{% set all_tags = (used_tags + (closure.keys() | list)) | unique | sort %}
+###############################################################################
+# tag sets -- {{ all_tags | length }} tags over {{ hosts | length }} tagged hosts
+#
+# Derived. Do not edit; change `fw_tags` in the inventory instead.
+###############################################################################
+{% for tag in all_tags %}
+{% set members = hosts | selectattr('tags', 'contains', tag) | list %}
+{% set ips = members | map(attribute='ip') | reject('equalto', '') | unique | sort %}
+
+    # {{ tag }} -- {{ ips | length }} address{{ '' if ips | length == 1 else 'es' }}
+{% for m in members %}
+    #   {{ '%-16s' | format(m.ip) }}{{ m.site }}/{{ m.segment }}/{{ m.pool }}/{{ m.name }}
+{% endfor %}
+{% if ips | length == 0 %}
+    # (no members -- set is declared so rules referencing it still load)
+{% endif %}
+    set tag_{{ tag | replace('-', '_') }} {
+        type ipv4_addr
+{% if ips | length > 0 %}
+        elements = { {{ ips | join(', ') }} }
+{% endif %}
+    }
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 4. Optional site-scoped variants, opt-in only.                         -#}
+{#-    firewall_site_scoped_tags: [prometheus, syncthing]                  -#}
+{#- --------------------------------------------------------------------- -#}
+{% set scoped = firewall_site_scoped_tags | default([]) %}
+{% if scoped | length > 0 %}
+
+###############################################################################
+# site-scoped variants
+#
+# Only for tags listed in `firewall_site_scoped_tags`. Prefer an interface
+# match (iifname $DEV_PRIVATE / $WG_IF) over these where it expresses the
+# same intent -- it distinguishes how a packet arrived, not just where its
+# address is allocated.
+###############################################################################
+{% for tag in scoped | sort %}
+{% for site in networks.keys() | list | sort %}
+{% set ips = hosts | selectattr('site', 'equalto', site) | selectattr('tags', 'contains', tag) | map(attribute='ip') | reject('equalto', '') | unique | sort %}
+
+    set tag_{{ site }}_{{ tag | replace('-', '_') }} {
+        type ipv4_addr
+{% if ips | length > 0 %}
+        elements = { {{ ips | join(', ') }} }
+{% endif %}
+    }
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+
+}
+
+table ip6 global {
+    # Internet hosts allowed to SSH in over IPv6.
+    # An empty set means no SSH over IPv6 at all; WireGuard still works.
+    # Runtime edits: nft add element ip6 global world_ssh6 { 2001:db8::1 }
+    set world_ssh6 {
+        type ipv6_addr
+        flags interval
+        elements = { 2001:db8:1234::/48 }
+    }
+
+    chain inbound_world6 {
+        # WireGuard, so peers can reach you on a v6-only network
+        udp dport $WIREGUARD_PORT accept
+
+        ip6 saddr @world_ssh6 tcp dport 22 accept
+
+        # DHCPv6 client / prefix delegation. Drop if your uplink is SLAAC-only.
+        ip6 saddr fe80::/10 udp sport 547 udp dport 546 accept
+
+        # No echo-request here on purpose: the router does not answer pings
+        # from the internet on its global address. Uncomment if you want it.
+        # icmpv6 type echo-request limit rate 5/second accept
+
+        # anything else falls through to the base chain's drop policy
+    }
+
+    chain inbound_lan6 {
+        # The router runs no IPv6 services for the LAN. The only things
+        # allowed are what SLAAC / DHCPv6 need, and they are all link-local.
+        icmpv6 type echo-request limit rate 5/second accept
+
+        # DHCPv6 server, if you run one (kea, dnsmasq --dhcp-range=::,...)
+        ip6 saddr fe80::/10 udp sport 546 udp dport 547 accept
+
+        # If your RAs advertise the router as a DNS server (RDNSS), clients
+        # will resolve over IPv6 link-local and you need this. Better: turn
+        # RDNSS off in radvd/dnsmasq and keep DNS on IPv4 as you intended.
+        # ip6 saddr fe80::/10 ip protocol . th dport vmap { udp . 53 : accept, tcp . 53 : accept }
+    }
+
+    chain inbound6 {
+        type filter hook input priority 0; policy drop;
+
+        ct state vmap { established : accept, related : accept, invalid : drop }
+
+        iifname lo accept
+
+        # ICMPv6 error signalling: needed for the router's own outbound
+        # connections, PMTU discovery in particular.
+        icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem } accept
+
+        # Neighbour and router discovery. hoplimit 255 proves it is on-link,
+        # so this is safe to allow on every interface including the uplink.
+        icmpv6 type { nd-neighbor-solicit, nd-neighbor-advert, nd-router-solicit, nd-router-advert } ip6 hoplimit 255 accept
+
+        # MLD, always from link-local
+        ip6 saddr fe80::/10 icmpv6 type { mld-listener-query, mld-listener-report, mld-listener-done, mld2-listener-report } accept
+
+        iifname vmap {
+            $DEV_WORLD    : jump inbound_world6,
+            $DEV_PRIVATE  : jump inbound_lan6,
+            "vlan64"      : jump inbound_lan6,
+            "vlan65"      : jump inbound_lan6,
+            "vlan66"      : jump inbound_lan6,
+            "vlan67"      : jump inbound_lan6,
+            "vlan68"      : jump inbound_lan6,
+            "vlan69"      : jump inbound_lan6,
+            "vlan70"      : jump inbound_lan6
+        }
+
+        # wg0 is deliberately absent: the tunnel carries IPv4 only.
+
+        log prefix "drop-in6 " level info limit rate 3/minute counter
+    }
+
+    chain forward6 {
+        type filter hook forward priority 0; policy drop;
+
+        ct state vmap { established : accept, related : accept, invalid : drop }
+
+        # Packet-too-big has to get through or large transfers hang instead
+        # of failing. ct related covers most of it; this is the safety net.
+        icmpv6 type packet-too-big limit rate 10/second accept
+
+        # Inter-VLAN IPv6 is rejected rather than dropped, so a client that
+        # gets a AAAA for something local fails instantly and falls back to
+        # IPv4 instead of sitting in a connect timeout.
+        iifname { $DEV_PRIVATE, "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan69", "vlan70" } \
+            oifname { $DEV_PRIVATE, "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan69", "vlan70", $WG_IF } \
+            reject with icmpv6 type admin-prohibited
+
+        # The only thing IPv6 is for: LAN out to the internet.
+        # Requiring a global unicast source keeps ULA and link-local from
+        # leaking upstream and blocks the cruder spoofing attempts.
+        iifname { $DEV_PRIVATE, "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan69", "vlan70" } \
+            oifname $DEV_WORLD ip6 saddr 2000::/3 accept
+
+        # Nothing accepts iifname $DEV_WORLD, so unsolicited internet traffic
+        # to your LAN hits the drop policy. That is the point.
+
+        log prefix "drop-fwd6 " level info limit rate 3/minute counter
     }
 }
