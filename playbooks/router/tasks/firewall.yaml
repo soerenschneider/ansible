@@ -52,6 +52,9 @@
     src: "nftables.conf-{{ location }}.j2"
     dest: "{{ nft_file }}"
     validate: "nft -c -f %s"
+    owner: "root"
+    group: "root"
+    mode: "0600"
   notify: Reload nftables
   tags: [firewall]
 

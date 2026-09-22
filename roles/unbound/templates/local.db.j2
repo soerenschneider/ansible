@@ -15,11 +15,15 @@
             .ha_records[]                     bare names
             .aliases[]                        site-scoped
             .global_aliases[]                 domain-scoped
+            .local_aliases[]                  domain-scoped, emitted only when
+                                              the host's site == `location`, so
+                                              the short name resolves inside its
+                                              own datacenter and nowhere else
 
     Rendered with ansible.builtin.template defaults (trim_blocks: yes,
     lstrip_blocks: no), so block tags sit at column 0.
 #}
-{% macro host_records(hostname, host, site, domain) %}
+{% macro host_records(hostname, host, site, domain, is_local=false) %}
 {% set ttl = host.ttl | default(60) %}
 {% set fqdn = hostname ~ '.' ~ site ~ '.' ~ domain %}
     local-data: "{{ fqdn }}. {{ ttl }} IN A {{ host.logical }}"
@@ -41,6 +45,12 @@
     # global alias {{ alias }} for {{ hostname }}
     local-data: "{{ alias }}.{{ domain }}. {{ ttl }} IN A {{ host.logical }}"
 {% endfor %}
+{% if is_local %}
+{% for alias in host.local_aliases | default([]) %}
+    # local-only alias {{ alias }} for {{ hostname }} (served in {{ site }} only)
+    local-data: "{{ alias }}.{{ domain }}. {{ ttl }} IN CNAME {{ fqdn }}."
+{% endfor %}
+{% endif %}
 {% endmacro %}
 {#
     Local site first, so its records are emitted before the remote ones.
@@ -67,7 +77,7 @@
 {% for pool_name, pool in pools | dictsort %}
     # pool {{ pool_name }} -- {{ pool.cidr | default('NO CIDR') }}
 {% for hostname, host in (pool.hosts | default({})) | dictsort %}
-{{ host_records(hostname, host, site, domain) }}
+{{ host_records(hostname, host, site, domain, site == location) }}
 {% endfor %}
 {% endfor %}
 {% endif %}

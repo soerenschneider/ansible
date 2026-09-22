@@ -1,0 +1,167 @@
+{#
+    nftables tag sets, derived from `fw_tags`.
+
+    Named sets rather than defines, because a tag is legitimately empty at
+    some sites (`babycam` at ez) and `define X = { }` does not parse, while
+    a named set with no elements is valid. They are also updatable at
+    runtime with `nft add element inet filter tag_foo { 1.2.3.4 }`.
+
+    Named sets must live inside the table that references them, so include
+    this inside `table inet filter { ... }`.
+
+    A host's effective tags are the union of four sources:
+
+      device.fw_tags            every host on that segment
+      pool.fw_tags              every host in that pool
+      host.fw_tags              that host
+      floating device fw_tags   matched by MAC, so a roaming device carries
+                                its tags to every address it appears under
+
+    ...then expanded through `firewall_tag_groups` (tag -> implied tags),
+    resolved transitively.
+
+    NOTE: lookups use dict.get(key, default) rather than the `extract`
+    filter. `extract` returns an undefined value for a missing key, which
+    propagates as an UndefinedMarker through the rest of the expression on
+    Ansible 2.19+; `reject('none')` does not catch it, because undefined is
+    not None.
+
+    Usage:
+      iifname $WG_IF ip saddr @tag_prometheus ip daddr $IP_PT_SERVERS accept
+      ip saddr $POOL_DD_SERVERS_VMS ip saddr @tag_prometheus accept
+
+    Rendered with ansible.builtin.template defaults (trim_blocks: yes).
+#}
+{#- --------------------------------------------------------------------- -#}
+{#- 1. Transitive closure of tag composition.                             -#}
+{#- --------------------------------------------------------------------- -#}
+{% set groups = firewall_tag_groups | default({}) %}
+{% set closure = {} %}
+{% for tag, implied in groups.items() %}
+{{- closure.update({tag: implied | flatten | unique | list}) or '' -}}
+{% endfor %}
+{% for _pass in range(8) %}
+{% for tag in closure.keys() | list %}
+{% set acc = closure.get(tag, []) %}
+{% set expanded = [] %}
+{{- expanded.extend(acc) or '' -}}
+{% for t in acc %}
+{{- expanded.extend(closure.get(t, [])) or '' -}}
+{% endfor %}
+{{- closure.update({tag: expanded | unique | list}) or '' -}}
+{% endfor %}
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 2. MAC -> tags, for devices that move between sites.                   -#}
+{#- --------------------------------------------------------------------- -#}
+{% set floating = {} %}
+{% for dname, fdev in (network_floating_devices | default({})).items() %}
+{% if fdev.fw_tags is defined and fdev.mac is defined %}
+{{- floating.update({fdev.mac | lower: fdev.fw_tags | flatten | unique | list}) or '' -}}
+{% endif %}
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 3. Flatten hosts with their effective tags.                            -#}
+{#- --------------------------------------------------------------------- -#}
+{#- Sources: every segment's pools, plus every wireguard mesh's pools. -#}
+{% set sources = [] %}
+{% for site, net in networks | dictsort %}
+{% for dev in net.devices | default([]) %}
+{{- sources.append({
+      'site': site,
+      'seg': dev.name | default(dev.device) | default('unnamed'),
+      'tags': dev.fw_tags | default([]) | flatten,
+      'pools': dev.pools | default({}),
+    }) or '' -}}
+{% endfor %}
+{% endfor %}
+{% for mesh_name, mesh in (wireguard_networks | default({})) | dictsort %}
+{{- sources.append({
+      'site': 'wg',
+      'seg': mesh_name,
+      'tags': mesh.fw_tags | default([]) | flatten,
+      'pools': mesh.pools | default({}),
+    }) or '' -}}
+{% endfor %}
+{% set hosts = [] %}
+{% for src in sources %}
+{% set site = src.site %}
+{% set seg = src.seg %}
+{% for pname, pool in src.pools | dictsort %}
+{% for hname, host in (pool.hosts | default({})) | dictsort %}
+{% set own = [] %}
+{{- own.extend(src.tags) or '' -}}
+{{- own.extend(pool.fw_tags | default([]) | flatten) or '' -}}
+{{- own.extend(host.fw_tags | default([]) | flatten) or '' -}}
+{{- own.extend(floating.get(host.physical | default('') | lower, [])) or '' -}}
+{% if own | length > 0 %}
+{% set eff = [] %}
+{{- eff.extend(own) or '' -}}
+{% for t in own | unique %}
+{{- eff.extend(closure.get(t, [])) or '' -}}
+{% endfor %}
+{{- hosts.append({
+      'site': site,
+      'segment': seg,
+      'pool': pname,
+      'name': hname,
+      'ip': host.logical | default(''),
+      'tags': eff | unique | sort,
+    }) or '' -}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
+{% set used_tags = hosts | map(attribute='tags') | flatten | unique | list %}
+{% set all_tags = (used_tags + (closure.keys() | list)) | unique | sort %}
+###############################################################################
+# tag sets -- {{ all_tags | length }} tags over {{ hosts | length }} tagged hosts
+#
+# Derived. Do not edit; change `fw_tags` in the inventory instead.
+###############################################################################
+{% for tag in all_tags %}
+{% set members = hosts | selectattr('tags', 'contains', tag) | list %}
+{% set ips = members | map(attribute='ip') | reject('equalto', '') | unique | sort %}
+
+    # {{ tag }} -- {{ ips | length }} address{{ '' if ips | length == 1 else 'es' }}
+{% for m in members %}
+    #   {{ '%-16s' | format(m.ip) }}{{ m.site }}/{{ m.segment }}/{{ m.pool }}/{{ m.name }}
+{% endfor %}
+{% if ips | length == 0 %}
+    # (no members -- set is declared so rules referencing it still load)
+{% endif %}
+    set tag_{{ tag | replace('-', '_') }} {
+        type ipv4_addr
+{% if ips | length > 0 %}
+        elements = { {{ ips | join(', ') }} }
+{% endif %}
+    }
+{% endfor %}
+{#- --------------------------------------------------------------------- -#}
+{#- 4. Optional site-scoped variants, opt-in only.                         -#}
+{#-    firewall_site_scoped_tags: [prometheus, syncthing]                  -#}
+{#- --------------------------------------------------------------------- -#}
+{% set scoped = firewall_site_scoped_tags | default([]) %}
+{% if scoped | length > 0 %}
+
+###############################################################################
+# site-scoped variants
+#
+# Only for tags listed in `firewall_site_scoped_tags`. Prefer an interface
+# match (iifname $DEV_PRIVATE / $WG_IF) over these where it expresses the
+# same intent -- it distinguishes how a packet arrived, not just where its
+# address is allocated.
+###############################################################################
+{% for tag in scoped | sort %}
+{% for site in networks.keys() | list | sort %}
+{% set ips = hosts | selectattr('site', 'equalto', site) | selectattr('tags', 'contains', tag) | map(attribute='ip') | reject('equalto', '') | unique | sort %}
+
+    set tag_{{ site }}_{{ tag | replace('-', '_') }} {
+        type ipv4_addr
+{% if ips | length > 0 %}
+        elements = { {{ ips | join(', ') }} }
+{% endif %}
+    }
+{% endfor %}
+{% endfor %}
+{% endif %}
