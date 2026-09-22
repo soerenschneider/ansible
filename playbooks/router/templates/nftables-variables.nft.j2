@@ -1,25 +1,3 @@
-{% set devs    = networks[location].devices %}
-{% set uplink  = networks[location].uplink.device %}
-{% set untagged = devs | rejectattr('vlantag', 'defined')
-                       | map(attribute='device')
-                       | reject('equalto', uplink) | unique | list %}
-{% set tagged = devs | selectattr('vlantag', 'defined') | list %}
-{% set vlans    = devs | selectattr('vlantag', 'defined')
-                       | map(attribute='vlantag') | unique | list %}
-
-define IF_PRIVATE = { {% for d in untagged %}"{{ d }}", {% endfor %}{% for v in vlans %}"vlan{{ v }}"{{ ", " if not loop.last }}{% endfor %} }
-
-define ROOTSERVERS = { {% for ip in enclave_ips | dict2items %}{{ ip.value }}{% if not loop.last %}, {% endif %}{% endfor %} }
-
-define NET_PRIVATE = 192.168.0.0/16
-define WORLD_SSH_SOURCES = { $ROOTSERVERS }
-define WG_NET = {192.168.2.0/24, 192.168.65.0/21, 192.168.72.0/21, 192.168.200.200/32 }
-
-define WG_IF = wg0
-define WIREGUARD_PORT = 12686
-define DEV_WORLD = {{ networks[location].uplink.device }}
-
-
 {#
     nftables variable definitions, derived from `networks` and
     `wireguard_networks`.
@@ -35,21 +13,63 @@ define DEV_WORLD = {{ networks[location].uplink.device }}
       NET_<SITE>                     all segments, merged
       NET_ALL                        every segment everywhere, merged
 
-    WireGuard meshes are not sites, so they get their own namespace:
+    WireGuard meshes are not sites, so they get their own namespace. Mesh
+    names are always qualified -- there is deliberately no unsuffixed
+    WG_IF or NET_WG:
 
+      WG_IF_<MESH>                   tunnel device       wg0
+      IP_WG_<MESH>                   router's own addr   192.168.200.1
       NET_WG_<MESH>                  mesh prefix         192.168.200.0/24
+      WG_PORT_<MESH>                 listen port         12686
       POOL_WG_<MESH>_<POOL>          pool prefix         192.168.200.96/27
+      WG_IFS                         every local tunnel device
+
+    The tunnel devices are derived entirely from `wireguard_networks`: a
+    mesh member carrying `site: <this site>` IS this router's endpoint, and
+    its interface name, address and prefix all follow from the mesh. There
+    is no wg device in `networks` -- it would be a second copy of data the
+    mesh already holds, and the two drifted.
+
+      device   member.device | mesh.device | wg0
+      address  member.logical / prefix of mesh.net
 
     Then unqualified aliases for the local site ({{ location }}), so rules
-    about "here" stay readable:
+    about "here" stay readable.
 
-      NET_SERVERS = $NET_{{ location | upper }}_SERVERS
-      NET_WG      = $NET_WG_DEFAULT
+    Symbol names are sanitised to [A-Z0-9_]: nft reads '.' as the
+    concatenation operator, so a mesh called "soeren.cloud" must become
+    SOEREN_CLOUD. For the same reason every interface *value* is quoted.
+
+    Interface naming follows `ip link add ... name vlanN`, i.e. vlan64 and
+    not enp2s0.64. A segment whose interface is named some other way can
+    override it with `interface:` in the YAML.
 
     Rendered with ansible.builtin.template defaults (trim_blocks: yes).
 #}
-{% macro n(s) %}{{ s | replace('-', '_') | upper }}{% endmacro %}
+{% macro n(s) %}{{ s | string | upper | regex_replace('[^A-Z0-9]', '_') }}{% endmacro %}
+{% macro ifname(dev) %}{% if dev.interface is defined %}{{ dev.interface }}{% elif dev.vlantag is defined %}vlan{{ dev.vlantag }}{% else %}{{ dev.device }}{% endif %}{% endmacro %}
 {% set site_nets = [] %}
+{% set uplink = networks[location].uplink.device %}
+{#- ------------------------------------------------------------------ -#}
+{#- This router's mesh endpoints: members whose `site` is this site.    -#}
+{#- ------------------------------------------------------------------ -#}
+{% set local_wg = [] %}
+{% for mesh_name, mesh in (wireguard_networks | default({})) | dictsort %}
+{% for pname, pool in (mesh.pools | default({})) | dictsort %}
+{% for mname, member in (pool.hosts | default({})) | dictsort %}
+{% if member.site | default('') == location %}
+{{- local_wg.append({
+      'mesh': mesh_name,
+      'member': mname,
+      'pool': pname,
+      'device': member.device | default(mesh.device) | default('wg0'),
+      'ip': member.logical,
+      'net': mesh.net | default(''),
+    }) or '' -}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endfor %}
 
 {% for site, net in networks | dictsort %}
 {% set segs = net.devices | default([]) | selectattr('address', 'defined') | list %}
@@ -62,11 +82,9 @@ define DEV_WORLD = {{ networks[location].uplink.device }}
 {% for dev in segs %}
 {% set seg = dev.name | default(dev.device) | default('unnamed') %}
 {% set cidr = dev.address | ansible.utils.ipaddr('subnet') %}
-{% if dev.mesh is not defined %}
 {{- cidrs.append(cidr) or '' -}}
-{% endif %}
 
-# {{ seg }}{% if dev.device is defined %} on {{ dev.device }}{% endif %}{% if dev.mesh is defined %} (mesh {{ dev.mesh }}){% endif %}
+# {{ seg }}{% if dev.device is defined %} on {{ dev.device }}{% endif %}
 
 {% if dev.vlantag is defined %}
 define VLAN_{{ n(site) }}_{{ n(seg) }} = {{ dev.vlantag }}
@@ -83,7 +101,7 @@ define POOL_{{ n(site) }}_{{ n(seg) }}_{{ n(pname) }} = {{ pool.cidr }}
 {% endfor %}
 
 {% endfor %}
-{% if cidrs | length > 0 %}
+{% if cidrs %}
 define NET_{{ n(site) }} = { {{ cidrs | ansible.utils.cidr_merge | join(', ') }} }
 {{- site_nets.extend(cidrs) or '' -}}
 {% endif %}
@@ -96,6 +114,8 @@ define NET_{{ n(site) }} = { {{ cidrs | ansible.utils.cidr_merge | join(', ') }}
 {% set mesh_nets = [] %}
 {% for mesh_name, mesh in (wireguard_networks | default({})) | dictsort %}
 {% set mesh_cidr = mesh.net | default('') %}
+
+# mesh {{ mesh_name }}
 {% if mesh_cidr | length > 0 %}
 {{- mesh_nets.append(mesh_cidr) or '' -}}
 define NET_WG_{{ n(mesh_name) }} = {{ mesh_cidr }}
@@ -113,34 +133,37 @@ define POOL_WG_{{ n(mesh_name) }}_{{ n(pname) }} = {{ pool.cidr }}
 ###############################################################################
 # aggregates
 ###############################################################################
+{% if site_nets %}
 define NET_SITES = { {{ site_nets | ansible.utils.cidr_merge | join(', ') }} }
-{% if mesh_nets | length > 0 %}
+{% endif %}
+{% if mesh_nets %}
 define NET_MESH = { {{ mesh_nets | ansible.utils.cidr_merge | join(', ') }} }
+{% endif %}
+{% if site_nets or mesh_nets %}
 define NET_ALL = { {{ (site_nets + mesh_nets) | ansible.utils.cidr_merge | join(', ') }} }
-{% else %}
-define NET_ALL = $NET_SITES
 {% endif %}
 
 ###############################################################################
 # local aliases for {{ location }}
 ###############################################################################
+{% set local_devs = networks[location].devices | default([]) | selectattr('address', 'defined') | list %}
+{% set priv_ifs = [] %}
+{% set wg_ifs = [] %}
+{% if local_devs %}
 define NET_LOCAL = $NET_{{ n(location) }}
-{% for dev in networks[location].devices | default([]) | selectattr('address', 'defined') %}
-{% set seg = dev.name | default(dev.device) | default('unnamed') %}
-{% if dev.mesh is defined %}
-# tunnel endpoint -- {{ dev.device }} on mesh {{ dev.mesh }}
-define WG_IF = {{ dev.device }}
-define IP_WG = {{ dev.address | ansible.utils.ipaddr('address') }}
-define NET_WG = $NET_WG_{{ n(dev.mesh) }}
-{% for pname, pool in ((wireguard_networks | default({})).get(dev.mesh, {}).get('pools', {})) | dictsort %}
-{% if pool.cidr is defined %}
-define POOL_WG_{{ n(pname) }} = $POOL_WG_{{ n(dev.mesh) }}_{{ n(pname) }}
 {% endif %}
-{% endfor %}
-{% else %}
+{% for dev in local_devs %}
+{% set seg = dev.name | default(dev.device) | default('unnamed') %}
+{% if dev.device is defined and dev.device != uplink %}
+{{- priv_ifs.append(ifname(dev) | string | trim) or '' -}}
+{% endif %}
+
+# {{ seg }}
 {% if dev.vlantag is defined %}
 define VLAN_{{ n(seg) }} = $VLAN_{{ n(location) }}_{{ n(seg) }}
-define IF_{{ n(seg) }} = {{ dev.device }}.{{ dev.vlantag }}
+{% endif %}
+{% if dev.device is defined %}
+define IF_{{ n(seg) }} = "{{ ifname(dev) | trim }}"
 {% endif %}
 define NET_{{ n(seg) }} = $NET_{{ n(location) }}_{{ n(seg) }}
 define IP_{{ n(seg) }} = $IP_{{ n(location) }}_{{ n(seg) }}
@@ -149,17 +172,41 @@ define IP_{{ n(seg) }} = $IP_{{ n(location) }}_{{ n(seg) }}
 define POOL_{{ n(seg) }}_{{ n(pname) }} = $POOL_{{ n(location) }}_{{ n(seg) }}_{{ n(pname) }}
 {% endif %}
 {% endfor %}
-{% endif %}
 {% endfor %}
+{% for wg in local_wg %}
+{{- wg_ifs.append(wg.device) or '' -}}
+
+
+# tunnel endpoint -- {{ wg.device }} on mesh {{ wg.mesh }} as member {{ wg.member }}
+define WG_IF_{{ n(wg.mesh) }} = "{{ wg.device }}"
+define IP_WG_{{ n(wg.mesh) }} = {{ wg.ip }}
+{% endfor %}
+
+###############################################################################
+# interface groups
+###############################################################################
+define DEV_WORLD = "{{ uplink }}"
+{% if priv_ifs %}
+define IF_PRIVATE = { {% for i in priv_ifs | unique %}"{{ i }}"{{ ", " if not loop.last }}{% endfor %} }
+{% endif %}
+{% if wg_ifs %}
+define WG_IFS = { {% for i in wg_ifs | unique %}"{{ i }}"{{ ", " if not loop.last }}{% endfor %} }
+{% endif %}
 
 ###############################################################################
 # static, from group_vars
 ###############################################################################
+define NET_PRIVATE = 192.168.0.0/16
+{% set rootservers = (enclave_ips | default({})) | dict2items | map(attribute='value') | list %}
+{% if rootservers %}
+define ROOTSERVERS = { {{ rootservers | join(', ') }} }
+define WORLD_SSH_SOURCES = $ROOTSERVERS
+{% endif %}
 {% for name, value in (firewall.scalars | default({})) | dictsort %}
 define {{ name }} = {{ value }}
 {% endfor %}
 {% for name, members in (firewall.sets | default({})) | dictsort %}
-{% if members | length > 0 %}
+{% if members %}
 define {{ name }} = { {{ members | join(', ') }} }
 {% endif %}
 {% endfor %}

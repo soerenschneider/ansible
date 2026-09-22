@@ -1,2 +1,85 @@
 ---
-wireguard_wg_net_name: mesh
+# roles/wireguard/defaults/main.yaml
+#
+# Everything here is overridable per host, per group, or on the command
+# line. The data itself -- wireguard_networks, wg_pubkeys, wg_psks,
+# wg_private_keys -- belongs in group_vars, not here: a default of {} for
+# those would let a typo'd group_vars path render an empty mesh instead of
+# failing, so the role asserts on them instead.
+
+# --- where the config goes ---------------------------------------------
+
+# Point this at /tmp/wireguard for a dry run: the whole stage, validate,
+# back up, move cycle runs there without touching the live tunnel.
+wireguard_dir: /etc/wireguard
+
+# Package providing wg, wg-quick and wg genkey.
+wireguard_package: wireguard-tools
+
+# --- restart behaviour --------------------------------------------------
+
+# Restart wg-quick@<device> when the config actually changed. False stages
+# the new config for the next boot without dropping the current session --
+# useful when you are connected through the tunnel you are editing.
+wireguard_restart: true
+
+# --- rollback -----------------------------------------------------------
+
+# Seconds before an armed rollback restores <device>.conf.bak and restarts
+# the tunnel. 0 disables it.
+#
+# A config can parse and still be wrong -- a stale peer key or the wrong
+# AllowedIPs locks you out of a remote router with the backup sitting on a
+# machine you can no longer reach. Verification (below) disarms this
+# automatically on success, so the timer only fires when the play could not
+# confirm the tunnel or never finished.
+#
+# Recommended: 0 for local hosts, 180 for anything you reach through the
+# tunnel you are changing.
+wireguard_rollback_seconds: 0
+
+# Disarm a pending rollback and stop. Skips rendering entirely, so a
+# confirm run cannot accidentally push a new config.
+#
+#   ansible-playbook site.yml --tags wireguard -e wireguard_confirm=true
+wireguard_confirm: false
+
+# --- verification -------------------------------------------------------
+
+# After a restart, ping the tunnel addresses of the peers this host dials.
+# One answer is enough -- a peer can be legitimately down without this
+# host's tunnel being broken, so requiring all of them would fail the play
+# for someone else's outage.
+#
+# Peers with no Endpoint are skipped: their address is unknown until they
+# dial in, so there is nothing to ping. When a host dials nobody (the hub),
+# verification waits for at least one inbound handshake instead.
+#
+# On success an armed rollback is disarmed. On failure it is left armed --
+# or, if none was armed, the previous config is restored and the tunnel
+# restarted.
+wireguard_verify: true
+wireguard_verify_retries: 6
+wireguard_verify_delay: 5
+
+# --- secrets checking ---------------------------------------------------
+
+# Require a PSK for every declared peering. Set false if some links are
+# deliberately without one and you would rather not list them all in
+# `no_psk_with`.
+wireguard_require_psk: true
+
+# Members with `managed: false` are configured by hand on the device: a
+# phone, a tablet. They are skipped when rendering, and exempt from the
+# private-key check -- but they still need a public key and pre-shared
+# keys, because their peers reference them. There is no variable for this;
+# set `managed: false` on the member itself.
+
+# --- expected in group_vars, not defaulted here -------------------------
+#
+#   wireguard_networks   the meshes: pools, members, peers_with, endpoints
+#   wg_pubkeys           <mesh> -> <inventory_host> -> public key
+#   wg_psks              <mesh> -> <host_a>_<host_b> -> psk   (sops)
+#   wg_private_keys      <mesh> -> <inventory_host> -> key    (sops)
+#
+# The mesh key must be identical across all four.

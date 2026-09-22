@@ -1,0 +1,280 @@
+---
+# Validates the `networks` data structure.
+#
+# Run it standalone (`--tags net_validate`) or as the first tasks of the
+# roles that consume `networks`, so bad data fails before anything is
+# written to a router or a resolver.
+#
+# Requires the `ansible.utils` collection for CIDR containment.
+# Everything else is plain Jinja, and all IP range comparisons are done
+# on octet lists so they need no extra plugins.
+
+- name: Flatten pools into a checkable list
+  ansible.builtin.set_fact:
+    _net_pools_json: >-
+      {%- set out = [] -%}
+      {%- for site, net in networks.items() -%}
+      {%- for dev in net.devices | default([]) -%}
+      {%- set dev_name = dev.name | default(dev.device) | default('unnamed') -%}
+      {%- for pname, pool in (dev.pools | default({})).items() -%}
+      {%- set cidr = pool.cidr | default('') -%}
+      {%- set net_addr = (cidr | ansible.utils.ipaddr('network')) if cidr else '' -%}
+      {%- set bcast = (cidr | ansible.utils.ipaddr('broadcast')) or net_addr -%}
+      {{- out.append({
+            'site': site,
+            'device': dev_name,
+            'dev_cidr': dev.address | default(''),
+            'name': pname,
+            'cidr': cidr,
+            'network': net_addr,
+            'broadcast': bcast,
+            'first': (net_addr.split('.') | map('int') | list) if net_addr else [],
+            'last': (bcast.split('.') | map('int') | list) if bcast else [],
+            'host_count': (pool.hosts | default({})) | length,
+            'has_hosts_key': 'hosts' in pool,
+            'extra_keys': pool.keys() | difference(['cidr', 'hosts']) | list,
+          }) or '' -}}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out | to_json }}
+
+- name: Flatten hosts into a checkable list
+  ansible.builtin.set_fact:
+    _net_hosts_json: >-
+      {%- set out = [] -%}
+      {%- for site, net in networks.items() -%}
+      {%- for dev in net.devices | default([]) -%}
+      {%- set dev_name = dev.name | default(dev.device) | default('unnamed') -%}
+      {%- set dhcp = dev.dhcp | default({}) -%}
+      {%- for pname, pool in (dev.pools | default({})).items() -%}
+      {%- for hname, host in (pool.hosts | default({})).items() -%}
+      {{- out.append({
+            'site': site,
+            'device': dev_name,
+            'pool': pname,
+            'pool_cidr': pool.cidr | default(''),
+            'name': hname,
+            'ip': host.logical | default(''),
+            'mac': host.physical | default(''),
+            'dhcp_from': dhcp.from | default(''),
+            'dhcp_to': dhcp.to | default(''),
+          }) or '' -}}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out | to_json }}
+
+- name: Decode the flattened lists
+  ansible.builtin.set_fact:
+    net_pools_flat: "{{ _net_pools_json | from_json }}"
+    net_hosts_flat: "{{ _net_hosts_json | from_json }}"
+
+# ---------------------------------------------------------------------------
+# Pool-level checks
+# ---------------------------------------------------------------------------
+
+- name: Pool schema is complete
+  ansible.builtin.assert:
+    that:
+      - item.cidr | length > 0
+      - item.has_hosts_key
+      - item.extra_keys | length == 0
+    fail_msg: >-
+      Pool {{ item.site }}/{{ item.device }}/{{ item.name }} is malformed.
+      cidr={{ item.cidr | default('MISSING') }},
+      hosts key present={{ item.has_hosts_key }},
+      unexpected keys={{ item.extra_keys }}.
+      Unexpected keys usually mean a nested pool -- check the indentation.
+    quiet: true
+  loop: "{{ net_pools_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
+
+- name: Pool CIDR is prefix-aligned
+  ansible.builtin.assert:
+    that:
+      - item.cidr == item.network ~ '/' ~ (item.cidr | ansible.utils.ipaddr('prefix'))
+    fail_msg: >-
+      Pool {{ item.site }}/{{ item.device }}/{{ item.name }} declares
+      {{ item.cidr }}, which is not a valid prefix -- the network address is
+      {{ item.network }}. Use
+      {{ item.network }}/{{ item.cidr | ansible.utils.ipaddr('prefix') }}.
+    quiet: true
+  loop: "{{ net_pools_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
+
+- name: Pool sits inside its device network
+  ansible.builtin.assert:
+    that:
+      - item.network | ansible.utils.ipaddr(item.dev_cidr | ansible.utils.ipaddr('subnet')) is truthy
+      - item.broadcast | ansible.utils.ipaddr(item.dev_cidr | ansible.utils.ipaddr('subnet')) is truthy
+    fail_msg: >-
+      Pool {{ item.site }}/{{ item.device }}/{{ item.name }} ({{ item.cidr }})
+      is not contained in the device network
+      {{ item.dev_cidr | ansible.utils.ipaddr('subnet') }}.
+    quiet: true
+  when: item.dev_cidr | length > 0
+  loop: "{{ net_pools_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
+
+- name: Find overlapping pools within a device
+  ansible.builtin.set_fact:
+    _net_pool_overlaps_json: >-
+      {%- set out = [] -%}
+      {%- for a in net_pools_flat -%}
+      {%- for b in net_pools_flat -%}
+      {%- if a.site == b.site and a.device == b.device and a.name < b.name -%}
+      {%- if not (a.last < b.first or a.first > b.last) -%}
+      {{- out.append(a.site ~ '/' ~ a.device ~ ': ' ~ a.name ~ ' (' ~ a.cidr ~ ') overlaps ' ~ b.name ~ ' (' ~ b.cidr ~ ')') or '' -}}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out | to_json }}
+
+- name: Decode the overlap list
+  ansible.builtin.set_fact:
+    _net_pool_overlaps: "{{ _net_pool_overlaps_json | from_json }}"
+
+- name: Pools within a device do not overlap
+  ansible.builtin.assert:
+    that:
+      - _net_pool_overlaps | length == 0
+    fail_msg: |
+      Overlapping pools (a host IP must fall in exactly one pool):
+      {% for o in _net_pool_overlaps %}
+        - {{ o }}
+      {% endfor %}
+    quiet: true
+
+# ---------------------------------------------------------------------------
+# Host-level checks
+# ---------------------------------------------------------------------------
+
+- name: Host has an address
+  ansible.builtin.assert:
+    that:
+      - item.ip | length > 0
+      - item.ip | ansible.utils.ipaddr('address') is truthy
+    fail_msg: >-
+      Host {{ item.site }}/{{ item.name }} has no usable `logical`
+      (got {{ item.ip | default('MISSING') }}).
+    quiet: true
+  loop: "{{ net_hosts_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.name }}"
+
+# A /32 is a single host and a /31 is a point-to-point pair (RFC 3021):
+# both use every address, so the network/broadcast exclusion applies only
+# to /30 and shorter.
+- name: Host address sits inside its pool
+  ansible.builtin.assert:
+    that:
+      - item.ip | ansible.utils.ipaddr(item.pool_cidr) is truthy
+    fail_msg: >-
+      {{ item.site }}/{{ item.name }} ({{ item.ip }}) is outside pool
+      {{ item.pool }} ({{ item.pool_cidr }}).
+    quiet: true
+  loop: "{{ net_hosts_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.name }}"
+
+- name: Host address is not a pool's network or broadcast address
+  ansible.builtin.assert:
+    that:
+      - item.ip != item.pool_cidr | ansible.utils.ipaddr('network')
+      - item.ip != item.pool_cidr | ansible.utils.ipaddr('broadcast')
+    fail_msg: >-
+      {{ item.site }}/{{ item.name }} ({{ item.ip }}) is the network or
+      broadcast address of pool {{ item.pool }} ({{ item.pool_cidr }}).
+      Usable range is {{ item.pool_cidr | ansible.utils.ipaddr('range_usable') }}.
+    quiet: true
+  when: (item.pool_cidr | ansible.utils.ipaddr('prefix') | int) < 31
+  loop: "{{ net_hosts_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.name }}"
+
+- name: Static host address does not collide with the DHCP scope
+  ansible.builtin.assert:
+    that:
+      - not ((item.ip.split('.') | map('int') | list) >= (item.dhcp_from.split('.') | map('int') | list)
+             and (item.ip.split('.') | map('int') | list) <= (item.dhcp_to.split('.') | map('int') | list))
+    fail_msg: >-
+      {{ item.site }}/{{ item.name }} ({{ item.ip }}) is a static assignment
+      inside the DHCP scope of {{ item.device }}
+      ({{ item.dhcp_from }} - {{ item.dhcp_to }}).
+    quiet: true
+  when:
+    - item.dhcp_from | length > 0
+    - item.dhcp_to | length > 0
+  loop: "{{ net_hosts_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.name }}"
+
+- name: MAC addresses are well formed and lowercase
+  ansible.builtin.assert:
+    that:
+      - item.mac is match('^([0-9a-f]{2}:){5}[0-9a-f]{2}$')
+    fail_msg: >-
+      {{ item.site }}/{{ item.name }} has MAC {{ item.mac }}; expected six
+      lowercase hex octets separated by colons.
+    quiet: true
+  when: item.mac | length > 0
+  loop: "{{ net_hosts_flat }}"
+  loop_control:
+    label: "{{ item.site }}/{{ item.name }}"
+
+# ---------------------------------------------------------------------------
+# Uniqueness
+# ---------------------------------------------------------------------------
+
+- name: Collect keys for uniqueness checks
+  ansible.builtin.set_fact:
+    _net_site_ips: "{{ net_hosts_flat | map(attribute='site') | zip(net_hosts_flat | map(attribute='ip')) | map('join', ' ') | list }}"
+    _net_site_names: "{{ net_hosts_flat | map(attribute='site') | zip(net_hosts_flat | map(attribute='name')) | map('join', ' ') | list }}"
+    _net_macs: "{{ net_hosts_flat | map(attribute='mac') | select('!=', '') | list }}"
+
+- name: Addresses are unique within a site
+  ansible.builtin.assert:
+    that:
+      - _net_site_ips | length == _net_site_ips | unique | length
+    fail_msg: |
+      Duplicate addresses:
+      {% for k in _net_site_ips | unique if _net_site_ips.count(k) > 1 %}
+        - {{ k }} ({{ _net_site_ips.count(k) }}x)
+      {% endfor %}
+    quiet: true
+
+- name: Hostnames are unique within a site
+  ansible.builtin.assert:
+    that:
+      - _net_site_names | length == _net_site_names | unique | length
+    fail_msg: |
+      Duplicate hostnames (same name in two pools of one site):
+      {% for k in _net_site_names | unique if _net_site_names.count(k) > 1 %}
+        - {{ k }} ({{ _net_site_names.count(k) }}x)
+      {% endfor %}
+    quiet: true
+
+# - name: MAC addresses are globally unique
+#   ansible.builtin.assert:
+#     that:
+#       - _net_macs | length == _net_macs | unique | length
+#     fail_msg: |
+#       Duplicate MACs. Floating devices belong in `network_floating_devices`
+#       and should appear once per site, not twice in one:
+#       {% for k in _net_macs | unique if _net_macs.count(k) > 1 %}
+#         - {{ k }} ({{ _net_macs.count(k) }}x)
+#       {% endfor %}
+#     quiet: true
+
+- name: Summarise
+  ansible.builtin.debug:
+    msg: >-
+      networks OK: {{ networks | length }} sites,
+      {{ net_pools_flat | length }} pools,
+      {{ net_hosts_flat | length }} hosts.

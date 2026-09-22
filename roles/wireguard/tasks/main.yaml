@@ -1,4 +1,23 @@
 ---
+# roles/wireguard/tasks/main.yaml
+#
+# A host can belong to several meshes -- a site router on the private mesh
+# and on a separate management or backup mesh, say. Each membership gets its
+# own interface and its own config file, so everything below is per-mesh and
+# mesh.yaml is included once per membership.
+#
+# Member names only need to be unique within a mesh: `dd` on the private
+# mesh and `dd` on a management mesh are different members with different
+# addresses and keys.
+#
+# Interface names must be unique on the host. Set `device` on the mesh (or
+# on the member, to override) -- the default wg0 only works for one mesh.
+#
+# `managed: false` on a member means its config is written by hand on the
+# device (a phone, a tablet). Such members are skipped here even if they
+# happen to be in the Ansible inventory, and are exempt from the
+# private-key check -- but they still need a public key and pre-shared
+# keys, since their peers reference them.
 - name: "Install wireguard"
   when: [ansible_system == "Linux"]
   tags: [wireguard, vpn]
@@ -26,41 +45,84 @@
         daemon_reload: true
       when: wireguard_wg_timer is changed  # noqa: no-handler
 
-- name: "Configure wireguard"
-  when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
-  tags: [wireguard, vpn]
-  block:
-    - name: Add wireguard device
-      ansible.builtin.template:
-        src: wg-{{ ansible_system | lower }}.j2
-        dest: /etc/wireguard/{{ item.device }}.conf
-        owner: root
-        group: root
-        mode: "0640"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+- name: "Run tasks validate-networks.yaml"
+  ansible.builtin.include_tasks: validate-networks.yaml
+  tags: [wireguard]
 
-    - name: Add systemd override directory
-      ansible.builtin.file:
-        name: /etc/systemd/system/wg-quick@{{ item.device }}.service.d
-        state: directory
-        owner: root
-        group: root
-        mode: "0755"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+- name: Mesh data is present
+  ansible.builtin.assert:
+    that:
+      - wireguard_networks is defined
+      - wireguard_networks | length > 0
+    fail_msg: >-
+      `wireguard_networks` is undefined or empty. It belongs in group_vars,
+      not in the role defaults -- a default of {} would let a typo'd path
+      render an empty mesh instead of failing here.
+    quiet: true
 
-    - name: Add systemd override config
-      ansible.builtin.template:
-        src: wg-quick.override.conf.j2
-        dest: /etc/systemd/system/wg-quick@{{ item.device }}.service.d/override.conf
-        owner: root
-        group: root
-        mode: "0640"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+- name: Find every mesh membership for this host
+  ansible.builtin.set_fact:
+    _wg_memberships_json: >-
+      {%- set out = [] -%}
+      {%- for mesh_name, mesh in wireguard_networks.items() -%}
+      {%- for pname, pool in (mesh.pools | default({})).items() -%}
+      {%- for mname, member in (pool.hosts | default({})).items() -%}
+      {%- if member.inventory_host | default('') == inventory_hostname
+             and member.managed | default(true) -%}
+      {{- out.append({
+            'mesh': mesh_name,
+            'member': mname,
+            'pool': pname,
+            'device': member.device | default(mesh.device) | default('wg0'),
+          }) or '' -}}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {{ out | to_json }}
 
-    - name: Start and enable wireguard tunnel
-      ansible.builtin.systemd:
-        name: wg-quick@{{ item.device }}
-        state: "{% if wg_enable_default | default(True) %}restarted{% else %}stopped{% endif %}"
-        daemon_reload: true
-        enabled: "{% if wg_enable_default | default(True) %}true{% else %}false{% endif %}"
-      with_items: ["{{ wg_nets[wireguard_wg_net_name][inventory_hostname] }}"]
+- name: Decode memberships
+  ansible.builtin.set_fact:
+    wg_memberships: "{{ _wg_memberships_json | from_json }}"
+
+- name: This host belongs to at least one mesh
+  ansible.builtin.assert:
+    that:
+      - wg_memberships | length > 0
+    fail_msg: >-
+      {{ inventory_hostname }} matches no managed `inventory_host` in any
+      mesh of wireguard_networks. Add it to a pool, drop `managed: false`
+      if its config should be rendered here, or exclude this host from the
+      wireguard play.
+    quiet: true
+
+- name: Interface names are unique across meshes
+  ansible.builtin.assert:
+    that:
+      - wg_memberships | map(attribute='device') | list | length
+        == wg_memberships | map(attribute='device') | unique | list | length
+    fail_msg: >-
+      {{ inventory_hostname }} would use the same interface for more than
+      one mesh: {{ wg_memberships | map(attribute='device') | list | join(', ') }}.
+      Set a distinct `device` on each mesh (or on this member).
+    quiet: true
+
+- name: "Run tasks wireguard_secrets_check.yaml"
+  ansible.builtin.include_tasks: wireguard_secrets_check.yaml
+  tags: [wireguard]
+
+# `loop_var` is not optional here. include_tasks vars are resolved lazily,
+# inside the included file -- by then any loop in mesh.yaml has rebound
+# `item` to its own value, and `item.mesh` resolves against a string.
+- name: Configure each mesh
+  ansible.builtin.include_tasks: mesh.yaml
+  vars:
+    wg_mesh_name: "{{ wg_membership.mesh }}"
+    wg_mesh: "{{ wireguard_networks[wg_membership.mesh] }}"
+    wg_member: "{{ wg_membership.member }}"
+    wg_pool: "{{ wg_membership.pool }}"
+    wg_device: "{{ wg_membership.device }}"
+  loop: "{{ wg_memberships }}"
+  loop_control:
+    loop_var: wg_membership
+    label: "{{ wg_membership.mesh }} ({{ wg_membership.device }}) as {{ wg_membership.member }}"

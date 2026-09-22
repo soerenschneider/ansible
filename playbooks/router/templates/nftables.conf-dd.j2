@@ -1,5 +1,13 @@
 #!/usr/sbin/nft -f
 
+{% set devs    = networks[location].devices %}
+{% set uplink  = networks[location].uplink.device %}
+{% set untagged = devs | rejectattr('vlantag', 'defined')
+                       | map(attribute='device')
+                       | reject('equalto', uplink) | unique | list %}
+{% set vlans    = devs | selectattr('vlantag', 'defined')
+                       | map(attribute='vlantag') | unique | list %}
+
 flush ruleset
 
 include "{{ nftables_variables_file }}"
@@ -13,7 +21,7 @@ table ip global {
         # icmp type echo-request limit rate 5/second accept
 
         # allow wireguard
-        udp dport $WIREGUARD_PORT accept
+        udp dport $WG_PORT_SOEREN_CLOUD accept
 
         # allow SSH connections from some well-known internet host
         ip saddr $WORLD_SSH_SOURCES tcp dport 22 accept
@@ -60,13 +68,10 @@ table ip global {
         # allow loopback traffic, anything else jump to chain for further evaluation
         iifname vmap {
         lo : accept,
-            $DEV_WORLD:   jump inbound_world,
-            $WG_IF:       jump inbound_wg,
-{% for n in tagged %},
-            "vlan{{ n.vlantag }}" : jump inbound_private
-{%- endfor %}
-{%- for d in untagged %},
-            "{{ d }}" : jump inbound_private
+            $DEV_WORLD:    jump inbound_world,
+            $WG_IF_SOEREN_CLOUD:        jump inbound_wg,
+{% for v in vlans %},
+            "vlan{{ v }}": jump inbound_private
 {%- endfor %}
         }
 
@@ -117,16 +122,16 @@ table ip global {
         iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
 
         # allow cam access from soeren and ines over wireguard
-        iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_soeren oifname "vlan69" ip daddr $NET_CAM accept
-        iifname $WG_IF ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_ines   oifname "vlan69" ip daddr $NET_CAM accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_soeren oifname "vlan69" ip daddr $NET_CAM accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_ines   oifname "vlan69" ip daddr $NET_CAM accept
 
         # allow seedbox to talk to fetcharr
         # TODO: add tag for ch
-        iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
         # allow seedbox to talk to kubernetes services
-        iifname $WG_IF ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
         # allow routers over wireguard to talk to nas
-        iifname $WG_IF ip saddr { 192.168.200.2, 192.168.200.4 } oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { 192.168.200.2, 192.168.200.4 } oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
 
         # deny internet to selected hosts
         ip saddr @tag_nointernet oifname $DEV_WORLD counter drop
@@ -160,7 +165,7 @@ table ip6 global {
 
     chain inbound_world6 {
         # WireGuard, so peers can reach you on a v6-only network
-        udp dport $WIREGUARD_PORT accept
+        udp dport $WG_PORT_SOEREN_CLOUD accept
 
         ip6 saddr @world_ssh6 tcp dport 22 accept
 
@@ -208,11 +213,8 @@ table ip6 global {
 
         iifname vmap {
             $DEV_WORLD            : jump inbound_world6,
-{% for n in tagged %},
-            "vlan{{ n.vlantag }}" : jump inbound_world6
-{%- endfor %}
-{%- for d in untagged %},
-            "{{ d }}"             : jump inbound_world6
+{% for v in vlans %},
+            "vlan{{ v }}":          jump inbound_world6
 {%- endfor %}
         }
 
@@ -236,7 +238,7 @@ table ip6 global {
         # direction. Rejected rather than dropped so a client that gets a
         # AAAA for something local fails instantly and falls back to IPv4
         # instead of sitting in a connect timeout.
-        iifname { $IF_PRIVATE, $WG_IF } oifname { $IF_PRIVATE, $WG_IF } \
+        iifname { $IF_PRIVATE, $WG_IF_SOEREN_CLOUD } oifname { $IF_PRIVATE, $WG_IF_SOEREN_CLOUD } \
             reject with icmpv6 type admin-prohibited
 
         # The only thing IPv6 is for: LAN out to the internet.
