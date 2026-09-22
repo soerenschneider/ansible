@@ -3,6 +3,7 @@
 {% set untagged = devs | rejectattr('vlantag', 'defined')
                        | map(attribute='device')
                        | reject('equalto', uplink) | unique | list %}
+{% set tagged = devs | selectattr('vlantag', 'defined') | list %}
 {% set vlans    = devs | selectattr('vlantag', 'defined')
                        | map(attribute='vlantag') | unique | list %}
 
