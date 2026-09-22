@@ -2,7 +2,8 @@
 # roles/wireguard/tasks/mesh.yaml
 #
 # Configures ONE mesh membership. Included per membership from main.yaml,
-# which passes: wg_mesh_name, wg_mesh, wg_member, wg_pool, wg_device.
+# which passes: wireguard_mesh_name, wireguard_mesh, wireguard_member,
+# wireguard_pool, wireguard_device.
 #
 # The config is rendered into <wireguard_dir>/.staging/<device>.conf,
 # validated with `wg-quick strip`, and only then moved up into place --
@@ -25,15 +26,15 @@
   block:
     - name: Stop the rollback timer  # noqa: command-instead-of-module
       ansible.builtin.command:
-        cmd: "systemctl stop wg-rollback-{{ wg_device }}.timer"
-      register: _wg_disarm
-      changed_when: _wg_disarm.rc == 0
+        cmd: "systemctl stop wg-rollback-{{ wireguard_device }}.timer"
+      register: _wireguard_disarm
+      changed_when: _wireguard_disarm.rc == 0
       failed_when: false
 
     - name: Report
       ansible.builtin.debug:
         msg: >-
-          Rollback disarmed for {{ wg_device }} on {{ inventory_hostname }}.
+          Rollback disarmed for {{ wireguard_device }} on {{ inventory_hostname }}.
           The running config stands.
 
 # ---------------------------------------------------------------------------
@@ -47,9 +48,9 @@
   block:
     - name: Flatten this mesh's members
       ansible.builtin.set_fact:
-        _wg_members_json: >-
+        _wireguard_members_json: >-
           {%- set out = {} -%}
-          {%- for pname, pool in (wg_mesh.pools | default({})).items() -%}
+          {%- for pname, pool in (wireguard_mesh.pools | default({})).items() -%}
           {%- for mname, member in (pool.hosts | default({})).items() -%}
           {{- out.update({mname: (member | combine({'_pool': pname}))}) or '' -}}
           {%- endfor -%}
@@ -58,7 +59,7 @@
 
     - name: Decode this mesh's members
       ansible.builtin.set_fact:
-        wg_members: "{{ _wg_members_json | from_json }}"
+        wireguard_members: "{{ _wireguard_members_json | from_json }}"
 
     # ---------------------------------------------------------------------------
     # Consistency checks -- cheap, and they catch the failure modes that produce
@@ -69,33 +70,33 @@
     # handed to loop even behind a condition. Expand it once, here.
     - name: Expand this host's peer list
       ansible.builtin.set_fact:
-        wg_peers: >-
-          {{ (wg_members.keys() | list | reject('equalto', wg_member) | sort)
-            if (wg_members[wg_member].peers_with | default([])) == 'all'
-            else (wg_members[wg_member].peers_with | default([]) | sort) }}
+        wireguard_peers: >-
+          {{ (wireguard_members.keys() | list | reject('equalto', wireguard_member) | sort)
+            if (wireguard_members[wireguard_member].peers_with | default([])) == 'all'
+            else (wireguard_members[wireguard_member].peers_with | default([]) | sort) }}
 
     - name: Every peer this host names exists
       ansible.builtin.assert:
         that:
-          - wg_peer in wg_members
-        fail_msg: "{{ wg_member }} peers with unknown member '{{ wg_peer }}'"
+          - wireguard_peer in wireguard_members
+        fail_msg: "{{ wireguard_member }} peers with unknown member '{{ wireguard_peer }}'"
         quiet: true
-      loop: "{{ wg_peers }}"
+      loop: "{{ wireguard_peers }}"
       loop_control:
-        loop_var: wg_peer
+        loop_var: wireguard_peer
 
     - name: Peering is declared in both directions
       ansible.builtin.assert:
         that:
-          - (wg_members[wg_peer].peers_with | default([])) == 'all'
-            or wg_member in (wg_members[wg_peer].peers_with | default([]))
+          - (wireguard_members[wireguard_peer].peers_with | default([])) == 'all'
+            or wireguard_member in (wireguard_members[wireguard_peer].peers_with | default([]))
         fail_msg: >-
-          {{ wg_member }} peers with {{ wg_peer }}, but {{ wg_peer }} does not peer
+          {{ wireguard_member }} peers with {{ wireguard_peer }}, but {{ wireguard_peer }} does not peer
           back. A one-sided link produces a tunnel that never handshakes.
         quiet: true
-      loop: "{{ wg_peers }}"
+      loop: "{{ wireguard_peers }}"
       loop_control:
-        loop_var: wg_peer
+        loop_var: wireguard_peer
 
     # Public keys live centrally in wg_pubkeys, keyed by mesh then by inventory
     # hostname -- the same shape as wg_psks and wg_private_keys, so a key
@@ -103,26 +104,26 @@
     - name: Every member has a public key
       ansible.builtin.assert:
         that:
-          - (wg_pubkeys | default({})).get(wg_mesh_name, {}).get(wg_members[wg_peer].inventory_host | default(''), '') | length > 0
+          - (wg_pubkeys | default({})).get(wireguard_mesh_name, {}).get(wireguard_members[wireguard_peer].inventory_host | default(''), '') | length > 0
         fail_msg: >-
-          Missing wg_pubkeys.{{ wg_mesh_name }}.{{ wg_members[wg_peer].inventory_host | default('<no inventory_host>') }}
-          (member '{{ wg_peer }}'). Defined keys for this mesh:
-          {{ (wg_pubkeys | default({})).get(wg_mesh_name, {}).keys() | list | sort | join(', ') | default('none', true) }}
+          Missing wg_pubkeys.{{ wireguard_mesh_name }}.{{ wireguard_members[wireguard_peer].inventory_host | default('<no inventory_host>') }}
+          (member '{{ wireguard_peer }}'). Defined keys for this mesh:
+          {{ (wg_pubkeys | default({})).get(wireguard_mesh_name, {}).keys() | list | sort | join(', ') | default('none', true) }}
         quiet: true
-      loop: "{{ ([wg_member] + wg_peers) | unique }}"
+      loop: "{{ ([wireguard_member] + wireguard_peers) | unique }}"
       loop_control:
-        loop_var: wg_peer
+        loop_var: wireguard_peer
 
     - name: Member address falls inside its pool
       ansible.builtin.assert:
         that:
-          - wg_members[wg_member].logical | ansible.utils.ipaddr(wg_mesh.pools[wg_pool].cidr) is truthy
-          - wg_members[wg_member].logical | ansible.utils.ipaddr(wg_mesh.net) is truthy
+          - wireguard_members[wireguard_member].logical | ansible.utils.ipaddr(wireguard_mesh.pools[wireguard_pool].cidr) is truthy
+          - wireguard_members[wireguard_member].logical | ansible.utils.ipaddr(wireguard_mesh.net) is truthy
         fail_msg: >-
-          {{ wg_member }} ({{ wg_members[wg_member].logical }}) is outside pool
-          {{ wg_pool }}
-          ({{ wg_mesh.pools[wg_pool].cidr }}) or outside the
-          mesh net {{ wg_mesh.net }}.
+          {{ wireguard_member }} ({{ wireguard_members[wireguard_member].logical }}) is outside pool
+          {{ wireguard_pool }}
+          ({{ wireguard_mesh.pools[wireguard_pool].cidr }}) or outside the
+          mesh net {{ wireguard_mesh.net }}.
         quiet: true
 
     - name: Ensure the config directory exists
@@ -147,79 +148,79 @@
     - name: Render the config to the staging directory
       ansible.builtin.template:
         src: wg.conf.j2
-        dest: "{{ wireguard_dir }}/.staging/{{ wg_device }}.conf"
+        dest: "{{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf"
         owner: "root"
         group: "root"
         mode: "0600"
-      register: _wg_staged
+      register: _wireguard_staged
 
     - name: Validate the staged config
       ansible.builtin.command:
-        cmd: "wg-quick strip {{ wireguard_dir }}/.staging/{{ wg_device }}.conf"
+        cmd: "wg-quick strip {{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf"
       changed_when: false
       check_mode: false
-      register: _wg_strip
+      register: _wireguard_strip
       failed_when: false
 
     - name: Remove the staged config if it does not parse
       ansible.builtin.file:
-        path: "{{ wireguard_dir }}/.staging/{{ wg_device }}.conf"
+        path: "{{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf"
         state: absent
-      when: _wg_strip.rc != 0
+      when: _wireguard_strip.rc != 0
 
     - name: Fail on an invalid config
       ansible.builtin.fail:
         msg: |
-          Staged config for {{ wg_device }} does not parse; it has been removed
+          Staged config for {{ wireguard_device }} does not parse; it has been removed
           and the running config is untouched.
 
-          {{ _wg_strip.stderr | default(_wg_strip.stdout) }}
-      when: _wg_strip.rc != 0
+          {{ _wireguard_strip.stderr | default(_wireguard_strip.stdout) }}
+      when: _wireguard_strip.rc != 0
 
     - name: Read the current config
       ansible.builtin.slurp:
-        src: "{{ wireguard_dir }}/{{ wg_device }}.conf"
-      register: _wg_current
+        src: "{{ wireguard_dir }}/{{ wireguard_device }}.conf"
+      register: _wireguard_current
       failed_when: false
 
     - name: Read the staged config
       ansible.builtin.slurp:
-        src: "{{ wireguard_dir }}/.staging/{{ wg_device }}.conf"
-      register: _wg_new
+        src: "{{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf"
+      register: _wireguard_new
 
     - name: Decide whether anything changed
       ansible.builtin.set_fact:
-        _wg_changed: >-
-          {{ (_wg_current.content | default('')) != (_wg_new.content | default('')) }}
+        _wireguard_changed: >-
+          {{ (_wireguard_current.content | default('')) != (_wireguard_new.content | default('')) }}
 
     - name: Discard the staged config when it matches the running one
       ansible.builtin.file:
-        path: "{{ wireguard_dir }}/.staging/{{ wg_device }}.conf"
+        path: "{{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf"
         state: absent
-      when: not (_wg_changed | bool)
+      when: not (_wireguard_changed | bool)
 
     - name: Back up the current config
       ansible.builtin.copy:
-        src: "{{ wireguard_dir }}/{{ wg_device }}.conf"
-        dest: "{{ wireguard_dir }}/{{ wg_device }}.conf.bak"
+        src: "{{ wireguard_dir }}/{{ wireguard_device }}.conf"
+        dest: "{{ wireguard_dir }}/{{ wireguard_device }}.conf.bak"
         remote_src: true
         owner: root
         group: root
         mode: "0600"
       when:
-        - _wg_changed | bool
-        - _wg_current.content is defined
+        - _wireguard_changed | bool
+        - _wireguard_current.content is defined
 
     - name: Move the staged config into place
       ansible.builtin.command:
-        cmd: "mv -f {{ wireguard_dir }}/.staging/{{ wg_device }}.conf {{ wireguard_dir }}/{{ wg_device }}.conf"
-      when: _wg_changed | bool
-      register: _wg_moved
-      changed_when: _wg_moved.rc == 0
+        cmd: "mv -f {{ wireguard_dir }}/.staging/{{ wireguard_device }}.conf {{ wireguard_dir }}/{{ wireguard_device }}.conf"
+      when: _wireguard_changed | bool
+      register: _wireguard_moved
+      changed_when: _wireguard_moved.rc == 0
 
     - name: Add systemd override directory
       ansible.builtin.file:
-        name: /etc/systemd/system/wg-quick@{{ wg_device }}.service.d
+        name: /etc/systemd/system/wg-quick@{{ wireguard_device }}.service.d
         state: directory
         owner: root
         group: root
@@ -228,14 +229,14 @@
     - name: Add systemd override config
       ansible.builtin.template:
         src: wg-quick.override.conf.j2
-        dest: /etc/systemd/system/wg-quick@{{ wg_device }}.service.d/override.conf
+        dest: /etc/systemd/system/wg-quick@{{ wireguard_device }}.service.d/override.conf
         owner: root
         group: root
         mode: "0640"
 
     - name: Enable the tunnel
       ansible.builtin.systemd_service:
-        name: "wg-quick@{{ wg_device }}"
+        name: "wg-quick@{{ wireguard_device }}"
         enabled: true
         state: started
 
@@ -247,25 +248,25 @@
         cmd: >-
           systemd-run
           --on-active={{ wireguard_rollback_seconds }}
-          --unit=wg-rollback-{{ wg_device }}
-          --description="Restore {{ wg_device }}.conf.bak if not disarmed"
+          --unit=wg-rollback-{{ wireguard_device }}
+          --description="Restore {{ wireguard_device }}.conf.bak if not disarmed"
           /bin/sh -c
-          'mv -f {{ wireguard_dir }}/{{ wg_device }}.conf.bak {{ wireguard_dir }}/{{ wg_device }}.conf
-          && systemctl restart wg-quick@{{ wg_device }}'
+          'mv -f {{ wireguard_dir }}/{{ wireguard_device }}.conf.bak {{ wireguard_dir }}/{{ wireguard_device }}.conf
+          && systemctl restart wg-quick@{{ wireguard_device }}'
       when:
-        - _wg_changed | bool
+        - _wireguard_changed | bool
         - wireguard_restart | bool
         - (wireguard_rollback_seconds | int) > 0
-        - _wg_current.content is defined
+        - _wireguard_current.content is defined
       changed_when: true
 
     - name: Reload the tunnel
       ansible.builtin.systemd_service:
-        name: "wg-quick@{{ wg_device }}"
+        name: "wg-quick@{{ wireguard_device }}"
         daemon_reload: true
         state: "restarted"
       when:
-        - _wg_changed | bool
+        - _wireguard_changed | bool
         - wireguard_restart | bool
 
     # ---------------------------------------------------------------------------
@@ -280,10 +281,10 @@
     # toward it -- the same condition the template uses to emit Endpoint.
     - name: Work out which peers this host dials
       ansible.builtin.set_fact:
-        wg_verify_targets: >-
-          {{ wg_peers
-            | reject('in', wg_members[wg_member].no_dial | default([]))
-            | map('extract', wg_members)
+        wireguard_verify_targets: >-
+          {{ wireguard_peers
+            | reject('in', wireguard_members[wireguard_member].no_dial | default([]))
+            | map('extract', wireguard_members)
             | selectattr('endpoint', 'defined')
             | map(attribute='logical')
             | list }}
@@ -291,15 +292,15 @@
     - name: Verify the tunnel
       when:
         - wireguard_verify | bool
-        - _wg_changed | bool
+        - _wireguard_changed | bool
         - wireguard_restart | bool
       block:
         - name: Wait for the interface to come up
           ansible.builtin.command:
-            cmd: "wg show {{ wg_device }}"
+            cmd: "wg show {{ wireguard_device }}"
           changed_when: false
-          register: _wg_show
-          until: _wg_show.rc == 0
+          register: _wireguard_show
+          until: _wireguard_show.rc == 0
           retries: 3
           delay: 2
 
@@ -310,8 +311,8 @@
         - name: Ping the dialed peers until one answers
           ansible.builtin.shell:
             cmd: |
-              for ip in {{ wg_verify_targets | join(' ') }}; do
-                if ping -c 2 -W 2 -I {{ wg_device }} "$ip" >/dev/null 2>&1; then
+              for ip in {{ wireguard_verify_targets | join(' ') }}; do
+                if ping -c 2 -W 2 -I {{ wireguard_device }} "$ip" >/dev/null 2>&1; then
                   echo "$ip"
                   exit 0
                 fi
@@ -320,34 +321,34 @@
           args:
             executable: /bin/sh
           changed_when: false
-          register: _wg_ping
-          until: _wg_ping.rc == 0
+          register: _wireguard_ping
+          until: _wireguard_ping.rc == 0
           retries: "{{ wireguard_verify_retries }}"
           delay: "{{ wireguard_verify_delay }}"
-          when: wg_verify_targets | length > 0
+          when: wireguard_verify_targets | length > 0
 
         - name: Note which peer answered
           ansible.builtin.debug:
             msg: >-
-              Tunnel up: {{ _wg_ping.stdout | trim }} answered over
-              {{ wg_device }}
-              ({{ wg_verify_targets | length }} target{{ '' if wg_verify_targets | length == 1 else 's' }} tried).
-          when: wg_verify_targets | length > 0
+              Tunnel up: {{ _wireguard_ping.stdout | trim }} answered over
+              {{ wireguard_device }}
+              ({{ wireguard_verify_targets | length }} target{{ '' if wireguard_verify_targets | length == 1 else 's' }} tried).
+          when: wireguard_verify_targets | length > 0
 
         - name: Confirm at least one handshake
           ansible.builtin.shell:
-            cmd: "set -o pipefail && wg show {{ wg_device }} latest-handshakes | awk '$2 != 0' | wc -l"
+            cmd: "set -o pipefail && wg show {{ wireguard_device }} latest-handshakes | awk '$2 != 0' | wc -l"
             executable: /bin/bash
           changed_when: false
-          register: _wg_handshakes
-          until: (_wg_handshakes.stdout | int) > 0
+          register: _wireguard_handshakes
+          until: (_wireguard_handshakes.stdout | int) > 0
           retries: "{{ wireguard_verify_retries }}"
           delay: "{{ wireguard_verify_delay }}"
-          when: wg_verify_targets | length == 0
+          when: wireguard_verify_targets | length == 0
 
         - name: Disarm the rollback -- the tunnel works  # noqa: command-instead-of-module
           ansible.builtin.command:
-            cmd: "systemctl stop wg-rollback-{{ wg_device }}.timer"
+            cmd: "systemctl stop wg-rollback-{{ wireguard_device }}.timer"
           changed_when: true
           failed_when: false
           when: (wireguard_rollback_seconds | int) > 0
@@ -355,43 +356,43 @@
       rescue:
         - name: Restore the previous config
           ansible.builtin.command:
-            cmd: "mv -f {{ wireguard_dir }}/{{ wg_device }}.conf.bak {{ wireguard_dir }}/{{ wg_device }}.conf"
+            cmd: "mv -f {{ wireguard_dir }}/{{ wireguard_device }}.conf.bak {{ wireguard_dir }}/{{ wireguard_device }}.conf"
           when:
             - (wireguard_rollback_seconds | int) == 0
-            - _wg_current.content is defined
+            - _wireguard_current.content is defined
           changed_when: true
 
         - name: Restart on the restored config
           ansible.builtin.systemd_service:
-            name: "wg-quick@{{ wg_device }}"
+            name: "wg-quick@{{ wireguard_device }}"
             state: restarted
           when:
             - (wireguard_rollback_seconds | int) == 0
-            - _wg_current.content is defined
+            - _wireguard_current.content is defined
 
         - name: Fail
           ansible.builtin.fail:
-            msg: "{{ _wg_fail_lines | reject('equalto', '') | list }}"
+            msg: "{{ _wireguard_fail_lines | reject('equalto', '') | list }}"
           vars:
-            _wg_armed: "{{ (wireguard_rollback_seconds | int) > 0 }}"
-            _wg_fail_lines:
+            _wireguard_armed: "{{ (wireguard_rollback_seconds | int) > 0 }}"
+            _wireguard_fail_lines:
               - "Tunnel verification failed on {{ inventory_hostname }}."
-              - "{{ 'No peer answered. Tried: ' ~ wg_verify_targets | join(', ') if wg_verify_targets | length > 0 else 'This host dials no peers; no inbound handshake arrived.' }}"
-              - "{{ 'A rollback is armed: the previous config is restored within ' ~ wireguard_rollback_seconds ~ 's. Do NOT run with wireguard_confirm=true.' if _wg_armed | bool else '' }}"
-              - "{{ 'Previous config restored from .bak and the tunnel restarted.' if (not (_wg_armed | bool) and _wg_current.content is defined) else '' }}"
-              - "{{ 'No previous config existed; the tunnel is down.' if (not (_wg_armed | bool) and _wg_current.content is not defined) else '' }}"
+              - "{{ 'No peer answered. Tried: ' ~ wireguard_verify_targets | join(', ') if wireguard_verify_targets | length > 0 else 'This host dials no peers; no inbound handshake arrived.' }}"
+              - "{{ 'A rollback is armed: the previous config is restored within ' ~ wireguard_rollback_seconds ~ 's. Do NOT run with wireguard_confirm=true.' if _wireguard_armed | bool else '' }}"
+              - "{{ 'Previous config restored from .bak and the tunnel restarted.' if (not (_wireguard_armed | bool) and _wireguard_current.content is defined) else '' }}"
+              - "{{ 'No previous config existed; the tunnel is down.' if (not (_wireguard_armed | bool) and _wireguard_current.content is not defined) else '' }}"
 
     - name: Report
       ansible.builtin.debug:
-        msg: "{{ _wg_report | reject('equalto', '') | list }}"
+        msg: "{{ _wireguard_report | reject('equalto', '') | list }}"
       vars:
-        _wg_armed: >-
-          {{ _wg_changed | bool and wireguard_restart | bool
+        _wireguard_armed: >-
+          {{ _wireguard_changed | bool and wireguard_restart | bool
             and (wireguard_rollback_seconds | int) > 0
-            and _wg_current.content is defined }}
-        _wg_report:
-          - "{{ inventory_hostname }} is member '{{ wg_member }}' on mesh '{{ wg_mesh_name }}'."
-          - "{{ 'Config updated; previous kept at ' ~ wireguard_dir ~ '/' ~ wg_device ~ '.conf.bak' if _wg_changed | bool else 'Config unchanged.' }}"
-          - "{{ 'ROLLBACK ARMED: previous config restored in ' ~ wireguard_rollback_seconds ~ 's unless disarmed.' if _wg_armed | bool else '' }}"
-          - "{{ 'Disarm with: ansible-playbook ... -e wireguard_confirm=true' if _wg_armed | bool else '' }}"
-          - "{{ 'or on the host: systemctl stop wg-rollback-' ~ wg_device ~ '.timer' if _wg_armed | bool else '' }}"
+            and _wireguard_current.content is defined }}
+        _wireguard_report:
+          - "{{ inventory_hostname }} is member '{{ wireguard_member }}' on mesh '{{ wireguard_mesh_name }}'."
+          - "{{ 'Config updated; previous kept at ' ~ wireguard_dir ~ '/' ~ wireguard_device ~ '.conf.bak' if _wireguard_changed | bool else 'Config unchanged.' }}"
+          - "{{ 'ROLLBACK ARMED: previous config restored in ' ~ wireguard_rollback_seconds ~ 's unless disarmed.' if _wireguard_armed | bool else '' }}"
+          - "{{ 'Disarm with: ansible-playbook ... -e wireguard_confirm=true' if _wireguard_armed | bool else '' }}"
+          - "{{ 'or on the host: systemctl stop wg-rollback-' ~ wireguard_device ~ '.timer' if _wireguard_armed | bool else '' }}"

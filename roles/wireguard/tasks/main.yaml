@@ -62,7 +62,7 @@
 
 - name: Find every mesh membership for this host
   ansible.builtin.set_fact:
-    _wg_memberships_json: >-
+    _wireguard_memberships_json: >-
       {%- set out = [] -%}
       {%- for mesh_name, mesh in wireguard_networks.items() -%}
       {%- for pname, pool in (mesh.pools | default({})).items() -%}
@@ -83,12 +83,12 @@
 
 - name: Decode memberships
   ansible.builtin.set_fact:
-    wg_memberships: "{{ _wg_memberships_json | from_json }}"
+    wireguard_memberships: "{{ _wireguard_memberships_json | from_json }}"
 
 - name: This host belongs to at least one mesh
   ansible.builtin.assert:
     that:
-      - wg_memberships | length > 0
+      - wireguard_memberships | length > 0
     fail_msg: >-
       {{ inventory_hostname }} matches no managed `inventory_host` in any
       mesh of wireguard_networks. Add it to a pool, drop `managed: false`
@@ -99,11 +99,11 @@
 - name: Interface names are unique across meshes
   ansible.builtin.assert:
     that:
-      - wg_memberships | map(attribute='device') | list | length
-        == wg_memberships | map(attribute='device') | unique | list | length
+      - wireguard_memberships | map(attribute='device') | list | length
+        == wireguard_memberships | map(attribute='device') | unique | list | length
     fail_msg: >-
       {{ inventory_hostname }} would use the same interface for more than
-      one mesh: {{ wg_memberships | map(attribute='device') | list | join(', ') }}.
+      one mesh: {{ wireguard_memberships | map(attribute='device') | list | join(', ') }}.
       Set a distinct `device` on each mesh (or on this member).
     quiet: true
 
@@ -117,12 +117,12 @@
 - name: Configure each mesh
   ansible.builtin.include_tasks: mesh.yaml
   vars:
-    wg_mesh_name: "{{ wg_membership.mesh }}"
-    wg_mesh: "{{ wireguard_networks[wg_membership.mesh] }}"
-    wg_member: "{{ wg_membership.member }}"
-    wg_pool: "{{ wg_membership.pool }}"
-    wg_device: "{{ wg_membership.device }}"
-  loop: "{{ wg_memberships }}"
+    wireguard_mesh_name: "{{ wireguard_membership.mesh }}"
+    wireguard_mesh: "{{ wireguard_networks[wireguard_membership.mesh] }}"
+    wireguard_member: "{{ wireguard_membership.member }}"
+    wireguard_pool: "{{ wireguard_membership.pool }}"
+    wireguard_device: "{{ wireguard_membership.device }}"
+  loop: "{{ wireguard_memberships }}"
   loop_control:
-    loop_var: wg_membership
-    label: "{{ wg_membership.mesh }} ({{ wg_membership.device }}) as {{ wg_membership.member }}"
+    loop_var: wireguard_membership
+    label: "{{ wireguard_membership.mesh }} ({{ wireguard_membership.device }}) as {{ wireguard_membership.member }}"
