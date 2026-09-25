@@ -92,16 +92,10 @@
 - name: Resolve this host's datacenter
   ansible.builtin.set_fact:
     baseline_fw_datacenter: >-
-      {%- set explicit = datacenter | default('') | string -%}
-      {%- set labels = inventory_hostname.split('.') -%}
-      {%- set guess = labels[1] if labels | length > 1 else '' -%}
-      {%- if explicit | length > 0 -%}
-      {{- explicit -}}
-      {%- elif guess in (networks | default({})).keys() | list -%}
-      {{- guess -}}
-      {%- else -%}
-      {{- '' -}}
-      {%- endif -%}
+      {{ (datacenter | default('') | string)
+         or (_baseline_fw_dc_guess if _baseline_fw_dc_guess in (networks | default({})).keys() | list else '') }}
+  vars:
+    _baseline_fw_dc_guess: "{{ (inventory_hostname.split('.') + [''])[1] }}"
   tags: [firewall, base]
 
 - name: Warn when the datacenter could not be resolved

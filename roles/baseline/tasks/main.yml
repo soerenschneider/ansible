@@ -9,6 +9,7 @@
 
 - name: "Run tasks net_data_validate.yaml"
   ansible.builtin.include_tasks: "net_data_validate.yaml"
+  run_once: true
   tags: [base, network, firewall, always]
 
 - name: "Run tasks firewall_data.yml"

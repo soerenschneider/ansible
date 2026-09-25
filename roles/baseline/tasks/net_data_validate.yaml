@@ -260,7 +260,6 @@
       {{ baseline_net_hosts_flat | map(attribute='site')
          | zip(baseline_net_hosts_flat | map(attribute='name'))
          | map('join', ' ') | list }}
-    _baseline_net_macs: "{{ baseline_net_hosts_flat | map(attribute='mac') | select('!=', '') | list }}"
   tags: [always, firewall, baseline]
 
 - name: Addresses are unique within a site
@@ -287,18 +286,65 @@
     quiet: true
   tags: [always, firewall, baseline]
 
-#- name: MAC addresses are globally unique
-#  ansible.builtin.assert:
-#    that:
-#      - _baseline_net_macs | length == _baseline_net_macs | unique | length
-#    fail_msg: |
-#      Duplicate MACs. Floating devices belong in `network_floating_devices`
-#      and should appear once per site, not twice in one:
-#      {% for k in _baseline_net_macs | unique if _baseline_net_macs.count(k) > 1 %}
-#        - {{ k }} ({{ _baseline_net_macs.count(k) }}x)
-#      {% endfor %}
-#    quiet: true
-#  tags: [always, firewall, baseline]
+# A floating device (laptop, phone) legitimately has the same MAC in every
+# site it visits. Two rules instead of one global uniqueness check:
+#   - within a site a MAC appears once, whatever it is
+#   - across sites a MAC may repeat only if it is in network_floating_devices
+- name: Group MACs by site and by host
+  ansible.builtin.set_fact:
+    _baseline_net_mac_report_json: >-
+      {%- set floating = (network_floating_devices | default({})).values()
+            | selectattr('mac', 'defined') | map(attribute='mac') | map('lower') | list -%}
+      {%- set hosts_by_key = {} -%}
+      {%- set sites_by_mac = {} -%}
+      {%- for h in baseline_net_hosts_flat if h.mac -%}
+      {%- set mac = h.mac | lower -%}
+      {%- set key = h.site ~ ' ' ~ mac -%}
+      {{- hosts_by_key.update({key: hosts_by_key.get(key, []) + [h.pool ~ '/' ~ h.name]}) or '' -}}
+      {{- sites_by_mac.update({mac: (sites_by_mac.get(mac, []) + [h.site]) | unique | list}) or '' -}}
+      {%- endfor -%}
+      {%- set same_site = [] -%}
+      {%- for key, names in hosts_by_key | dictsort if names | length > 1 -%}
+      {{- same_site.append(key ~ ': ' ~ names | join(', ')) or '' -}}
+      {%- endfor -%}
+      {%- set undeclared = [] -%}
+      {%- for mac, sites in sites_by_mac | dictsort if sites | length > 1 and mac not in floating -%}
+      {{- undeclared.append(mac ~ ' in ' ~ sites | sort | join(', ')) or '' -}}
+      {%- endfor -%}
+      {{ {'same_site': same_site, 'undeclared': undeclared} | to_json }}
+  tags: [always, firewall, baseline]
+
+- name: Decode the MAC report
+  ansible.builtin.set_fact:
+    _baseline_net_mac_report: "{{ _baseline_net_mac_report_json | from_json }}"
+  tags: [always, firewall, baseline]
+
+- name: MAC addresses are unique within a site
+  ansible.builtin.assert:
+    that:
+      - _baseline_net_mac_report.same_site | length == 0
+    fail_msg: |
+      One MAC on several hosts of the same site (site mac: pool/host, ...).
+      A floating device belongs in each site once, not in two pools of one:
+      {% for d in _baseline_net_mac_report.same_site %}
+        - {{ d }}
+      {% endfor %}
+    quiet: true
+  tags: [always, firewall, baseline]
+
+- name: MAC addresses shared between sites are declared floating
+  ansible.builtin.assert:
+    that:
+      - _baseline_net_mac_report.undeclared | length == 0
+    fail_msg: |
+      These MACs appear in more than one site but are not listed in
+      `network_floating_devices`. Add them there if the device really moves,
+      otherwise one of the entries is a copy-paste leftover:
+      {% for d in _baseline_net_mac_report.undeclared %}
+        - {{ d }}
+      {% endfor %}
+    quiet: true
+  tags: [always, firewall, baseline]
 
 - name: Summarise
   ansible.builtin.debug:
