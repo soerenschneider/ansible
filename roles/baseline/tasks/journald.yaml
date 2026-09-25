@@ -3,10 +3,11 @@
   ansible.builtin.fail:
     msg: "baseline_systemd_journal_storage must be either auto, persistent or volatile"
   when: baseline_systemd_journal_storage not in ['persistent', 'volatile', 'auto']
+  tags: [bootstrap, base, journald, logs]
 
 - name: "Create journald dir"
   when: "baseline_systemd_journal_storage == 'persistent'"
-  tags: [base, systemd, journald, logs, logging]
+  tags: [bootstrap, base, journald, logs]
   block:
     - name: "Check if journald dir exists"
       ansible.builtin.stat:
@@ -23,7 +24,7 @@
       when: not baseline_systemd_journal_dir.stat.exists
 
 - name: Find journald.conf location
-  tags: [base, systemd, journald, logs, logging]
+  tags: [bootstrap, base, journald, logs]
   block:
     - name: Check if journald.conf exists in /usr/lib/systemd
       ansible.builtin.stat:
@@ -49,7 +50,7 @@
 
 - name: "Add system limits for auto/persistent setting"
   when: baseline_systemd_journal_storage in ['persistent', 'auto']
-  tags: [base, systemd, journald, logs, logging]
+  tags: [bootstrap, base, journald, logs]
   block:
     - name: "Limit the total size of journald logs"
       ansible.builtin.lineinfile:
@@ -67,7 +68,7 @@
 
 - name: "Add runtime limits for auto/volatile setting"
   when: baseline_systemd_journal_storage in ['volatile', 'auto']
-  tags: [base, systemd, journald, logs, logging]
+  tags: [bootstrap, base, journald, logs]
   block:
     - name: "Limit the total size of journald logs"
       ansible.builtin.lineinfile:

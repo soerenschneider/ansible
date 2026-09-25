@@ -24,13 +24,13 @@
       - baseline_default_users_name is defined
       - baseline_default_users_name | length > 0
     fail_msg: "baseline_default_users_name must be set to the desired username."
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Record the current user and whether a rename is actually needed
   ansible.builtin.set_fact:
     baseline_old_user: "{{ ansible_user }}"
     baseline_rename_needed: "{{ ansible_user != baseline_default_users_name }}"
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Allow/refuse passwordless sudo for all 'sudo' group members
   ansible.builtin.lineinfile:
@@ -40,7 +40,7 @@
     line: "%sudo ALL=(ALL) NOPASSWD: ALL"
     validate: "visudo -cf %s"
   become: true
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 # The new user is created without a password. If we're going to switch the
 # connection to it and then reboot/delete as that user, it MUST be able to sudo.
@@ -57,7 +57,7 @@
       after the connection switches. Set 'baseline_default_users_passwordless_sudo: true'
       (or give the user a password and remove this assert).
   when: baseline_rename_needed | bool
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 # Don't assume /home/<user>: read the real home from passwd. getent_passwd
 # returns the fields after the username, so index 4 is the home directory
@@ -66,18 +66,18 @@
   ansible.builtin.getent:
     database: passwd
     key: "{{ baseline_old_user }}"
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Record the old user's real home directory
   ansible.builtin.set_fact:
     baseline_old_user_home: "{{ ansible_facts.getent_passwd[baseline_old_user][4] }}"
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Verify the source authorized_keys exists and is non-empty
   ansible.builtin.stat:
     path: "{{ baseline_old_user_home }}/.ssh/authorized_keys"
   register: baseline_ssh_key_stat
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Fail on missing or empty authorized_keys
   ansible.builtin.fail:
@@ -85,26 +85,26 @@
       No usable SSH keys at
       {{ baseline_old_user_home }}/.ssh/authorized_keys on the target host.
   when: (not baseline_ssh_key_stat.stat.exists) or (baseline_ssh_key_stat.stat.size == 0)
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Slurp authorized_keys from the current user
   ansible.builtin.slurp:
     src: "{{ baseline_old_user_home }}/.ssh/authorized_keys"
   register: baseline_ssh_key
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Add ssh group
   ansible.builtin.group:
     name: ssh
     system: true
   become: true
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Default the supplementary groups when none were provided
   ansible.builtin.set_fact:
     baseline_default_users_groups: ["{{ baseline_default_users_name }}", adm, sudo, ssh]
   when: baseline_default_users_groups is not defined or baseline_default_users_groups | length == 0
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 # Single source of truth for the primary group, so it exists whether or not the
 # supplementary-groups default above ran (useradd -g requires it to pre-exist).
@@ -112,7 +112,7 @@
   ansible.builtin.group:
     name: "{{ baseline_default_users_group | default(baseline_default_users_name) }}"
   become: true
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Create user {{ baseline_default_users_name }}
   ansible.builtin.user:
@@ -123,14 +123,14 @@
     append: true
   become: true
   register: baseline_user_created
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Install authorized_keys for the new user
   ansible.posix.authorized_key:
     user: "{{ baseline_default_users_name }}"
     key: "{{ baseline_ssh_key['content'] | b64decode }}"
   become: true
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 # --- Switch-over (only when a rename is actually needed) ---------------------
 
@@ -140,13 +140,13 @@
   ansible.builtin.reboot:
   become: true
   when: baseline_rename_needed | bool
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Switch the Ansible connection to the new user
   ansible.builtin.set_fact:
     ansible_user: "{{ baseline_default_users_name }}"
   when: baseline_rename_needed | bool
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 # CRITICAL: set_fact only changes the variable; Ansible keeps reusing the cached
 # connection built for the old user. Without this reset, every task below still
@@ -165,7 +165,7 @@
   become: true
   changed_when: false
   when: baseline_rename_needed | bool
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
 
 - name: Delete the old user and its group
   become: true
@@ -173,7 +173,7 @@
     - baseline_rename_needed | bool
     - baseline_old_user != "root"
     - baseline_old_user != baseline_default_users_name   # defense-in-depth
-  tags: [base, default_users]
+  tags: [bootstrap, base, default_users]
   block:
     - name: Delete old user and its home directory
       ansible.builtin.user:

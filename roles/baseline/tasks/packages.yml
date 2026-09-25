@@ -3,11 +3,11 @@
   ansible.builtin.package:
     name: [snapd, modemmanager]
     state: absent
-  tags: [base, base-packages]
+  tags: [bootstrap, base, packages]
 
 - name: Install packages
   when: ansible_os_family == "Debian"
-  tags: [base, base-packages]
+  tags: [bootstrap, base, packages]
   block:
     - name: Configure apt
       ansible.builtin.copy:
@@ -38,7 +38,7 @@
 
 - name: Install packages
   when: ansible_os_family | lower == "redhat"
-  tags: [base, base-packages]
+  tags: [bootstrap, base, packages]
   block:
     - name: Enable crb/powertools repo for redhat
       ansible.builtin.command: dnf config-manager --set-enabled crb

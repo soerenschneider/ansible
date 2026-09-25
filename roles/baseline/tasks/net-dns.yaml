@@ -12,4 +12,4 @@
       nameserver {{ nameserver }}
       {% endfor %}
   when: resolv_conf_nameservers | default([]) | length > 0
-  tags: [resolv, dns]
+  tags: [bootstrap, resolv, dns]

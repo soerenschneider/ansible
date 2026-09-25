@@ -4,7 +4,7 @@
     name: fstrim.timer
     state: enabled
   failed_when: false
-  tags: [base, fs]
+  tags: [bootstrap, base, fs]
 
 - name: Add noatime option to appropriate filesystem entries in fstab
   ansible.builtin.lineinfile:
@@ -15,4 +15,4 @@
   when: item.fstype in ['ext2', 'ext3', 'ext4', 'xfs', 'btrfs'] and 'noatime' not in (item.options | default(''))
   with_items: "{{ ansible_mounts | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$') | list }}"
   notify: remount filesystems
-  tags: [base, fs]
+  tags: [bootstrap, base, fs]

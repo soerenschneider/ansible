@@ -26,9 +26,6 @@ baseline_authorized_keys_soft: []
 # authorized_keys stored on hardware tokens (won't get automatically confined by 'from' on internal systems)
 baseline_authorized_keys_hw: []
 
-baseline_age_key_path: "/etc/age/keys.txt"
-baseline_age_bin: "/usr/local/bin/age-keygen"
-baseline_force_age_keygen: false
 
 baseline_linux_sysctl_congestion_control: "bbr"
 baseline_linux_sysctl_net_qdisc: "fq"
@@ -80,3 +77,32 @@ baseline_firewall_nftables_conf_by_os_family:
 # ufw (Debian) and firewalld (RHEL) must not manage the host alongside this.
 baseline_firewall_disable_ufw: true
 baseline_firewall_disable_firewalld: true
+
+# Common location for public key material on every host (world-readable).
+# One file per key: age, gpg, gpg_fingerprint.
+# All key material lives under one root:
+#   pubkeys/  0755  public keys, one file per key (age, gpg, gpg_fingerprint)
+#   private/  0700  private keys (age.key, gnupg/)
+baseline_dir: /etc/baseline
+baseline_crypto_pubkey_dir: "{{ baseline_dir }}/pubkeys"
+baseline_crypto_private_dir: "{{ baseline_dir }}/private"
+baseline_facts_dir: /etc/ansible/facts.d
+
+# age
+baseline_age_auto_gen: true
+baseline_age_force_keygen: false
+
+baseline_age_bin: /usr/bin/age-keygen
+baseline_age_key_path: "/etc/baseline/private/age.key"
+
+# gpg
+baseline_gpg_auto_gen: true
+baseline_gpg_home: "/etc/host-gpg"
+# rsa4096 or ed25519 (ed25519 = EdDSA primary + cv25519 encryption subkey).
+# Only affects newly generated keys; existing keys are left alone.
+baseline_gpg_key_algo: rsa4096
+baseline_gpg_uid: "{{ ansible_facts['fqdn'] | default(inventory_hostname) }}"
+
+# Controller path for the aggregated key map (e.g. a Terraform
+# *.auto.tfvars.json). Empty string disables harvesting.
+baseline_pubkey_harvest_file: ""

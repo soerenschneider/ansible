@@ -1,34 +1,34 @@
 ---
 - name: "Run tasks system_basics.yaml"
   ansible.builtin.include_tasks: system_basics.yml
-  tags: [base]
+  tags: always
 
-- name: "Run tasks sysctl.yml"
-  ansible.builtin.include_tasks: sysctl.yml
-  tags: [base, base-resilience, sysctl]
+- name: "Run tasks linux-sysctl.yml"
+  ansible.builtin.include_tasks: linux-sysctl.yml
+  tags: always
 
-- name: "Run tasks net_data_validate.yaml"
-  ansible.builtin.include_tasks: "net_data_validate.yaml"
+- name: "Run tasks net-validate-data.yaml"
+  ansible.builtin.include_tasks: "net-validate-data.yaml"
   run_once: true
-  tags: [base, network, firewall, always]
+  tags: always
 
-- name: "Run tasks firewall_data.yml"
-  ansible.builtin.include_tasks: firewall_data.yml
-  tags: [base, firewall, always]
+- name: "Run tasks net-firewall-data.yml"
+  ansible.builtin.include_tasks: net-firewall-data.yml
+  tags: always
 
 - name: "Run tasks packages.yml"
   ansible.builtin.include_tasks: packages.yml
   when: ansible_system == "Linux"
-  tags: [base, base-packages]
+  tags: always
 
 - name: "Configure NFT based firewall"
-  ansible.builtin.include_tasks: "firewall_rules_nft.yaml"
+  ansible.builtin.include_tasks: "net-firewall-nft.yaml"
   when:
     - baseline_firewall_enabled
     - baseline_firewall_nft_enabled
     - not inventory_hostname.startswith("k8s-")
   ignore_errors: true  # noqa: ignore-errors
-  tags: [base, firewall]
+  tags: always
 
 - name: "Configure distro-based firewall"
   ansible.builtin.include_tasks: "firewall_rules_{{ ansible_os_family | lower }}.yml"
@@ -37,7 +37,7 @@
     - not baseline_firewall_nft_enabled
     - not inventory_hostname.startswith("k8s-")
   ignore_errors: true  # noqa: ignore-errors
-  tags: [base, firewall]
+  tags: always
 
 - name: Read the device tree model
   ansible.builtin.slurp:
@@ -58,7 +58,7 @@
   when:
     - ansible_system == "Linux"
     - not _baseline_is_raspberry_pi
-  tags: [base, logs, logging, journald, systemd]
+  tags: always
 
 - name: "Include role raspberry"
   ansible.builtin.include_role:
@@ -74,9 +74,9 @@
     - ansible_user != baseline_default_users_name
   tags: always
 
-- name: "Run tasks authorized_keys.yml"
-  ansible.builtin.include_tasks: authorized_keys.yml
-  tags: [base, authorized_keys, ssh]
+- name: "Run tasks ssh-authorized-keys.yml"
+  ansible.builtin.include_tasks: ssh-authorized-keys.yml
+  tags: always
 
 - name: "Run tasks mounts.yml"
   ansible.builtin.include_tasks: mounts.yml
@@ -84,18 +84,104 @@
   tags: always
 
 - name: "Run tasks signify.yaml"
-  ansible.builtin.include_tasks: signify.yml
-  tags: [base, base-signify, signify]
+  ansible.builtin.include_tasks: crypto-signify.yml
+  tags: always
 
-- name: "Run tasks pki.yml"
-  ansible.builtin.include_tasks: pki.yml
-  tags: [base, pki]
+- name: "Ensure public key directory exists"
+  ansible.builtin.file:
+    path: "{{ baseline_crypto_pubkey_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [bootstrap, base, crypto, age, gpg]
+
+- name: "Ensure private key directory exists"
+  ansible.builtin.file:
+    path: "{{ baseline_crypto_private_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [bootstrap, base, crypto, age, gpg]
+
+- name: "Run tasks crypto-pki.yml"
+  ansible.builtin.include_tasks: crypto-pki.yml
+  tags: always
+
+- name: Ensure public key directory exists
+  ansible.builtin.file:
+    path: "{{ baseline_crypto_pubkey_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [bootstrap, base, crypto, age, gpg]
+
+- name: Ensure local facts directory exists
+  ansible.builtin.file:
+    path: "{{ baseline_facts_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [bootstrap, base, crypto, age, gpg]
+
+# Exposes every file in baseline_pubkey_dir as
+# ansible_local.baseline_pubkeys.<filename>
+- name: Install baseline_pubkeys local fact
+  ansible.builtin.copy:
+    dest: "{{ baseline_facts_dir }}/baseline_pubkeys.fact"
+    owner: root
+    group: root
+    mode: "0755"
+    content: |
+      #!/bin/sh
+      # Managed by Ansible
+      dir={{ baseline_crypto_pubkey_dir }}
+      sep=
+      printf '{'
+      for f in "$dir"/*; do
+        [ -f "$f" ] || continue
+        printf '%s"%s":"%s"' "$sep" "${f##*/}" "$(tr -d '\n' < "$f")"
+        sep=,
+      done
+      printf '}\n'
+  tags: [bootstrap, base, crypto, age, gpg]
+
+- name: "Run tasks crypto-age.yml"
+  ansible.builtin.include_tasks: "crypto-age.yaml"
+  tags: always
+
+- name: "Run tasks crypto-gpg.yml"
+  ansible.builtin.include_tasks: "crypto-gpg.yaml"
+  tags: always
+
+# Writes {"host_age_keys": {host: key}, "host_gpg_keys": {host: key}}
+# for all hosts in the play that reported keys.
+- name: Write aggregated public key map on controller
+  ansible.builtin.copy:
+    dest: "{{ baseline_pubkey_harvest_file }}"
+    mode: "0644"
+    content: |
+      {%- set out = {'host_age_keys': {}, 'host_gpg_keys': {}} -%}
+      {%- for h in ansible_play_hosts -%}
+      {%-   set k = (hostvars[h].ansible_local | default({})).baseline_pubkeys | default({}) -%}
+      {%-   if k.age is defined %}{% set _ = out.host_age_keys.update({h: k.age}) %}{% endif -%}
+      {%-   if k.gpg is defined %}{% set _ = out.host_gpg_keys.update({h: k.gpg}) %}{% endif -%}
+      {%- endfor -%}
+      {{ out | to_nice_json }}
+  delegate_to: localhost
+  become: false
+  run_once: true
+  when: baseline_pubkey_harvest_file | default("") | length > 0
+  tags: always
 
 - name: "Run tasks wake_on_lan.yaml"
   ansible.builtin.include_tasks: wake_on_lan.yaml
   when: baseline_wol_enable
-  tags: [base, wol, wake-on-lan]
+  tags: always
 
-- name: "Run tasks dns.yaml"
-  ansible.builtin.include_tasks: dns.yaml
-  tags: [base, dns, resolv]
+- name: "Run tasks net-dns.yaml"
+  ansible.builtin.include_tasks: net-dns.yaml
+  tags: always

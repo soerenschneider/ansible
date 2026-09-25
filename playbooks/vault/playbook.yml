@@ -2,6 +2,8 @@
 - name: "Setup OpenBAO cluster"
   hosts: "openbao"
   become: true
+  vars:
+    baseline_pubkey_harvest_file: "{{ playbook_dir }}/../../pubkeys/host_keys.json"
   tasks:
     - name: "Print user info"
       ansible.builtin.debug:
@@ -45,7 +47,7 @@
         name: "openbao"
       tags: always
 
-    - name: Copy cert hook
+    - name: "Copy cert hook"
       ansible.builtin.template:
         src: "openbao-cert-hook.sh.j2"
         dest: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"

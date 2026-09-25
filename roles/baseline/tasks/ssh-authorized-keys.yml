@@ -10,12 +10,12 @@
           }) %}
       {% endfor %}
       {{ result }}
-  tags: [base, authorized_keys, ssh]
+  tags: [bootstrap, base, authorized_keys, ssh]
 
 - name: Add current user to authorized_keys_users
   ansible.builtin.set_fact:
     baseline_authorized_keys_users: "{{ authorized_keys_users | default([]) + ([ansible_user] if ansible_user is defined else []) | unique }}"
-  tags: [base, authorized_keys, ssh]
+  tags: [bootstrap, base, authorized_keys, ssh]
 
 - name: Build complete authorized keys list
   ansible.builtin.set_fact:
@@ -26,7 +26,7 @@
       {% for soft_key in baseline_soft_keys %}
       {{ soft_key.key_options | default('') }} {{ soft_key.pub }}
       {% endfor %}
-  tags: [base, authorized_keys, ssh]
+  tags: [bootstrap, base, authorized_keys, ssh]
 
 - name: Manage all SSH authorized keys exclusively
   ansible.posix.authorized_key:
@@ -35,7 +35,7 @@
     exclusive: true
     state: present
   loop: "{{ baseline_authorized_keys_users }}"
-  tags: [base, authorized_keys, ssh]
+  tags: [bootstrap, base, authorized_keys, ssh]
 
 - name: Add custom ssh keys
   ansible.posix.authorized_key:
@@ -45,4 +45,4 @@
     user: "{{ item.user }}"
   when: item.pub is defined and item.user is defined
   with_items: "{{ baseline_additional_authorized_keys }}"
-  tags: [base, authorized_keys, ssh]
+  tags: [bootstrap, base, authorized_keys, ssh]

@@ -1,7 +1,7 @@
 ---
 - name: Baseline firewall
   when: baseline_firewall_enabled | bool
-  tags: [baseline, firewall]
+  tags: [bootstrap, base, firewall]
   block:
     - name: Baseline firewall resolve nftables config path
       ansible.builtin.set_fact:

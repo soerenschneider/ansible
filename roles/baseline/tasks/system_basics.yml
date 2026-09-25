@@ -7,7 +7,7 @@
     state: present
     validate: visudo -cf %s
   when: ansible_os_family | lower == "redhat"
-  tags: [base, sudo]
+  tags: [bootstrap, base, sudo]
 
 - name: "Set PATH for cron"
   ansible.builtin.cron:
@@ -15,11 +15,11 @@
     env: true
     job: /sbin:/bin:/usr/sbin:/usr/bin:/usr/local/bin:/usr/local/sbin
   when: ansible_os_family | lower == "redhat"
-  tags: [base, sudo]
+  tags: [bootstrap, base, sudo]
 
 - name: "Set hostname (Linux)"
   when: [ansible_system != "OpenBSD", not inventory_hostname | ansible.utils.ipaddr('bool')]
-  tags: [base, hostname]
+  tags: [bootstrap, base, hostname]
   block:
     - name: Set full hostname
       ansible.builtin.hostname:
@@ -36,7 +36,7 @@
 
 - name: "Install dbus (Debian)"
   when: ansible_os_family == "Debian"
-  tags: [base, hostname]
+  tags: [bootstrap, base, hostname]
   block:
     - name: Make sure 'dbus' is installed and started
       ansible.builtin.package:
@@ -49,11 +49,11 @@
 - name: Set timezone
   community.general.timezone:
     name: "{{ baseline_timezone | default('UTC') }}"
-  tags: [base, timezone]
+  tags: [bootstrap, base, timezone]
 
 - name: "Install chronyd (RHEL)"
   when: ansible_os_family | lower == "redhat"
-  tags: [base, base-ntp]
+  tags: [bootstrap, base, base-ntp]
   block:
     - name: Install chronyd
       ansible.builtin.dnf:
@@ -72,4 +72,4 @@
     mode: "0640"
   with_items: [/root/.bashrc, "{{ ansible_env.HOME }}/.bashrc"]
   when: ansible_system == "Linux"
-  tags: [base]
+  tags: [bootstrap, base]

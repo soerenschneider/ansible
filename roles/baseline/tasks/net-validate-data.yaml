@@ -42,7 +42,7 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ out | to_json }}
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Flatten hosts into a checkable list
   ansible.builtin.set_fact:
@@ -70,13 +70,13 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ out | to_json }}
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Decode the flattened lists
   ansible.builtin.set_fact:
     baseline_net_pools_flat: "{{ _baseline_net_pools_json | from_json }}"
     baseline_net_hosts_flat: "{{ _baseline_net_hosts_json | from_json }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 # ---------------------------------------------------------------------------
 # Pool-level checks
@@ -98,7 +98,7 @@
   loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Pool CIDR is prefix-aligned
   ansible.builtin.assert:
@@ -113,7 +113,7 @@
   loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Pool sits inside its device network
   ansible.builtin.assert:
@@ -129,7 +129,7 @@
   loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Find overlapping pools within a device
   ansible.builtin.set_fact:
@@ -145,12 +145,12 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ out | to_json }}
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Decode the overlap list
   ansible.builtin.set_fact:
     _baseline_net_pool_overlaps: "{{ _baseline_net_pool_overlaps_json | from_json }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Pools within a device do not overlap
   ansible.builtin.assert:
@@ -162,7 +162,7 @@
         - {{ o }}
       {% endfor %}
     quiet: true
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 # ---------------------------------------------------------------------------
 # Host-level checks
@@ -180,7 +180,7 @@
   loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 # A /32 is a single host and a /31 is a point-to-point pair (RFC 3021):
 # both use every address, so the network/broadcast exclusion applies only
@@ -196,7 +196,7 @@
   loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Host address is not a pool's network or broadcast address
   ansible.builtin.assert:
@@ -212,7 +212,7 @@
   loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Static host address does not collide with the DHCP scope
   ansible.builtin.assert:
@@ -230,7 +230,7 @@
   loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: MAC addresses are well formed and lowercase
   ansible.builtin.assert:
@@ -244,7 +244,7 @@
   loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 # ---------------------------------------------------------------------------
 # Uniqueness
@@ -260,7 +260,7 @@
       {{ baseline_net_hosts_flat | map(attribute='site')
          | zip(baseline_net_hosts_flat | map(attribute='name'))
          | map('join', ' ') | list }}
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Addresses are unique within a site
   ansible.builtin.assert:
@@ -272,7 +272,7 @@
         - {{ k }} ({{ _baseline_net_site_ips.count(k) }}x)
       {% endfor %}
     quiet: true
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Hostnames are unique within a site
   ansible.builtin.assert:
@@ -284,7 +284,7 @@
         - {{ k }} ({{ _baseline_net_site_names.count(k) }}x)
       {% endfor %}
     quiet: true
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 # A floating device (laptop, phone) legitimately has the same MAC in every
 # site it visits. Two rules instead of one global uniqueness check:
@@ -312,12 +312,12 @@
       {{- undeclared.append(mac ~ ' in ' ~ sites | sort | join(', ')) or '' -}}
       {%- endfor -%}
       {{ {'same_site': same_site, 'undeclared': undeclared} | to_json }}
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Decode the MAC report
   ansible.builtin.set_fact:
     _baseline_net_mac_report: "{{ _baseline_net_mac_report_json | from_json }}"
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: MAC addresses are unique within a site
   ansible.builtin.assert:
@@ -330,7 +330,7 @@
         - {{ d }}
       {% endfor %}
     quiet: true
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: MAC addresses shared between sites are declared floating
   ansible.builtin.assert:
@@ -344,7 +344,7 @@
         - {{ d }}
       {% endfor %}
     quiet: true
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]
 
 - name: Summarise
   ansible.builtin.debug:
@@ -352,4 +352,4 @@
       networks OK: {{ networks | length }} sites,
       {{ baseline_net_pools_flat | length }} pools,
       {{ baseline_net_hosts_flat | length }} hosts.
-  tags: [always, firewall, baseline]
+  tags: [always, bootstrap, base, firewall]

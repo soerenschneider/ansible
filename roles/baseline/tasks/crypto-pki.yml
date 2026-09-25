@@ -6,4 +6,4 @@
     owner: root
     group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
     mode: "0644"
-  tags: [base, pki]
+  tags: [bootstrap, base, pki]

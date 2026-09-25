@@ -1,0 +1,120 @@
+---
+- name: Validate GPG key algorithm
+  ansible.builtin.assert:
+    that: baseline_gpg_key_algo in ['rsa4096', 'ed25519']
+    fail_msg: "baseline_gpg_key_algo must be 'rsa4096' or 'ed25519', got '{{ baseline_gpg_key_algo }}'"
+    quiet: true
+  tags: [bootstrap, base, crypto, gpg]
+
+- name: Install GnuPG
+  ansible.builtin.package:
+    name: gnupg
+    state: present
+  tags: [bootstrap, base, crypto, gpg]
+
+- name: Remove existing GPG host key (forced regeneration)
+  tags: [bootstrap, base, crypto, gpg]
+  when: baseline_gpg_force_keygen | bool
+  block:
+    - name: Stop gpg-agent for the host keyring
+      ansible.builtin.command:
+        argv: [gpgconf, --homedir, "{{ baseline_gpg_home }}", --kill, gpg-agent]
+      changed_when: false
+      failed_when: false
+
+    - name: Remove GnuPG home
+      ansible.builtin.file:
+        path: "{{ baseline_gpg_home }}"
+        state: absent
+
+- name: Ensure GnuPG home exists
+  ansible.builtin.file:
+    path: "{{ baseline_gpg_home }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [bootstrap, base, crypto, gpg]
+
+- name: Check for existing GPG host key
+  ansible.builtin.command:
+    argv: [gpg, --homedir, "{{ baseline_gpg_home }}", --batch, --with-colons,
+           --list-secret-keys, "{{ baseline_gpg_uid }}"]
+  register: baseline_gpg_existing
+  changed_when: false
+  failed_when: baseline_gpg_existing.rc not in [0, 2]
+  check_mode: false
+  tags: [bootstrap, base, crypto, gpg]
+
+- name: Generate GPG host key if missing
+  ansible.builtin.command:
+    argv: [gpg, --homedir, "{{ baseline_gpg_home }}", --batch, --generate-key]
+    stdin: |
+      {% if baseline_gpg_key_algo == 'ed25519' %}
+      Key-Type: EDDSA
+      Key-Curve: ed25519
+      Key-Usage: sign
+      Subkey-Type: ECDH
+      Subkey-Curve: cv25519
+      Subkey-Usage: encrypt
+      {% else %}
+      Key-Type: RSA
+      Key-Length: 4096
+      Key-Usage: sign
+      Subkey-Type: RSA
+      Subkey-Length: 4096
+      Subkey-Usage: encrypt
+      {% endif %}
+      Name-Real: {{ baseline_gpg_uid }}
+      Name-Email: root@{{ baseline_gpg_uid }}
+      Expire-Date: 0
+      %no-protection
+      %commit
+  register: baseline_gpg_keygen
+  when: baseline_gpg_existing.rc != 0
+  changed_when: true
+  tags: [bootstrap, base, crypto, gpg]
+
+- name: Publish GPG public key
+  tags: [bootstrap, base, crypto, gpg]
+  when: not (ansible_check_mode and baseline_gpg_keygen is changed)
+  block:
+    - name: Read GPG key fingerprint
+      ansible.builtin.command:
+        argv: [gpg, --homedir, "{{ baseline_gpg_home }}", --batch, --with-colons,
+               --list-secret-keys, "{{ baseline_gpg_uid }}"]
+      register: baseline_gpg_list
+      changed_when: false
+      check_mode: false
+
+    - name: Register GPG fingerprint as fact
+      ansible.builtin.set_fact:
+        baseline_gpg_fingerprint: >-
+          {{ (baseline_gpg_list.stdout_lines | select('match', '^fpr:') | first).split(':')[9] }}
+
+    - name: Export GPG public key as base64
+      ansible.builtin.shell:
+        cmd: >-
+          set -o pipefail &&
+          gpg --homedir {{ baseline_gpg_home }} --batch --export {{ baseline_gpg_fingerprint }}
+          | base64 -w0
+        executable: /bin/bash
+      register: baseline_gpg_pubkey_cmd
+      changed_when: false
+      check_mode: false
+
+    - name: Write GPG public key to common directory
+      ansible.builtin.copy:
+        dest: "{{ baseline_pubkey_dir }}/gpg"
+        content: "{{ baseline_gpg_pubkey_cmd.stdout }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Write GPG fingerprint to common directory
+      ansible.builtin.copy:
+        dest: "{{ baseline_pubkey_dir }}/gpg_fingerprint"
+        content: "{{ baseline_gpg_fingerprint }}\n"
+        owner: root
+        group: root
+        mode: "0644"

@@ -1,0 +1,78 @@
+---
+- name: Install age
+  ansible.builtin.package:
+    name: age
+    state: present
+  tags: [bootstrap, base, crypto, age]
+
+- name: Ensure age-keygen binary is present
+  ansible.builtin.stat:
+    path: "{{ baseline_age_bin }}"
+  register: baseline_age_bin_stat
+  tags: [bootstrap, base, crypto, age]
+
+- name: Fail if age-keygen is not installed
+  ansible.builtin.fail:
+    msg: "age-keygen binary not found at {{ baseline_age_bin }}"
+  when: not baseline_age_bin_stat.stat.exists
+  tags: [bootstrap, base, crypto, age]
+
+- name: Ensure age key directory exists
+  ansible.builtin.file:
+    path: "{{ baseline_age_key_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  tags: [bootstrap, base, crypto, age]
+
+- name: Remove existing age key (forced regeneration)
+  ansible.builtin.file:
+    path: "{{ baseline_age_key_path }}"
+    state: absent
+  when: baseline_age_force_keygen | bool
+  tags: [bootstrap, base, crypto, age]
+
+- name: Generate age key if missing
+  ansible.builtin.command:
+    argv: ["{{ baseline_age_bin }}", -o, "{{ baseline_age_key_path }}"]
+    creates: "{{ baseline_age_key_path }}"
+  register: baseline_age_keygen
+  no_log: true
+  tags: [bootstrap, base, crypto, age]
+
+- name: Set permissions on age key
+  ansible.builtin.file:
+    path: "{{ baseline_age_key_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: not (ansible_check_mode and baseline_age_keygen is changed)
+  tags: [bootstrap, base, crypto, age]
+
+- name: Publish age public key
+  tags: [bootstrap, base, crypto, age]
+  when: not (ansible_check_mode and baseline_age_keygen is changed)
+  block:
+    - name: Read age public key
+      ansible.builtin.command:
+        argv: ["{{ baseline_age_bin }}", -y, "{{ baseline_age_key_path }}"]
+      register: baseline_age_pubkey_cmd
+      changed_when: false
+      check_mode: false
+
+    - name: Register age public key as fact
+      ansible.builtin.set_fact:
+        baseline_age_public_key: "{{ baseline_age_pubkey_cmd.stdout }}"
+
+    - name: Write age public key to common directory
+      ansible.builtin.copy:
+        dest: "{{ baseline_pubkey_dir }}/age"
+        content: "{{ baseline_age_public_key }}\n"
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Print age public key
+      ansible.builtin.debug:
+        msg: "age public key for {{ inventory_hostname }}: {{ baseline_age_public_key }}"

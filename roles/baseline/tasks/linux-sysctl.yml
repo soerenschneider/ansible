@@ -6,7 +6,7 @@
     sysctl_file: "/etc/sysctl.d/90-baseline.conf"
     sysctl_set: true
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience, sysctl]
+  tags: [bootstrap, base, resilience, sysctl]
 
 - name: "Set tcp congestion algorithm"
   ansible.posix.sysctl:
@@ -15,7 +15,7 @@
     sysctl_file: "/etc/sysctl.d/90-baseline.conf"
     sysctl_set: true
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience, sysctl]
+  tags: [bootstrap, base, resilience, sysctl]
 
 - name: "Set tcp congestion algorithm"
   ansible.posix.sysctl:
@@ -23,7 +23,7 @@
     value: "{{ baseline_linux_sysctl_net_qdisc }}"
     sysctl_file: "/etc/sysctl.d/90-baseline.conf"
   when: [ansible_system == "Linux"]
-  tags: [base, base-resilience, sysctl]
+  tags: [bootstrap, base, resilience, sysctl]
 
 - name: Baseline firewall ICMP hardening
   ansible.posix.sysctl:
