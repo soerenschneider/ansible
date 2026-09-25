@@ -10,6 +10,8 @@
 # connections, and no outbound IPv6 to the LAN.
 # ============================================================================
 {% set _rules = baseline_firewall_base_rules + baseline_firewall_rules %}
+{% set icmp_echo_rate = baseline_firewall_icmp_echo_rate_limit | default('', true) | string | trim %}
+{% set icmp_echo_rate = '' if icmp_echo_rate == 'none' else icmp_echo_rate %}
 {% macro rate_of(rule) -%}
 {%- set r = (rule.rate_limit if 'rate_limit' in rule else baseline_firewall_rate_limit) | default('', true) | string | trim -%}
 {%- if r not in ['', 'none'] -%}
@@ -30,6 +32,16 @@ table inet baseline_firewall {
     flags interval
     elements = { {{ (['fc00::/7'] + baseline_firewall_lan_ipv6_prefixes) | unique | join(', ') }} }
   }
+{% if icmp_echo_rate %}
+
+  # Per-source-IP state for the ping limit.
+  set icmp_echo_rl {
+    type ipv4_addr
+    size {{ baseline_firewall_rate_limit_table_size | int }}
+    flags dynamic, timeout
+    timeout 1m
+  }
+{% endif %}
 {% for rule in _rules %}
 {%   set rate = rate_of(rule) %}
 {%   if rate %}
@@ -53,7 +65,16 @@ table inet baseline_firewall {
     ct state invalid drop
     iif "lo" accept
 
-    ip protocol icmp accept
+    # ICMPv4: error messages, plus ping with a per-source-IP limit.
+    # Errors about this host's own connections are already accepted above
+    # as ct state related.
+    icmp type { destination-unreachable, time-exceeded, parameter-problem } accept
+{% if icmp_echo_rate %}
+    icmp type echo-request update @icmp_echo_rl { ip saddr limit rate {{ icmp_echo_rate }} burst {{ baseline_firewall_icmp_echo_rate_burst | int }} packets } accept comment "ping"
+    icmp type echo-request counter drop comment "ping: rate limited"
+{% else %}
+    icmp type echo-request accept comment "ping"
+{% endif %}
     # Only the ICMPv6 needed to keep outbound IPv6 working (neighbour
     # discovery, SLAAC, path MTU); no echo, so hosts don't answer ping6.
     icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-query } accept
@@ -67,7 +88,11 @@ table inet baseline_firewall {
 {%   set l4 = (proto ~ ' dport') if proto != 'any' else 'meta l4proto { tcp, udp } th dport' %}
 {%   set match = l4 ~ ' { ' ~ ports ~ ' }' %}
 {%   set rate = rate_of(rule) %}
-{%   set burst = rule.rate_burst | default(baseline_firewall_rate_burst) | int %}
+{%   set burst_raw = rule.rate_burst | default(baseline_firewall_rate_burst) | string | trim %}
+{%   if burst_raw is not match('^[0-9]+$') %}
+{{     __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': invalid rate_burst '" ~ burst_raw ~ "', expected a whole number") }}
+{%   endif %}
+{%   set burst = burst_raw | int %}
 {%   set skipped = false %}
 {%   if 'from' not in rule or rule['from'] == 'any' %}
 {%     set src_match = 'meta nfproto ipv4' %}

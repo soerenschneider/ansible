@@ -18,6 +18,23 @@
           Set baseline_firewall_nftables_conf, or gather facts.
         quiet: true
 
+    - name: Baseline firewall check rate limit settings
+      ansible.builtin.assert:
+        that:
+          - >-
+            (baseline_firewall_rate_limit | default('', true) | string | trim) in ['', 'none']
+            or (baseline_firewall_rate_limit | string | trim) is match('^[0-9]+/(second|minute|hour|day)$')
+          - (baseline_firewall_rate_burst | string) is match('^[0-9]+$')
+          - (baseline_firewall_rate_limit_table_size | string) is match('^[1-9][0-9]*$')
+        fail_msg: >-
+          Invalid rate limit settings: baseline_firewall_rate_limit must be ""
+          or like "20/minute" (second|minute|hour|day), got
+          '{{ baseline_firewall_rate_limit }}'; baseline_firewall_rate_burst must
+          be a whole number >= 0, got '{{ baseline_firewall_rate_burst }}';
+          baseline_firewall_rate_limit_table_size must be a whole number > 0,
+          got '{{ baseline_firewall_rate_limit_table_size }}'.
+        quiet: true
+
     - name: Baseline firewall install nftables
       ansible.builtin.package:
         name: nftables

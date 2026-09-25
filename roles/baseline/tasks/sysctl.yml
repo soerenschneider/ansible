@@ -22,7 +22,25 @@
     name: "net.core.default_qdisc"
     value: "{{ baseline_linux_sysctl_net_qdisc }}"
     sysctl_file: "/etc/sysctl.d/90-baseline.conf"
-    sysctl_set: true
-    reload: true
   when: [ansible_system == "Linux"]
   tags: [base, base-resilience, sysctl]
+
+- name: Baseline firewall ICMP hardening
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: "/etc/sysctl.d/60-baseline-icmp.conf"
+    sysctl_set: true
+    reload: true
+  loop: "{{ baseline_firewall_icmp_sysctls | dict2items }}"
+  vars:
+    baseline_firewall_icmp_sysctls:
+      net.ipv4.conf.all.accept_redirects: 0
+      net.ipv4.conf.default.accept_redirects: 0
+      net.ipv4.conf.all.send_redirects: 0
+      net.ipv4.conf.default.send_redirects: 0
+      net.ipv6.conf.all.accept_redirects: 0
+      net.ipv6.conf.default.accept_redirects: 0
+      net.ipv4.icmp_echo_ignore_broadcasts: 1
+  when: [ansible_system == "Linux"]
+  tags: [base, base-resilience, sysctl, firewall]

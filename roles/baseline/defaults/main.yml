@@ -52,7 +52,19 @@ baseline_firewall_base_rules:
 #              omitted or "any" -> open to everyone
 #              empty list       -> rule is skipped (never opened to everyone)
 #     comment: optional, shown in `nft list ruleset`
+#     rate_limit: optional, new connections per source IP, e.g. "20/minute"
+#                 (second|minute|hour|day). "none" turns the default off.
+#     rate_burst: optional, extra connections allowed in a short spike
 baseline_firewall_rules: []
+
+# Default per-source-IP limit on new connections for every rule without its
+# own rate_limit. "" = no limit. Established connections are never limited.
+baseline_firewall_rate_limit: ""
+baseline_firewall_rate_burst: 10
+# Max. source addresses tracked per rate-limited rule; once full, new
+# addresses are not admitted until old ones expire.
+baseline_firewall_rate_limit_table_size: 65535
+
 
 # Global IPv6 prefixes used inside LAN, e.g. ["2001:db8:1234::/48"].
 # Outbound IPv6 to these, and to fc00::/7 (always included), is rejected.
