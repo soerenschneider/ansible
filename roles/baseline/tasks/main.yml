@@ -16,9 +16,21 @@
   when: ansible_system == "Linux"
   tags: [base, base-packages]
 
-- name: "Run tasks firewall_rules"
-  ansible.builtin.include_tasks: firewall_rules_{{ ansible_os_family | lower }}.yml
-  when: [not inventory_hostname.startswith("k8s-"), ufw_enabled | default(true)]
+- name: "Configure NFT based firewall"
+  ansible.builtin.include_tasks: "firewall_rules_nft.yaml"
+  when:
+    - baseline_firewall_enabled
+    - baseline_firewall_nft_enabled
+    - not inventory_hostname.startswith("k8s-")
+  ignore_errors: true  # noqa: ignore-errors
+  tags: [base, firewall]
+
+- name: "Configure distro-based firewall"
+  ansible.builtin.include_tasks: "firewall_rules_{{ ansible_os_family | lower }}.yml"
+  when:
+    - baseline_firewall_enabled
+    - not baseline_firewall_nft_enabled
+    - not inventory_hostname.startswith("k8s-")
   ignore_errors: true  # noqa: ignore-errors
   tags: [base, firewall]
 

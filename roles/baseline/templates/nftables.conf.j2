@@ -1,0 +1,105 @@
+#!/usr/sbin/nft -f
+# ============================================================================
+# Managed by Ansible — do not edit by hand. Changes will be overwritten.
+# Node: {{ inventory_hostname }}
+#
+# Only this table is replaced on reload; tables owned by other tools
+# (Docker, libvirt, fail2ban) are left alone.
+#
+# IPv6 is for reaching internet services only: no new inbound IPv6
+# connections, and no outbound IPv6 to the LAN.
+# ============================================================================
+{% set _rules = baseline_firewall_base_rules + baseline_firewall_rules %}
+{% macro rate_of(rule) -%}
+{%- set r = (rule.rate_limit if 'rate_limit' in rule else baseline_firewall_rate_limit) | default('', true) | string | trim -%}
+{%- if r not in ['', 'none'] -%}
+{%-   if r is not match('^[0-9]+/(second|minute|hour|day)$') -%}
+{{-     __baseline_firewall_fail | mandatory("baseline_firewall: invalid rate_limit '" ~ r ~ "', expected e.g. '20/minute'") -}}
+{%-   endif -%}
+{{- r -}}
+{%- endif -%}
+{%- endmacro %}
+table inet baseline_firewall
+delete table inet baseline_firewall
+
+table inet baseline_firewall {
+  # IPv6 ranges that belong to the LAN: unique local addresses (fc00::/7)
+  # plus any global prefixes from baseline_firewall_lan_ipv6_prefixes.
+  set lan_ipv6 {
+    type ipv6_addr
+    flags interval
+    elements = { {{ (['fc00::/7'] + baseline_firewall_lan_ipv6_prefixes) | unique | join(', ') }} }
+  }
+{% for rule in _rules %}
+{%   set rate = rate_of(rule) %}
+{%   if rate %}
+
+  # Per-source-IP state for rule "{{ rule.comment | default(loop.index) }}". Entries expire
+  # once an address has been quiet for the timeout.
+  set rl_{{ loop.index }} {
+    type ipv4_addr
+    size {{ baseline_firewall_rate_limit_table_size | int }}
+    flags dynamic, timeout
+    timeout {{ {'second': '1m', 'minute': '10m', 'hour': '2h', 'day': '2d'}[rate.split('/')[1]] }}
+  }
+{%   endif %}
+{% endfor %}
+
+  chain input {
+    type filter hook input priority filter; policy drop;
+
+    # Also admits replies to outbound connections, IPv4 and IPv6.
+    ct state established,related accept
+    ct state invalid drop
+    iif "lo" accept
+
+    ip protocol icmp accept
+    # Only the ICMPv6 needed to keep outbound IPv6 working (neighbour
+    # discovery, SLAAC, path MTU); no echo, so hosts don't answer ping6.
+    icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-query } accept
+{% for rule in _rules %}
+{%   set proto = rule.proto | default('tcp') %}
+{%   set ports = [rule.ports] | flatten | map('string') | map('replace', ':', '-') | unique | join(', ') %}
+{%   set label = rule.comment | default(proto ~ '/' ~ ports | replace(' ', '')) | replace('"', "'") %}
+{%   if proto not in ['tcp', 'udp', 'any'] %}
+{{     __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': invalid proto '" ~ proto ~ "'") }}
+{%   endif %}
+{%   set l4 = (proto ~ ' dport') if proto != 'any' else 'meta l4proto { tcp, udp } th dport' %}
+{%   set match = l4 ~ ' { ' ~ ports ~ ' }' %}
+{%   set rate = rate_of(rule) %}
+{%   set burst = rule.rate_burst | default(baseline_firewall_rate_burst) | int %}
+{%   set skipped = false %}
+{%   if 'from' not in rule or rule['from'] == 'any' %}
+{%     set src_match = 'meta nfproto ipv4' %}
+{%   else %}
+{%     set src = [rule['from']] | flatten | map('string') | map('trim') | select | unique | list %}
+{%     set v4 = src | reject('search', ':') | list %}
+{%     set v6 = src | select('search', ':') | list %}
+{%     if v6 %}
+{{       __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': IPv6 sources " ~ (v6 | join(', ')) ~ " are not allowed; inbound is IPv4 only") }}
+{%     endif %}
+{%     set src_match = 'ip saddr { ' ~ (v4 | join(', ')) ~ ' }' %}
+{%     set skipped = v4 | length == 0 %}
+{%   endif %}
+
+{%   if skipped %}
+    # SKIPPED {{ label }}: 'from' is empty
+{%   elif rate %}
+    # {{ label }}: at most {{ rate }} new connections per source IP, burst {{ burst }}
+    {{ src_match }} {{ match }} update @rl_{{ loop.index }} { ip saddr limit rate {{ rate }} burst {{ burst }} packets } accept comment "{{ label }}"
+    {{ src_match }} {{ match }} counter drop comment "{{ label }}: rate limited"
+{%   else %}
+    {{ src_match }} {{ match }} accept comment "{{ label }}"
+{%   endif %}
+{% endfor %}
+  }
+
+  chain output {
+    type filter hook output priority filter; policy accept;
+
+    # No new IPv6 connections into the LAN. Reject rather than drop, so
+    # clients fall back to IPv4 immediately instead of timing out.
+    ip6 daddr @lan_ipv6 ct state new meta l4proto tcp reject with tcp reset
+    ip6 daddr @lan_ipv6 ct state new meta l4proto udp reject
+  }
+}

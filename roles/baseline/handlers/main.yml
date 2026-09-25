@@ -1,17 +1,22 @@
 ---
-- name: Restart chrony
+- name: "Restart chrony"
   ansible.builtin.systemd:
-    name: chronyd
-    state: restarted
+    name: "chronyd"
+    state: "restarted"
 
 - name: "Restart journald"
   ansible.builtin.systemd:
     name: "systemd-journald"
     state: "restarted"
 
+- name: "Firewall reload nftables"
+  ansible.builtin.systemd_service:
+    name: "nftables"
+    state: "reloaded"
+
 - name: "Remount filesystems"
   ansible.posix.mount:
     path: "{{ item }}"
-    state: remounted
+    state: "remounted"
   with_items: "{{ ansible_mounts | selectattr('fstype', 'match', '^(ext[234]|xfs|btrfs)$') | map(attribute='mount') | list }}"
   listen: "remount filesystems"

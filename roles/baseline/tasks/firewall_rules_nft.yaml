@@ -1,0 +1,73 @@
+---
+- name: Baseline firewall
+  when: baseline_firewall_enabled | bool
+  tags: [baseline, firewall]
+  block:
+    - name: Baseline firewall resolve nftables config path
+      ansible.builtin.set_fact:
+        baseline_firewall_nftables_conf_path: >-
+          {{ baseline_firewall_nftables_conf
+             or baseline_firewall_nftables_conf_by_os_family.get(ansible_facts.os_family, '') }}
+
+    - name: Baseline firewall check nftables config path
+      ansible.builtin.assert:
+        that: baseline_firewall_nftables_conf_path | length > 0
+        fail_msg: >-
+          No nftables config path known for os_family
+          '{{ ansible_facts.os_family | default('undefined') }}'.
+          Set baseline_firewall_nftables_conf, or gather facts.
+        quiet: true
+
+    - name: Baseline firewall install nftables
+      ansible.builtin.package:
+        name: nftables
+        state: present
+
+    - name: Baseline firewall template nftables ruleset
+      ansible.builtin.template:
+        src: nftables.conf.j2
+        dest: "{{ baseline_firewall_nftables_conf_path }}"
+        owner: root
+        group: root
+        mode: "0640"
+        validate: "nft -c -f %s"
+      notify: Firewall reload nftables
+
+    - name: Baseline firewall enable and start nftables
+      ansible.builtin.systemd_service:
+        name: nftables
+        enabled: true
+        state: started
+
+    # Apply now rather than at the end of the play, so ufw/firewalld below
+    # are only turned off once the new ruleset is active.
+    - name: Baseline firewall apply nftables ruleset
+      ansible.builtin.meta: flush_handlers
+
+    - name: Baseline firewall gather package facts
+      ansible.builtin.package_facts:
+      when: baseline_firewall_disable_ufw | bool or baseline_firewall_disable_firewalld | bool
+
+    - name: Baseline firewall check ufw status
+      ansible.builtin.command: ufw status
+      register: baseline_firewall_ufw_status
+      changed_when: false
+      when:
+        - baseline_firewall_disable_ufw | bool
+        - "'ufw' in ansible_facts.packages"
+
+    - name: Baseline firewall disable ufw
+      ansible.builtin.command: ufw --force disable
+      changed_when: true
+      when:
+        - baseline_firewall_ufw_status is not skipped
+        - "'Status: active' in baseline_firewall_ufw_status.stdout"
+
+    - name: Baseline firewall stop and disable firewalld
+      ansible.builtin.systemd_service:
+        name: firewalld
+        state: stopped
+        enabled: false
+      when:
+        - baseline_firewall_disable_firewalld | bool
+        - "'firewalld' in ansible_facts.packages"

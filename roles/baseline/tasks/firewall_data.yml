@@ -294,6 +294,98 @@
     fw_nets: "{{ (_fw_prefixes_json | from_json).nets }}"
   tags: [firewall, base]
 
+# ---------------------------------------------------------------------------
+# Every network this estate owns, from both the segments and the meshes.
+#
+#   network_segments_merged          fewest prefixes covering everything
+#   network_segments                 exact per-segment prefixes, address-sorted
+#   network_segments_by_dc           per datacenter, including `wg`
+#   network_segments_trusted_merged  ...with the untrusted segments removed
+#   network_segments_trusted         ditto, unmerged
+#
+# A segment is untrusted when it sets `trusted: false`, or when its name is
+# in `firewall_untrusted_segments` (default: guest). Set the flag
+# explicitly where the name does not give it away.
+#
+# This is segment-level. A site whose untrusted hosts live in a POOL of a
+# trusted segment -- ez, where the work devices sit in 192.168.2.4/30 inside
+# the default /24 -- cannot be expressed as a prefix list: removing a pool
+# from the middle of a segment is a subtraction, not a filter. Those need
+# a tag (fw_tags_*_device_soeren_work) or the pool variable itself.
+#
+# `network_segments_merged` is the one to reach for: an nft set, a route
+# table, WireGuard AllowedIPs. It covers exactly what exists and no more --
+# unlike a hand-written supernet, where 192.168.64.0/21 silently reserves
+# .64-.71 for a site that uses .64-.70, and 192.168.2.0/21 was not even a
+# valid prefix (it normalises to 192.168.0.0/21).
+#
+# Add a VLAN and the merged list follows on the next run.
+# ---------------------------------------------------------------------------
+
+- name: Collect every network
+  ansible.builtin.set_fact:
+    _fw_segments_json: >-
+      {%- set untrusted_names = firewall_untrusted_segments | default(['guest']) -%}
+      {#- Which segments are untrusted: an explicit `trusted: false` on the
+          device, else a name match. -#}
+      {%- set untrusted = [] -%}
+      {%- for dc, net in (networks | default({})).items() -%}
+      {%- for dev in net.devices | default([]) -%}
+      {%- set seg = dev.name | default(dev.device) | default('unnamed') -%}
+      {%- if dev.address is defined -%}
+      {%- if dev.trusted is defined -%}
+      {%- if not dev.trusted -%}
+      {{- untrusted.append(dc ~ '/' ~ seg) or '' -}}
+      {%- endif -%}
+      {%- elif seg in untrusted_names -%}
+      {{- untrusted.append(dc ~ '/' ~ seg) or '' -}}
+      {%- endif -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- set by_dc = {} -%}
+      {%- set flat = [] -%}
+      {%- set trusted_flat = [] -%}
+      {%- for dc, segs in fw_nets.items() -%}
+      {{- by_dc.update({dc: segs.values() | unique | list}) or '' -}}
+      {%- for seg, cidr in segs.items() -%}
+      {{- flat.append(cidr) or '' -}}
+      {%- if (dc ~ '/' ~ seg) not in untrusted -%}
+      {{- trusted_flat.append(cidr) or '' -}}
+      {%- endif -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {#- address order, not string order: 192.168.2.0/24 belongs before
+          192.168.100.0/24, which a plain sort gets wrong. -#}
+      {%- set result = {} -%}
+      {%- for label, source in [['all', flat], ['trusted', trusted_flat]] -%}
+      {%- set keyed = [] -%}
+      {%- for c in source | unique -%}
+      {%- set o = c.split('/')[0].split('.') -%}
+      {{- keyed.append('%03d.%03d.%03d.%03d/%02d|%s' | format(
+            o[0] | int, o[1] | int, o[2] | int, o[3] | int,
+            c.split('/')[1] | int, c)) or '' -}}
+      {%- endfor -%}
+      {%- set ordered = [] -%}
+      {%- for k in keyed | sort -%}
+      {{- ordered.append(k.split('|')[1]) or '' -}}
+      {%- endfor -%}
+      {{- result.update({label: ordered}) or '' -}}
+      {%- endfor -%}
+      {{- result.update({'by_dc': by_dc, 'untrusted': untrusted | sort}) or '' -}}
+      {{ result | to_json }}
+  tags: [firewall, base]
+
+- name: Publish the network lists
+  ansible.builtin.set_fact:
+    network_segments_merged: "{{ (_fw_segments_json | from_json).all | ansible.utils.cidr_merge }}"
+    network_segments: "{{ (_fw_segments_json | from_json).all }}"
+    network_segments_by_dc: "{{ (_fw_segments_json | from_json).by_dc }}"
+    network_segments_trusted_merged: "{{ (_fw_segments_json | from_json).trusted | ansible.utils.cidr_merge }}"
+    network_segments_trusted: "{{ (_fw_segments_json | from_json).trusted }}"
+    network_segments_untrusted_names: "{{ (_fw_segments_json | from_json).untrusted }}"
+  tags: [firewall, base]
+
 - name: Narrow the tag map to this datacenter
   ansible.builtin.set_fact:
     fw_tags_local: "{{ fw_tags_by_dc.get(fw_datacenter | default(''), {}) }}"
