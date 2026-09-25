@@ -14,6 +14,8 @@
 #
 #   - ansible.builtin.include_tasks: fw_facts.yaml
 #
+# run_once is set inside this file, so include_tasks and import_tasks both work.
+#
 # Produces, as dicts:
 #
 #   baseline_fw_tags_by_dc[<dc>][<tag>]     addresses with that tag, per datacenter
@@ -60,8 +62,8 @@
 # is what makes baseline_fw_pools_wg_<mesh>_clients and
 # baseline_fw_tags_wg_humans useful for "anything arriving over the tunnel".
 #
-# This requires `wireguard_networks` to be in scope for the host being
-# configured, not just for the routers.
+# This requires `wireguard_networks` to be in scope for every host, not
+# just for the routers -- the fingerprint check below enforces it.
 #
 # Names are sanitised to [a-z0-9_].
 #
@@ -78,33 +80,60 @@
 # a tag deliberately before any host carries it, list it in
 # `firewall_declared_tags`.
 #
+# Two halves. The SHARED half is identical for every host -- the closure,
+# the tag/pool/segment maps, the network lists and every per-datacenter and
+# global flat variable -- so it runs once (`run_once: true`) and Ansible hands
+# the resulting facts to every host in the play (or in each `serial` batch).
+# The PER-HOST half resolves this host's datacenter and publishes only the
+# `local` views. With many hosts that is the difference between publishing
+# every flat variable once per host and publishing it once.
+#
+# run_once builds the shared facts from the FIRST host's view of the input
+# (networks, wireguard_networks, network_floating_devices,
+# firewall_tag_groups, firewall_declared_tags, firewall_untrusted_segments).
+# Every host fingerprints its own view and fails if it differs, so a host
+# that sees other data never silently receives facts built from someone
+# else's. Keep those variables in group_vars/all (or equivalent).
+#
 # Every task carries `tags: [firewall, base]`, so the facts can be rebuilt
 # on their own (--tags firewall) or as part of a baseline run (--tags base).
 # They must run before anything that reads firewall_rules, since group_vars
 # referencing baseline_fw_* is resolved lazily at use time.
 #
-# `datacenter` names this host's site and matches a key of `networks`. A host
-# that does not set it falls back to the second label of its FQDN when that
-# names a real site -- auth.dd.soeren.cloud -> dd. Failing both,
-# baseline_fw_datacenter is an empty string and every baseline_fw_*_local
-# fact is simply empty, rather than the play blowing up on an undefined
-# variable.
-- name: Resolve this host's datacenter
+# ===========================================================================
+# SHARED: computed once, handed to every host
+# ===========================================================================
+
+- name: Fingerprint the input data
   ansible.builtin.set_fact:
-    baseline_fw_datacenter: >-
-      {{ (datacenter | default('') | string)
-         or (_baseline_fw_dc_guess if _baseline_fw_dc_guess in (networks | default({})).keys() | list else '') }}
+    _baseline_fw_input_fingerprint: "{{ _baseline_fw_my_fingerprint }}"
   vars:
-    _baseline_fw_dc_guess: "{{ (inventory_hostname.split('.') + [''])[1] }}"
+    _baseline_fw_my_fingerprint: >-
+      {{ [networks | default({}), wireguard_networks | default({}),
+          network_floating_devices | default({}), firewall_tag_groups | default({}),
+          firewall_declared_tags | default([]), firewall_untrusted_segments | default(['guest'])]
+         | to_json(sort_keys=true) | hash('sha1') }}
+  run_once: true
   tags: [firewall, base]
 
-- name: Warn when the datacenter could not be resolved
-  ansible.builtin.debug:
-    msg: >-
-      No datacenter resolved for {{ inventory_hostname }}: `datacenter` is
-      unset and no label of the hostname matches a key of `networks`. Every
-      baseline_fw_*_local fact will be empty. Set `datacenter` in group_vars.
-  when: baseline_fw_datacenter | default('') | length == 0
+# Runs on every host: it is what makes run_once safe.
+- name: Every host sees the same input data
+  ansible.builtin.assert:
+    that:
+      - _baseline_fw_my_fingerprint == _baseline_fw_input_fingerprint
+    fail_msg: >-
+      {{ inventory_hostname }} sees different networks /
+      wireguard_networks / network_floating_devices / firewall_* data than
+      {{ ansible_play_hosts | first }}, which the shared firewall facts are
+      built from. Those variables must be the same for every host -- move
+      them to group_vars/all, or into a group every host belongs to.
+    quiet: true
+  vars:
+    _baseline_fw_my_fingerprint: >-
+      {{ [networks | default({}), wireguard_networks | default({}),
+          network_floating_devices | default({}), firewall_tag_groups | default({}),
+          firewall_declared_tags | default([]), firewall_untrusted_segments | default(['guest'])]
+         | to_json(sort_keys=true) | hash('sha1') }}
   tags: [firewall, base]
 
 # ---------------------------------------------------------------------------
@@ -114,11 +143,12 @@
 - name: Warn when the mesh data is not in scope
   ansible.builtin.debug:
     msg: >-
-      `wireguard_networks` is undefined or empty for {{ inventory_hostname }},
-      so no baseline_fw_*_wg_* variables will exist and mesh addresses are
+      `wireguard_networks` is undefined or empty for
+      {{ inventory_hostname }}, so no baseline_fw_*_wg_* variables will exist and mesh addresses are
       missing from every tag. If the meshes live in a group_vars file that
       only the routers load, move them somewhere this host sees too.
   when: (wireguard_networks | default({})) | length == 0
+  run_once: true
   tags: [firewall, base]
 
 - name: Expand tag composition
@@ -140,6 +170,7 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ closure | to_json }}
+  run_once: true
   tags: [firewall, base]
 
 # ---------------------------------------------------------------------------
@@ -211,6 +242,7 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ out | to_json }}
+  run_once: true
   tags: [firewall, base]
 
 # ---------------------------------------------------------------------------
@@ -256,6 +288,7 @@
       {{- pools['wg'].update({mesh_name: p}) or '' -}}
       {%- endfor -%}
       {{ {'pools': pools, 'nets': nets} | to_json }}
+  run_once: true
   tags: [firewall, base]
 
 # ---------------------------------------------------------------------------
@@ -286,6 +319,7 @@
       {%- endfor -%}
       {%- endfor -%}
       {{ out | to_json }}
+  run_once: true
   tags: [firewall, base]
 
 - name: Decode the tag and prefix maps
@@ -294,6 +328,7 @@
     baseline_fw_tags_global: "{{ _baseline_fw_tags_global_json | from_json }}"
     baseline_fw_pools: "{{ (_baseline_fw_prefixes_json | from_json).pools }}"
     baseline_fw_nets: "{{ (_baseline_fw_prefixes_json | from_json).nets }}"
+  run_once: true
   tags: [firewall, base]
 
 # ---------------------------------------------------------------------------
@@ -376,6 +411,7 @@
       {%- endfor -%}
       {{- result.update({'by_dc': by_dc, 'untrusted': untrusted | sort}) or '' -}}
       {{ result | to_json }}
+  run_once: true
   tags: [firewall, base]
 
 - name: Publish the network lists
@@ -386,6 +422,133 @@
     baseline_network_segments_trusted_merged: "{{ (_baseline_fw_segments_json | from_json).trusted | ansible.utils.cidr_merge }}"
     baseline_network_segments_trusted: "{{ (_baseline_fw_segments_json | from_json).trusted }}"
     baseline_network_segments_untrusted_names: "{{ (_baseline_fw_segments_json | from_json).untrusted }}"
+  run_once: true
+  tags: [firewall, base]
+
+# ---------------------------------------------------------------------------
+# Flat variables, so rule files stay readable
+#
+# Every tag known anywhere gets both a global and a local variable, so a
+# rule referring to a tag absent from this datacenter renders as an empty set
+# rather than failing on an undefined variable.
+# ---------------------------------------------------------------------------
+
+- name: Collect every tag name
+  ansible.builtin.set_fact:
+    _baseline_fw_all_tags: >-
+      {{ ((baseline_fw_tags_global.keys() | list)
+          + ((firewall_tag_groups | default({})).keys() | list)
+          + ((firewall_tag_groups | default({})).values() | list | flatten)
+          + (firewall_declared_tags | default([]))) | unique | list }}
+  run_once: true
+  tags: [firewall, base]
+
+- name: Build the shared flat variable map
+  ansible.builtin.set_fact:
+    _baseline_fw_flat_json: >-
+      {%- set out = {} -%}
+      {%- set dcs = (baseline_fw_nets.keys() | list) + (baseline_fw_tags_by_dc.keys() | list) -%}
+      {%- set dcs = dcs | unique | sort -%}
+      {#- tags: per datacenter, global -#}
+      {%- for t in _baseline_fw_all_tags -%}
+      {%- set st = t | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {{- out.update({'baseline_fw_tags_global_' ~ st: baseline_fw_tags_global.get(t, [])}) or '' -}}
+      {%- for dc in dcs -%}
+      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {{- out.update({'baseline_fw_tags_' ~ sdc ~ '_' ~ st: baseline_fw_tags_by_dc.get(dc, {}).get(t, [])}) or '' -}}
+      {%- endfor -%}
+      {%- endfor -%}
+      {#- segments: per datacenter, global (global is a list) -#}
+      {%- set seg_global = {} -%}
+      {%- for dc, segs in baseline_fw_nets.items() -%}
+      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {%- for seg, cidr in segs.items() -%}
+      {%- set sseg = seg | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {{- out.update({'baseline_fw_nets_' ~ sdc ~ '_' ~ sseg: cidr}) or '' -}}
+      {{- seg_global.update({sseg: (seg_global.get(sseg, []) + [cidr]) | unique | sort | list}) or '' -}}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- for sseg, cidrs in seg_global.items() -%}
+      {{- out.update({'baseline_fw_nets_global_' ~ sseg: cidrs}) or '' -}}
+      {%- endfor -%}
+      {#- pools: per datacenter, global (global is a list) -#}
+      {%- set pool_global = {} -%}
+      {%- for dc, segs in baseline_fw_pools.items() -%}
+      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {%- for seg, pools in segs.items() -%}
+      {%- set sseg = seg | lower | regex_replace('[^a-z0-9]', '_') -%}
+      {%- for pname, cidr in pools.items() -%}
+      {%- set sp = sseg ~ '_' ~ (pname | lower | regex_replace('[^a-z0-9]', '_')) -%}
+      {{- out.update({'baseline_fw_pools_' ~ sdc ~ '_' ~ sp: cidr}) or '' -}}
+      {{- pool_global.update({sp: (pool_global.get(sp, []) + [cidr]) | unique | sort | list}) or '' -}}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- endfor -%}
+      {%- for sp, cidrs in pool_global.items() -%}
+      {{- out.update({'baseline_fw_pools_global_' ~ sp: cidrs}) or '' -}}
+      {%- endfor -%}
+      {{ out | to_json }}
+  run_once: true
+  tags: [firewall, base]
+
+# Published one key at a time. Handing set_fact a whole templated dict as
+# free-form args does not reliably expand into individual facts, and the
+# failure is silent: the dict renders fine, the variables never appear, and
+# the first thing that references one fails with "is undefined".
+- name: Publish the shared flat variables
+  ansible.builtin.set_fact:
+    "{{ item.key }}": "{{ item.value }}"
+  loop: "{{ _baseline_fw_flat_json | from_json | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+  run_once: true
+  tags: [firewall, base]
+
+# Cheap, and it turns a silent publish failure into a named one.
+#
+# `varnames` rather than the internal `vars` dict, which is deprecated and
+# goes away in ansible-core 2.24.
+- name: Verify every shared flat variable is actually defined
+  ansible.builtin.assert:
+    that:
+      - (_baseline_fw_flat_json | from_json).keys() | difference(_baseline_fw_defined) | length == 0
+    fail_msg: |
+      These were computed but never published as variables:
+      {% for k in (_baseline_fw_flat_json | from_json).keys() | difference(_baseline_fw_defined) | sort %}
+        {{ k }}
+      {% endfor %}
+    quiet: true
+  vars:
+    _baseline_fw_defined: "{{ query('varnames', '^baseline_fw_(nets|pools|tags)_') }}"
+  run_once: true
+  tags: [firewall, base]
+
+# ===========================================================================
+# PER HOST: this host's datacenter and its `local` views
+# ===========================================================================
+
+# `datacenter` names this host's site and matches a key of `networks`. A host
+# that does not set it falls back to the second label of its FQDN when that
+# names a real site -- auth.dd.soeren.cloud -> dd. Failing both,
+# baseline_fw_datacenter is an empty string and every baseline_fw_*_local
+# fact is simply empty, rather than the play blowing up on an undefined
+# variable.
+- name: Resolve this host's datacenter
+  ansible.builtin.set_fact:
+    baseline_fw_datacenter: >-
+      {{ (datacenter | default('') | string)
+         or (_baseline_fw_dc_guess if _baseline_fw_dc_guess in (networks | default({})).keys() | list else '') }}
+  vars:
+    _baseline_fw_dc_guess: "{{ (inventory_hostname.split('.') + [''])[1] }}"
+  tags: [firewall, base]
+
+- name: Warn when the datacenter could not be resolved
+  ansible.builtin.debug:
+    msg: >-
+      No datacenter resolved for {{ inventory_hostname }}: `datacenter` is
+      unset and no label of the hostname matches a key of `networks`. Every
+      baseline_fw_*_local fact will be empty. Set `datacenter` in group_vars.
+  when: baseline_fw_datacenter | default('') | length == 0
   tags: [firewall, base]
 
 - name: Narrow the tag map to this datacenter
@@ -399,101 +562,48 @@
     baseline_fw_nets_local: "{{ baseline_fw_nets.get(baseline_fw_datacenter | default(''), {}) }}"
   tags: [firewall, base]
 
-# ---------------------------------------------------------------------------
-# Flat variables, so rule files stay readable
-#
-# Every tag known anywhere gets both a global and a local variable, so a
-# rule referring to a tag absent from this datacenter renders as an empty set
-# rather than failing on an undefined variable.
-# ---------------------------------------------------------------------------
-
-- name: Build the flat variable map
+- name: Build the local flat variable map
   ansible.builtin.set_fact:
-    _baseline_fw_flat_json: >-
+    _baseline_fw_flat_local_json: >-
       {%- set out = {} -%}
-      {%- set dcs = (baseline_fw_nets.keys() | list) + (baseline_fw_tags_by_dc.keys() | list) -%}
-      {%- set dcs = dcs | unique | sort -%}
-      {%- set loc = baseline_fw_datacenter | default('') -%}
-      {%- set all_tags = (baseline_fw_tags_global.keys() | list)
-                         + ((firewall_tag_groups | default({})).keys() | list)
-                         + ((firewall_tag_groups | default({})).values() | list | flatten)
-                         + (firewall_declared_tags | default([])) -%}
-      {#- tags: per datacenter, local, global -#}
-      {%- for t in all_tags | unique -%}
+      {%- for t in _baseline_fw_all_tags -%}
       {%- set st = t | lower | regex_replace('[^a-z0-9]', '_') -%}
-      {{- out.update({'baseline_fw_tags_global_' ~ st: baseline_fw_tags_global.get(t, [])}) or '' -}}
-      {%- for dc in dcs -%}
-      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
-      {{- out.update({'baseline_fw_tags_' ~ sdc ~ '_' ~ st: baseline_fw_tags_by_dc.get(dc, {}).get(t, [])}) or '' -}}
+      {{- out.update({'baseline_fw_tags_local_' ~ st: baseline_fw_tags_local.get(t, [])}) or '' -}}
       {%- endfor -%}
-      {{- out.update({'baseline_fw_tags_local_' ~ st: baseline_fw_tags_by_dc.get(loc, {}).get(t, [])}) or '' -}}
-      {%- endfor -%}
-      {#- segments: per datacenter, local, global (global is a list) -#}
-      {%- set seg_global = {} -%}
-      {%- for dc, segs in baseline_fw_nets.items() -%}
-      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
-      {%- for seg, cidr in segs.items() -%}
+      {%- for seg, cidr in baseline_fw_nets_local.items() -%}
       {%- set sseg = seg | lower | regex_replace('[^a-z0-9]', '_') -%}
-      {{- out.update({'baseline_fw_nets_' ~ sdc ~ '_' ~ sseg: cidr}) or '' -}}
-      {%- if dc == loc -%}
       {{- out.update({'baseline_fw_nets_local_' ~ sseg: cidr}) or '' -}}
-      {%- endif -%}
-      {{- seg_global.update({sseg: (seg_global.get(sseg, []) + [cidr]) | unique | sort | list}) or '' -}}
       {%- endfor -%}
-      {%- endfor -%}
-      {%- for sseg, cidrs in seg_global.items() -%}
-      {{- out.update({'baseline_fw_nets_global_' ~ sseg: cidrs}) or '' -}}
-      {%- endfor -%}
-      {#- pools: per datacenter, local, global (global is a list) -#}
-      {%- set pool_global = {} -%}
-      {%- for dc, segs in baseline_fw_pools.items() -%}
-      {%- set sdc = dc | lower | regex_replace('[^a-z0-9]', '_') -%}
-      {%- for seg, pools in segs.items() -%}
+      {%- for seg, pools in baseline_fw_pools_local.items() -%}
       {%- set sseg = seg | lower | regex_replace('[^a-z0-9]', '_') -%}
       {%- for pname, cidr in pools.items() -%}
       {%- set sp = sseg ~ '_' ~ (pname | lower | regex_replace('[^a-z0-9]', '_')) -%}
-      {{- out.update({'baseline_fw_pools_' ~ sdc ~ '_' ~ sp: cidr}) or '' -}}
-      {%- if dc == loc -%}
       {{- out.update({'baseline_fw_pools_local_' ~ sp: cidr}) or '' -}}
-      {%- endif -%}
-      {{- pool_global.update({sp: (pool_global.get(sp, []) + [cidr]) | unique | sort | list}) or '' -}}
       {%- endfor -%}
-      {%- endfor -%}
-      {%- endfor -%}
-      {%- for sp, cidrs in pool_global.items() -%}
-      {{- out.update({'baseline_fw_pools_global_' ~ sp: cidrs}) or '' -}}
       {%- endfor -%}
       {{ out | to_json }}
   tags: [firewall, base]
 
-# Published one key at a time. Handing set_fact a whole templated dict as
-# free-form args does not reliably expand into individual facts, and the
-# failure is silent: the dict renders fine, the variables never appear, and
-# the first thing that references one fails with "is undefined".
-- name: Publish the flat variables
+- name: Publish the local flat variables
   ansible.builtin.set_fact:
     "{{ item.key }}": "{{ item.value }}"
-  loop: "{{ _baseline_fw_flat_json | from_json | dict2items }}"
+  loop: "{{ _baseline_fw_flat_local_json | from_json | dict2items }}"
   loop_control:
     label: "{{ item.key }}"
   tags: [firewall, base]
 
-# Cheap, and it turns a silent publish failure into a named one.
-#
-# `varnames` rather than the internal `vars` dict, which is deprecated and
-# goes away in ansible-core 2.24.
-- name: Verify every flat variable is actually defined
+- name: Verify every local flat variable is actually defined
   ansible.builtin.assert:
     that:
-      - (_baseline_fw_flat_json | from_json).keys() | difference(_baseline_fw_defined) | length == 0
+      - (_baseline_fw_flat_local_json | from_json).keys() | difference(_baseline_fw_defined) | length == 0
     fail_msg: |
       These were computed but never published as variables:
-      {% for k in (_baseline_fw_flat_json | from_json).keys() | difference(_baseline_fw_defined) | sort %}
+      {% for k in (_baseline_fw_flat_local_json | from_json).keys() | difference(_baseline_fw_defined) | sort %}
         {{ k }}
       {% endfor %}
     quiet: true
   vars:
-    _baseline_fw_defined: "{{ query('varnames', '^baseline_fw_(nets|pools|tags)_') }}"
+    _baseline_fw_defined: "{{ query('varnames', '^baseline_fw_(nets|pools|tags)_local_') }}"
   tags: [firewall, base]
 
 # Output is built as a LIST of lines, not one multi-line string: Ansible's
@@ -502,19 +612,19 @@
 #
 # For nicer output still, set `stdout_callback = yaml` in ansible.cfg.
 #
-#   fw_debug: true            everything: this datacenter, every other
-#                             datacenter, and the global scope
-#   fw_debug_scope: local     narrow it to this datacenter only
+#   baseline_fw_debug: true             everything: this datacenter, every
+#                                       other datacenter, and the global scope
+#   baseline_fw_debug_scope: local      narrow it to this datacenter only
 - name: Build the debug output
   ansible.builtin.set_fact:
     _baseline_fw_debug_json: >-
-      {#- Read the PUBLISHED variables, not _baseline_fw_flat_json: the debug
+      {#- Read the PUBLISHED variables, not the computed maps: the debug
           output must not be able to show a name that is not actually
           defined. `varnames`/`vars` lookups, not the deprecated internal
           dict. -#}
       {%- set defined = query('varnames', '^baseline_fw_(nets|pools|tags)_') -%}
       {%- set flat = {} -%}
-      {%- for k in (_baseline_fw_flat_json | from_json).keys() | sort -%}
+      {%- for k in ((_baseline_fw_flat_json | from_json) | combine(_baseline_fw_flat_local_json | from_json)).keys() | sort -%}
       {%- if k in defined -%}
       {{- flat.update({k: lookup('vars', k)}) or '' -}}
       {%- endif -%}
@@ -545,7 +655,7 @@
       {{- L.append('  pools         ' ~ (local_pools | sum) ~ ' here, '
             ~ (pool_count | sum) ~ ' across all datacenters') or '' -}}
       {%- set scopes = [['local_', 'local: ' ~ (loc if loc else 'none')]] -%}
-      {%- if (fw_debug_scope | default('all')) == 'all' -%}
+      {%- if (baseline_fw_debug_scope | default('all')) == 'all' -%}
       {%- for dc in dcs -%}
       {{- scopes.append([(dc | lower | regex_replace('[^a-z0-9]', '_')) ~ '_', 'datacenter: ' ~ dc]) or '' -}}
       {%- endfor -%}
@@ -584,13 +694,13 @@
       {%- endif -%}
       {%- endfor -%}
       {%- endfor -%}
-      {%- if (fw_debug_scope | default('all')) != 'all' -%}
+      {%- if (baseline_fw_debug_scope | default('all')) != 'all' -%}
       {%- set hidden = flat | length - (flat.keys() | select('match', '^baseline_fw_[a-z]+_local_') | list | length) -%}
       {{- L.append('') or '' -}}
       {{- L.append('─── other scopes ' ~ '─' * 55) or '' -}}
       {{- L.append('  ' ~ hidden ~ ' more variables in scopes: '
             ~ (dcs | join(', ')) ~ ', global') or '' -}}
-      {{- L.append('  drop -e fw_debug_scope=local to print them') or '' -}}
+      {{- L.append('  drop -e baseline_fw_debug_scope=local to print them') or '' -}}
       {%- endif -%}
       {%- set closure = _baseline_fw_closure_json | from_json -%}
       {{- L.append('') or '' -}}
@@ -603,11 +713,11 @@
       {{- L.append('  (no firewall_tag_groups defined)') or '' -}}
       {%- endif -%}
       {{ L | to_json }}
-  when: fw_debug | default(false) | bool
+  when: baseline_fw_debug | default(false) | bool
   tags: [firewall, base]
 
 - name: Show the derived firewall facts
   ansible.builtin.debug:
     msg: "{{ _baseline_fw_debug_json | from_json }}"
-  when: fw_debug | default(false) | bool
+  when: baseline_fw_debug | default(false) | bool
   tags: [firewall, base]
