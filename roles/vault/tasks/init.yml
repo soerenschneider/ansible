@@ -10,8 +10,6 @@
         owner: vault
         group: vault
         mode: "0640"
-      delegate_to: "{{ vault_cluster_first_node }}"
-      run_once: true
       with_items: "{{ vault_gpg_keys }}"
 
     - name: "Run vault operator init"

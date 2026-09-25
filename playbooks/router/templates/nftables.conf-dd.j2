@@ -42,7 +42,7 @@ table ip global {
 
         # allow access to haproxy that serves HA media and mpd
         ip saddr { $NET_DD_USERS, $POOL_MEDIA_TVBOXES, $POOL_MEDIA_MPD } tcp dport { 80, 445, 6600 } accept
-        ip saddr $NET_SERVERS ip saddr @tag_prometheus tcp dport { 8405, 9093, 9100, 9192, 15283 } accept
+        ip saddr $NET_SERVERS ip saddr @tag_prometheus tcp dport { 9093, 9100, 9167, 9192, 9194, 9443, 9823, 9865, 15283 } accept
     }
 
     chain inbound_wg {
@@ -71,7 +71,7 @@ table ip global {
             $DEV_WORLD:    jump inbound_world,
             $WG_IF_SOEREN_CLOUD:        jump inbound_wg,
 {% for v in vlans %},
-            "vlan{{ v }}": jump inbound_private
+            vlan{{ v }}: jump inbound_private
 {%- endfor %}
         }
 
@@ -86,62 +86,119 @@ table ip global {
         # Allow traffic from established and related packets, drop invalid
         ct state vmap { established : accept, related : accept, invalid : drop }
 
-        ip saddr 192.168.64.0/21 oifname "wg0" ip daddr { 192.168.200.1, 192.168.200.5 } udp dport 53 accept
+        #########################################################
+        # allow all clients to talk to DNS servers over wireguard
+        #########################################################
+        ip saddr 192.168.64.0/21 oifname $WG_IF_SOEREN_CLOUD ip daddr { $IP_WG_SOEREN_CLOUD_RS, $TAG_WG_SOEREN_CLOUD_SEEDBOX } udp dport 53 accept
+        ip saddr 192.168.64.0/21 oifname $WG_IF_SOEREN_CLOUD ip daddr { $IP_WG_SOEREN_CLOUD_RS, $TAG_WG_SOEREN_CLOUD_SEEDBOX } tcp dport 53 accept
 
-        # allow desktop to access management network
-        iifname "vlan64" ip saddr $POOL_USERS_SOEREN ip saddr @tag_desktop ip daddr $NET_MANAGEMENT accept
-        # accept all traffic from vlan64 expect to management network
-        iifname "vlan64" ip saddr $NET_USERS ip daddr @tag_kubernetes tcp dport 443 accept
-        iifname "vlan64" ip saddr $NET_USERS ip daddr $POOL_MEDIA_MPD tcp dport 6600 accept
-        
-        
-        iifname "vlan64" ip saddr $NET_USERS ip daddr != $NET_MANAGEMENT accept
+        ################################################
+        # USERS
+        ################################################
+        # allow soeren's desktop to access management network
+        iifname $IF_USERS ip saddr $POOL_USERS_SOEREN ip saddr @tag_desktop oifname $IF_MANAGEMENT ip daddr $NET_MANAGEMENT accept
 
+        # allow soeren pool to access everything
+        iifname $IF_USERS ip saddr $POOL_USERS_SOEREN ip daddr != $NET_MANAGEMENT accept
+
+        # allow access to kubernetes HTTPS
+        iifname $IF_USERS ip saddr $NET_USERS oifname $IF_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+
+        # allow access to MPD
+        iifname $IF_USERS ip saddr $NET_USERS oifname $IF_MEDIA ip daddr $POOL_MEDIA_MPD tcp dport 6600 accept
+
+        # allow access to onkyo stereo
+        iifname $IF_USERS ip saddr $NET_USERS oifname $IF_MEDIA ip daddr $POOL_MEDIA_APPLIANCES tcp dport 60128 accept
+
+        # allow access to vacuum cleaner
+        iifname $IF_USERS ip saddr $NET_USERS oifname $IF_IOT ip daddr $POOL_DD_IOT_VACUUM tcp dport { 80, 443 } accept
+
+        #############################################
+        # syncthing
+        # allow local nas to talk to local syncthing
+        #############################################
+        iifname $IF_USERS ip saddr $NET_USERS oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_nas tcp dport 22000 accept
+        iifname $IF_USERS ip saddr $NET_USERS oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_nas udp dport 22000 accept
+
+        ################################################
+        # SERVERS
+        ################################################
         # allow prometheus to scrape node exporter port
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { "vlan66", "vlan67", "vlan70", "wg0" } tcp dport { 9100, 9443, 15283 } accept
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname {"vlan66", "wg0" } ip daddr { $POOL_IOT_PI_ZERO } tcp dport { 9191, 9192, 9194, 9865 } accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { $IF_IOT, $IF_MEDIA, $IF_MANAGEMENT, $WG_IF_SOEREN_CLOUD } tcp dport { 8405, 9100, 9167, 9443, 15283 } accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname { $IF_IOT, $IF_MEDIA, $IF_MANAGEMENT, $WG_IF_SOEREN_CLOUD } icmp type echo-request accept
+
+        # allow access to IOT devices
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname {$IF_IOT, $WG_IF_SOEREN_CLOUD } ip daddr { $POOL_IOT_PI_ZERO, $POOL_PT_IOT_PI_ZERO } tcp dport { 9191, 9192, 9194, 9865 } accept
+
         # allow local nas to fetch data from seedbox
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr 192.168.200.5 tcp dport 22 accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname $WG_IF_SOEREN_CLOUD ip daddr $TAG_WG_SOEREN_CLOUD_SEEDBOX tcp dport 22 accept
+
         # allow local nas to talk to remote syncthing
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr @tag_nas tcp dport 22000 accept
-        iifname "vlan65" ip saddr $NET_SERVERS ip saddr @tag_nas oifname wg0 ip daddr @tag_nas udp dport 22000 accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname { $IF_USERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_syncthing tcp dport 22000 accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname { $IF_USERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_syncthing udp dport 22000 accept
 
-        # allow all members of vlan to talk to mqtt server
-        iifname "vlan66" ip saddr $NET_IOT oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_mqtt tcp dport { 1883, 8883 } accept
-        # allow raspberry PIs to talk to openbao
-        iifname "vlan66" ip saddr $POOL_IOT_PI_ZERO oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        ################################################
+        # IOT
+        ################################################
+        # allow access to mqtt server
+        iifname $IF_IOT ip saddr $NET_IOT oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_mqtt tcp dport { 1883, 8883 } accept
 
-        # let media boxes talk to nas
-        iifname "vlan67" ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname "vlan65" ip daddr @tag_nas tcp dport { 80, 443 } accept
-        # let raspberry pis talk to openbao cluster
-        iifname "vlan67" ip saddr $POOL_MEDIA_MPD oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        # allow access for raspberry PIs to openbao
+        iifname $IF_IOT ip saddr $POOL_IOT_PI_ZERO oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
 
-        # TODO: fix
-        # allow talking to kubernetes
-        iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname "vlan65" ip daddr 192.168.65.27 tcp dport 443 accept
-        iifname "vlan68" ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname "vlan65" ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        ################################################
+        # MEDIA
+        ################################################
+        # allow access to nas for media boxes
+        iifname $IF_MEDIA ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname $IF_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
 
+        # allow access to openbao for raspberry PIs
+        iifname $IF_MEDIA ip saddr $POOL_MEDIA_MPD oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+
+        ################################################
+        # GUEST
+        # allow access to kubernetes
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_kubernetes tcp dport 443 accept
+
+        # allow access to local openbao
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+
+        # allow access to syncthing
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_nas tcp dport 22000 accept
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_nas udp dport 22000 accept
+
+        ################################################
+        # CAM
         # allow cam access from soeren and ines over wireguard
-        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_soeren oifname "vlan69" ip daddr $NET_CAM accept
-        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, 192.168.200.0/24 } ip saddr @tag_ines   oifname "vlan69" ip daddr $NET_CAM accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, $NET_WG_SOEREN_CLOUD } ip saddr @tag_soeren oifname $IF_CAM ip daddr $NET_CAM accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, $NET_WG_SOEREN_CLOUD } ip saddr @tag_ines   oifname $IF_CAM ip daddr $NET_CAM accept
 
-        # allow seedbox to talk to fetcharr
-        # TODO: add tag for ch
-        iifname $WG_IF_SOEREN_CLOUD ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
+        ################################################
+        # Incoming Wireguard
+
+        # allow access for remote nas to talk to local syncthing
+        iifname $WG_IF_SOEREN_CLOUD ip saddr $NET_PRIVATE ip saddr @tag_nas oifname $IF_SERVERS ip daddr @tag_nas tcp dport 22000 accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr $NET_PRIVATE ip saddr @tag_nas oifname $IF_SERVERS ip daddr @tag_nas udp dport 22000 accept
+
+        # allow seedbox to talk to fetcharr on nas
+        iifname $WG_IF_SOEREN_CLOUD ip saddr $TAG_WG_SOEREN_CLOUD_SEEDBOX oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
+
         # allow seedbox to talk to kubernetes services
-        iifname $WG_IF_SOEREN_CLOUD ip saddr 192.168.200.5 oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr $TAG_WG_SOEREN_CLOUD_SEEDBOX oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+
         # allow routers over wireguard to talk to nas
-        iifname $WG_IF_SOEREN_CLOUD ip saddr { 192.168.200.2, 192.168.200.4 } oifname "vlan65" ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $IP_WG_SOEREN_CLOUD_PT } oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443, 445, 6600 } accept
 
         # deny internet to selected hosts
         ip saddr @tag_nointernet oifname $DEV_WORLD counter drop
         # allow forwarding
-        iifname { "vlan64", "vlan65", "vlan66", "vlan67", "vlan68", "vlan70" } oifname $DEV_WORLD ip saddr != @tag_nointernet counter accept
+        iifname { $IF_USERS, $IF_SERVERS, $IF_IOT, $IF_MEDIA, $IF_GUEST, $IF_MANAGEMENT } oifname $DEV_WORLD ip saddr != @tag_nointernet counter accept
+
         # allow android tablet to talk to internet
-        iifname { "vlan69" } ip saddr 192.168.69.50 ip daddr != 192.168.0.0/16 accept
+        iifname { $IF_CAM } ip saddr $POOL_CAM_FRONTENDS ip daddr != 192.168.0.0/16 accept
 
         # the rest is dropped by the above policy
-        #log prefix "drop-fwd " limit rate 1/minute
+        log prefix drop-fwd  limit rate 1/minute
     }
 
     chain postrouting {
@@ -214,13 +271,13 @@ table ip6 global {
         iifname vmap {
             $DEV_WORLD            : jump inbound_world6,
 {% for v in vlans %},
-            "vlan{{ v }}":          jump inbound_world6
+            vlan{{ v }}:          jump inbound_world6
 {%- endfor %}
         }
 
-        # wg0 is deliberately absent: the tunnel carries IPv4 only.
+        # $WG_IF_SOEREN_CLOUD is deliberately absent: the tunnel carries IPv4 only.
 
-        log prefix "drop-in6 " level info limit rate 3/minute counter
+        log prefix drop-in6  level info limit rate 3/minute counter
     }
 
     chain forward6 {
@@ -249,6 +306,6 @@ table ip6 global {
         # Nothing accepts iifname $DEV_WORLD, so unsolicited internet traffic
         # to your LAN hits the drop policy. That is the point.
 
-        log prefix "drop-fwd6 " level info limit rate 3/minute counter
+        log prefix drop-fwd6  level info limit rate 3/minute counter
     }
 }

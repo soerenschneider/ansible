@@ -18,11 +18,22 @@
     WG_IF or NET_WG:
 
       WG_IF_<MESH>                   tunnel device       wg0
-      IP_WG_<MESH>                   router's own addr   192.168.200.1
+      IP_WG_<MESH>                   router's own addr   192.168.200.3
       NET_WG_<MESH>                  mesh prefix         192.168.200.0/24
       WG_PORT_<MESH>                 listen port         12686
       POOL_WG_<MESH>_<POOL>          pool prefix         192.168.200.96/27
+      IP_WG_<MESH>_<MEMBER>          one member's addr   192.168.200.5
+      MEMBERS_WG_<MESH>_<POOL>       every addr in pool  { .1, .2, .3, .4, .5 }
+      TAG_WG_<MESH>_<TAG>            every addr so tagged
+      PEERS_WG_<MESH>                what THIS router peers with
       WG_IFS                         every local tunnel device
+
+    Every member of every mesh is emitted, not just the local ones -- a
+    rule on dd may well want to name ch's address. Pool and tag sets are
+    the useful granularity: TAG_WG_SOEREN_CLOUD_SEEDBOX beats writing
+    ch's /32 into a rule that stops being true when the seedbox moves.
+
+    fw_tags merge: a member carries its pool's tags plus its own.
 
     The tunnel devices are derived entirely from `wireguard_networks`: a
     mesh member carrying `site: <this site>` IS this router's endpoint, and
@@ -65,6 +76,7 @@
       'device': member.device | default(mesh.device) | default('wg0'),
       'ip': member.logical,
       'net': mesh.net | default(''),
+      'peers_with': member.peers_with | default('all'),
     }) or '' -}}
 {% endif %}
 {% endfor %}
@@ -113,21 +125,48 @@ define NET_{{ n(site) }} = { {{ cidrs | ansible.utils.cidr_merge | join(', ') }}
 ###############################################################################
 {% set mesh_nets = [] %}
 {% for mesh_name, mesh in (wireguard_networks | default({})) | dictsort %}
+{% set mk = n(mesh_name) | trim %}
 {% set mesh_cidr = mesh.net | default('') %}
+{% set tags = {} %}
 
-# mesh {{ mesh_name }}
+#------------------------------------------------------------------------------
+# mesh {{ mesh_name }}{% if mesh.hub is defined %} -- hub {{ mesh.hub }}{% endif %}
+
+#------------------------------------------------------------------------------
 {% if mesh_cidr | length > 0 %}
 {{- mesh_nets.append(mesh_cidr) or '' -}}
-define NET_WG_{{ n(mesh_name) }} = {{ mesh_cidr }}
+define NET_WG_{{ mk }} = {{ mesh_cidr }}
 {% endif %}
 {% if mesh.port is defined %}
-define WG_PORT_{{ n(mesh_name) }} = {{ mesh.port }}
+define WG_PORT_{{ mk }} = {{ mesh.port }}
 {% endif %}
 {% for pname, pool in (mesh.pools | default({})) | dictsort %}
+{% set addrs = [] %}
+
+# pool {{ pname }}
 {% if pool.cidr is defined %}
-define POOL_WG_{{ n(mesh_name) }}_{{ n(pname) }} = {{ pool.cidr }}
+define POOL_WG_{{ mk }}_{{ n(pname) }} = {{ pool.cidr }}
+{% endif %}
+{% for mname, member in (pool.hosts | default({})) | dictsort %}
+{% if member.logical is defined %}
+{{- addrs.append(member.logical) or '' -}}
+{% for t in (pool.fw_tags | default([])) + (member.fw_tags | default([])) %}
+{{- tags.setdefault(t, []).append(member.logical) or '' -}}
+{% endfor %}
+define IP_WG_{{ mk }}_{{ n(mname) }} = {{ member.logical }}
 {% endif %}
 {% endfor %}
+{% if addrs %}
+define MEMBERS_WG_{{ mk }}_{{ n(pname) }} = { {{ addrs | unique | join(', ') }} }
+{% endif %}
+{% endfor %}
+{% if tags %}
+
+# firewall tags
+{% for t, addrs in tags | dictsort %}
+define TAG_WG_{{ mk }}_{{ n(t) }} = { {{ addrs | unique | join(', ') }} }
+{% endfor %}
+{% endif %}
 
 {% endfor %}
 ###############################################################################
@@ -180,6 +219,20 @@ define POOL_{{ n(seg) }}_{{ n(pname) }} = $POOL_{{ n(location) }}_{{ n(seg) }}_{
 # tunnel endpoint -- {{ wg.device }} on mesh {{ wg.mesh }} as member {{ wg.member }}
 define WG_IF_{{ n(wg.mesh) }} = "{{ wg.device }}"
 define IP_WG_{{ n(wg.mesh) }} = {{ wg.ip }}
+{% if wg.peers_with != 'all' %}
+{% set reachable = [] %}
+{% for pname, pool in (wireguard_networks[wg.mesh].pools | default({})) | dictsort %}
+{% for mname, member in (pool.hosts | default({})) | dictsort %}
+{% if mname in wg.peers_with and member.logical is defined %}
+{{- reachable.append(member.logical) or '' -}}
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% if reachable %}
+# what {{ wg.member }} actually peers with -- tighter than the mesh prefix
+define PEERS_WG_{{ n(wg.mesh) }} = { {{ reachable | unique | join(', ') }} }
+{% endif %}
+{% endif %}
 {% endfor %}
 
 ###############################################################################

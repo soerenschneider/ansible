@@ -148,12 +148,18 @@ listener "tcp" {
   disable_unauthed_generate_root_endpoints = {{ openbao_disable_unauthed_generate_root_endpoints | default(true) | bool | string | lower }}
 
 {% if openbao_trusted_proxy_cidrs | default([]) %}
-  # Behind a load balancer: trust XFF only from these sources so audit logs
-  # record the real client IP. Rejects XFF from anywhere else.
+{% if openbao_proxy_protocol_behavior | default('') %}
+  # PROXY protocol from the load balancer (HAProxy `send-proxy`, mode tcp).
+  proxy_protocol_behavior         = "{{ openbao_proxy_protocol_behavior }}"
+  proxy_protocol_authorized_addrs = "{{ openbao_trusted_proxy_cidrs | join(',') }}"
+{% endif %}
+{% if openbao_x_forwarded_for_enabled | default(false) | bool %}
+  # X-Forwarded-For — only for an HTTP-mode proxy that adds the header.
   x_forwarded_for_authorized_addrs      = "{{ openbao_trusted_proxy_cidrs | join(',') }}"
   x_forwarded_for_hop_skips             = {{ openbao_x_forwarded_for_hop_skips | default(0) | int }}
   x_forwarded_for_reject_not_authorized = true
   x_forwarded_for_reject_not_present    = {{ openbao_x_forwarded_for_reject_not_present | default(true) | bool | string | lower }}
+{% endif %}
 {% endif %}
 
   telemetry {
@@ -261,7 +267,7 @@ user_lockout "{{ method }}" {
 # Telemetry
 # ----------------------------------------------------------------------------
 telemetry {
-{% for key, value in openbao_telemetry | default({'prometheus_retention_time': '30s', 'disable_hostname': true}) | dictsort %}
+{% for key, value in openbao_telemetry | default({'prometheus_retention_time': '24h', 'disable_hostname': true}) | dictsort %}
   {{ key }} = {{ hcl(value) }}
 {% endfor %}
 }
@@ -298,10 +304,37 @@ default_max_request_duration = "{{ openbao_default_max_request_duration | defaul
 {% if openbao_disable_standby_reads is defined %}
 disable_standby_reads = {{ openbao_disable_standby_reads | bool | string | lower }}
 {% endif %}
+
 {% if openbao_plugin_directory | default('') %}
 
-plugin_directory = "{{ openbao_plugin_directory }}"
+# ----------------------------------------------------------------------------
+# Plugins
+#
+# With auto-download, OpenBao pulls each declared plugin's OCI image into
+# plugin_directory and verifies it against sha256sum. With auto-register,
+# it adds the plugin to the catalog, so no `bao plugin register` is needed.
+# The directory must be writable by the service user when auto-download is on.
+# ----------------------------------------------------------------------------
+plugin_directory     = "{{ openbao_plugin_directory }}"
+{% if openbao_plugin_auto_download is defined %}
+plugin_auto_download = {{ openbao_plugin_auto_download | bool | string | lower }}
 {% endif %}
+{% if openbao_plugin_auto_register is defined %}
+plugin_auto_register = {{ openbao_plugin_auto_register | bool | string | lower }}
+{% endif %}
+{% for plugin in openbao_plugins | default([]) %}
+
+plugin "{{ plugin.type }}" "{{ plugin.name }}" {
+{% for key, value in plugin | dictsort if key not in ['type', 'name'] %}
+  {{ key }} = {{ hcl(value) }}
+{% endfor %}
+}
+{% endfor %}
+{% elif openbao_plugins | default([]) %}
+{{ "openbao_plugins is set but openbao_plugin_directory is empty" | mandatory }}
+{% endif %}
+
+
 {% if openbao_extra_config | default('') %}
 
 # ----------------------------------------------------------------------------

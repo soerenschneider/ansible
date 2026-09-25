@@ -1,158 +1,263 @@
 #!/usr/bin/env bash
+#
+# Update the unbound adblocker include file from a hosts-format blocklist
+# and export Prometheus textfile metrics about the import.
+#
+# Intended to be run from a systemd service/timer, which is responsible for
+# picking the user this runs as. The script does no privilege dropping itself.
+#
+# Configuration precedence (highest first):
+#   1. command line flags
+#   2. environment variables
+#   3. the defaults defined below
+#
+# Examples:
+#   ./unbound-adblocker-update.sh
+#   ADSERVERS_FILE=/etc/unbound/adblocker.conf ./unbound-adblocker-update.sh
+#   ./unbound-adblocker-update.sh --attempts 5 --mode 644
 
-set -eu
+set -euo pipefail
 
-# define vars
-URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+# ---------------------------------------------------------------------------
+# defaults
+# ---------------------------------------------------------------------------
+DEFAULT_URL="https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+DEFAULT_ADSERVERS_FILE="/etc/unbound/unbound.conf.d/adblocker.conf"
+DEFAULT_PROMETHEUS_TEXTFILE_DIR="/var/lib/node_exporter/textfile_collector"
+DEFAULT_RELOAD_CMD="systemctl restart unbound"
+DEFAULT_ADSERVERS_MODE="644"
 
-TMP_FILE="/tmp/adblocker.db"
-ADSERVERS_FILE={{ unbound_adblocker_adblocker_file }}
-UNPRIV_USER={{ unbound_adblocker_update_user }}
-PROMETHEUS_TEXTFILE_DIR="{{ prometheus_text_dir }}"
-METRIC_FILE="$PROMETHEUS_TEXTFILE_DIR/unbound_adblocker.prom"
+URL="${URL:-${DEFAULT_URL}}"
+ADSERVERS_FILE="${ADSERVERS_FILE:-${DEFAULT_ADSERVERS_FILE}}"
+PROMETHEUS_TEXTFILE_DIR="${PROMETHEUS_TEXTFILE_DIR:-${DEFAULT_PROMETHEUS_TEXTFILE_DIR}}"
+RELOAD_CMD="${RELOAD_CMD:-${DEFAULT_RELOAD_CMD}}"
+ADSERVERS_MODE="${ADSERVERS_MODE:-${DEFAULT_ADSERVERS_MODE}}"
+# empty means "leave ownership as-is" (i.e. whoever systemd runs this as)
+ADSERVERS_OWNER="${ADSERVERS_OWNER:-}"
+TMP_DIR="${TMP_DIR:-/tmp}"
+ATTEMPTS="${ATTEMPTS:-10}"
+TIMEOUT="${TIMEOUT:-1}"
+
+# runtime state
 SUCCESS=0
+START=0
+CHECKSUM_OLD=""
+TMP_FILE=""
+RAW_FILE=""
 
-# script start
-with_backoff() {
-  local max_attempts=${ATTEMPTS-10}
-  local timeout=${TIMEOUT-1}
-  local attempt=0
-  local exitCode=0
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+usage() {
+    cat <<EOF
+Usage: ${0##*/} [options]
 
-  while [[ $attempt < $max_attempts ]]
-  do
-    "$@"
-    exitCode=$?
+Options:
+  -f, --adservers-file PATH  unbound include file to write
+                             (default: ${DEFAULT_ADSERVERS_FILE})
+  -l, --url URL              blocklist URL in hosts format
+                             (default: ${DEFAULT_URL})
+  -m, --metrics-dir PATH     prometheus textfile collector directory
+                             (default: ${DEFAULT_PROMETHEUS_TEXTFILE_DIR})
+  -r, --reload-cmd CMD       command used to apply the new list
+                             (default: ${DEFAULT_RELOAD_CMD})
+  -o, --owner USER[:GROUP]   chown the include file after writing
+                             (default: unchanged)
+      --mode MODE            chmod for the include file (default: ${DEFAULT_ADSERVERS_MODE})
+  -a, --attempts N           download attempts before giving up (default: ${ATTEMPTS})
+  -t, --timeout SEC          initial retry backoff in seconds (default: ${TIMEOUT})
+  -h, --help                 show this help and exit
 
-    if [[ $exitCode == 0 ]]
-    then
-      break
-    fi
-
-    echo "Failure! Retrying in $timeout.." 1>&2
-    sleep $timeout
-    attempt=$(( attempt + 1 ))
-    timeout=$(( timeout * 2 ))
-  done
-
-  if [[ $exitCode != 0 ]]
-  then
-    echo "Giving up eventually! ($@)" 1>&2
-  fi
-
-  return $exitCode
+Every option can also be set via the matching environment variable:
+URL, ADSERVERS_FILE, PROMETHEUS_TEXTFILE_DIR, RELOAD_CMD, ADSERVERS_OWNER,
+ADSERVERS_MODE, ATTEMPTS, TIMEOUT, TMP_DIR.
+EOF
 }
 
+parse_args() {
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -f|--adservers-file) ADSERVERS_FILE="$2"; shift 2 ;;
+            -l|--url)            URL="$2"; shift 2 ;;
+            -m|--metrics-dir)    PROMETHEUS_TEXTFILE_DIR="$2"; shift 2 ;;
+            -r|--reload-cmd)     RELOAD_CMD="$2"; shift 2 ;;
+            -o|--owner)          ADSERVERS_OWNER="$2"; shift 2 ;;
+                --mode)          ADSERVERS_MODE="$2"; shift 2 ;;
+            -a|--attempts)       ATTEMPTS="$2"; shift 2 ;;
+            -t|--timeout)        TIMEOUT="$2"; shift 2 ;;
+            -h|--help)           usage; exit 0 ;;
+            *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
+        esac
+    done
+}
+
+cleanup() {
+    [ -n "${RAW_FILE}" ] && rm -f "${RAW_FILE}"
+    [ -n "${TMP_FILE}" ] && rm -f "${TMP_FILE}"
+    return 0
+}
+
+checksum() {
+    sha256sum "$1" | awk '{print $1}'
+}
+
+with_backoff() {
+    local max_attempts="${ATTEMPTS}"
+    local timeout="${TIMEOUT}"
+    local attempt=1
+    local exit_code=0
+
+    while true; do
+        exit_code=0
+        "$@" || exit_code=$?
+
+        if [ "${exit_code}" -eq 0 ]; then
+            return 0
+        fi
+
+        if [ "${attempt}" -ge "${max_attempts}" ]; then
+            break
+        fi
+
+        echo "Failure (exit ${exit_code})! Retrying in ${timeout}s ..." >&2
+        sleep "${timeout}"
+        attempt=$(( attempt + 1 ))
+        timeout=$(( timeout * 2 ))
+    done
+
+    echo "Giving up after ${attempt} attempts: $*" >&2
+    return "${exit_code}"
+}
+
+# ---------------------------------------------------------------------------
+# steps
+# ---------------------------------------------------------------------------
 fetch_list() {
-    set +e
-    # run the update command as unprivileged user
-    if [ "${OS}" = "OpenBSD" ];  then
-        with_backoff doas -u {{ unbound_adblocker_update_user }} /usr/local/bin/curl -sS -L --compressed "${URL}" | awk 'BEGIN { OFS = "" } NF == 2 && $1 == "0.0.0.0" { print "local-zone: \"", $2, "\" redirect"; print "local-data: \"", $2, " A 0.0.0.0\"" }' > $TMP_FILE
-    else
-        with_backoff sudo -u {{ unbound_adblocker_update_user }} curl -sS -L --compressed "${URL}" | awk 'BEGIN { OFS = "" } NF == 2 && $1 == "0.0.0.0" { print "local-zone: \"", $2, "\" redirect"; print "local-data: \"", $2, " A 0.0.0.0\"" }' > $TMP_FILE
+    RAW_FILE="$(mktemp "${TMP_DIR}/adblocker.raw.XXXXXX")"
+
+    if ! with_backoff curl -sS -L --compressed -o "${RAW_FILE}" "${URL}"; then
+        return 1
     fi
-    set -e
+
+    if [ ! -s "${RAW_FILE}" ]; then
+        echo "Downloaded blocklist is empty, aborting" >&2
+        return 1
+    fi
+
+    TMP_FILE="$(mktemp "${TMP_DIR}/adblocker.db.XXXXXX")"
+    awk 'BEGIN { OFS = "" }
+         NF == 2 && $1 == "0.0.0.0" {
+             print "local-zone: \"", $2, "\" redirect"
+             print "local-data: \"", $2, " A 0.0.0.0\""
+         }' "${RAW_FILE}" > "${TMP_FILE}"
+
+    rm -f "${RAW_FILE}"
+    RAW_FILE=""
+
+    if [ ! -s "${TMP_FILE}" ]; then
+        echo "Converted blocklist is empty, aborting" >&2
+        return 1
+    fi
 }
 
 apply_changes() {
-    # restart the unbound server to make changes effective, but only if files differ
-    CHECKSUM_NEW="$(checksum ${TMP_FILE})"
-    if [[ "${CHECKSUM_NEW}" != "${CHECKSUM_OLD}" ]] && [[ -s ${TMP_FILE} ]]; then
-        if [ -f "${ADSERVERS_FILE}" ]; then
-            mv "${ADSERVERS_FILE}" "${ADSERVERS_FILE}.bak"
-        fi
-        mv "${TMP_FILE}" "${ADSERVERS_FILE}"
-        chmod 640 "${ADSERVERS_FILE}"
+    local checksum_new
+    checksum_new="$(checksum "${TMP_FILE}")"
 
-        # set file permissions and SELinux context (if applicable)
-        if [ "${OS}" = "OpenBSD" ];  then
-            chown root:_unbound "${ADSERVERS_FILE}"
-        else
-            chown root:root "${ADSERVERS_FILE}"
-            set +e
-            if command -v restorecon >/dev/null 2>&1; then
-              restorecon "${ADSERVERS_FILE}"
-            fi
-            set -e
-        fi
-
-        # check config and restart service on success, rewind on failure
-        if unbound-checkconf; then
-            if [ "${OS}" = "OpenBSD" ];  then
-                unbound-control reload
-                SUCCESS=1
-            else
-                systemctl restart unbound
-                SUCCESS=1
-            fi
-            # delete temporary backup file after confirming that everything works
-            if [ -f "${ADSERVERS_FILE}.bak" ]; then
-                rm "${ADSERVERS_FILE}.bak"
-            fi
-        else
-            # undo change, continue using the old adblockers file
-            mv -v "${ADSERVERS_FILE}.bak" "${ADSERVERS_FILE}"
-        fi
-    else
+    # nothing changed: keep the current file and report success
+    if [ "${checksum_new}" = "${CHECKSUM_OLD}" ]; then
         SUCCESS=1
+        return 0
+    fi
+
+    if [ -f "${ADSERVERS_FILE}" ]; then
+        mv "${ADSERVERS_FILE}" "${ADSERVERS_FILE}.bak"
+    fi
+
+    mv "${TMP_FILE}" "${ADSERVERS_FILE}"
+    TMP_FILE=""
+
+    chmod "${ADSERVERS_MODE}" "${ADSERVERS_FILE}"
+    if [ -n "${ADSERVERS_OWNER}" ]; then
+        chown "${ADSERVERS_OWNER}" "${ADSERVERS_FILE}"
+    fi
+    if command -v restorecon >/dev/null 2>&1; then
+        restorecon "${ADSERVERS_FILE}" || true
+    fi
+
+    # check config and apply the new list, roll back on failure
+    if unbound-checkconf && ${RELOAD_CMD}; then
+        SUCCESS=1
+        rm -f "${ADSERVERS_FILE}.bak"
+    else
+        echo "config check or reload failed, rolling back" >&2
+        if [ -f "${ADSERVERS_FILE}.bak" ]; then
+            mv -v "${ADSERVERS_FILE}.bak" "${ADSERVERS_FILE}"
+        else
+            rm -f "${ADSERVERS_FILE}"
+        fi
     fi
 }
 
 print_metrics() {
-    # update metrics
-    local SUCCESS_METRIC_NAME="unbound_adblocker_import_success_bool"
-    echo "# HELP $SUCCESS_METRIC_NAME bool that indicates success of the import"
-    echo "# TYPE $SUCCESS_METRIC_NAME gauge"
-    echo "$SUCCESS_METRIC_NAME ${SUCCESS}"
-
-    local UPDATE_METRIC_NAME="unbound_adblocker_import_timestamp"
-    echo "# HELP $UPDATE_METRIC_NAME the timestamp of the last import"
-    echo "# TYPE $UPDATE_METRIC_NAME gauge"
-    echo "$UPDATE_METRIC_NAME $(date +%s)"
-
-    local ENTRIES_CNT_METRIC_NAME="unbound_adblocker_entries_total"
-    echo "# HELP $ENTRIES_CNT_METRIC_NAME the number of entries the adblocker list has"
-    echo "# TYPE $ENTRIES_CNT_METRIC_NAME gauge"
-    echo "$ENTRIES_CNT_METRIC_NAME $(grep 'local-zone:' $ADSERVERS_FILE | wc -l)"
-
-    local END=$SECONDS
-    local DURATION=$((END - START))
-    local DURATION_METRIC_NAME="unbound_adblocker_import_duration_sec"
-    echo "# HELP $DURATION_METRIC_NAME the duration of the last import"
-    echo "# TYPE $DURATION_METRIC_NAME gauge"
-    echo "$DURATION_METRIC_NAME $DURATION"
-}
-
-checksum() {
-    if [ "${OS}" = "OpenBSD" ];  then
-        sha256 "${1}" | awk '{print $1}'
-    else
-        sha256sum "${1}" | awk '{print $1}'
+    local entries=0
+    if [ -f "${ADSERVERS_FILE}" ]; then
+        entries="$(grep -c 'local-zone:' "${ADSERVERS_FILE}" || true)"
     fi
+
+    local success_metric="unbound_adblocker_import_success_bool"
+    echo "# HELP ${success_metric} bool that indicates success of the import"
+    echo "# TYPE ${success_metric} gauge"
+    echo "${success_metric} ${SUCCESS}"
+
+    local update_metric="unbound_adblocker_import_timestamp"
+    echo "# HELP ${update_metric} the timestamp of the last import"
+    echo "# TYPE ${update_metric} gauge"
+    echo "${update_metric} $(date +%s)"
+
+    local entries_metric="unbound_adblocker_entries_total"
+    echo "# HELP ${entries_metric} the number of entries the adblocker list has"
+    echo "# TYPE ${entries_metric} gauge"
+    echo "${entries_metric} ${entries}"
+
+    local duration_metric="unbound_adblocker_import_duration_sec"
+    echo "# HELP ${duration_metric} the duration of the last import"
+    echo "# TYPE ${duration_metric} gauge"
+    echo "${duration_metric} $(( SECONDS - START ))"
 }
 
+# ---------------------------------------------------------------------------
+# main
+# ---------------------------------------------------------------------------
 main() {
-    if [ $(id -u) -ne 0 ]; then
-        echo "This script must be run as root"
+    parse_args "$@"
+
+    trap cleanup EXIT
+    START=${SECONDS}
+
+    local metric_file="${PROMETHEUS_TEXTFILE_DIR}/unbound_adblocker.prom"
+
+    if [ ! -w "$(dirname "${ADSERVERS_FILE}")" ]; then
+        echo "$(dirname "${ADSERVERS_FILE}") is not writable by $(id -un)" >&2
         exit 1
     fi
-    
-    START=$SECONDS
-    OS="$(uname)"
 
     if [ -f "${ADSERVERS_FILE}" ]; then
-        CHECKSUM_OLD=$(checksum ${ADSERVERS_FILE})
+        CHECKSUM_OLD="$(checksum "${ADSERVERS_FILE}")"
+    fi
+
+    if fetch_list; then
+        apply_changes
     else
-        CHECKSUM_OLD=""
+        echo "Could not fetch the blocklist, keeping the existing file" >&2
     fi
 
-    fetch_list
-    apply_changes
-
-    if [ -d ${PROMETHEUS_TEXTFILE_DIR} ]; then
-        print_metrics > ${METRIC_FILE}.tmp
-        mv ${METRIC_FILE}.tmp ${METRIC_FILE}
+    if [ -d "${PROMETHEUS_TEXTFILE_DIR}" ] && [ -w "${PROMETHEUS_TEXTFILE_DIR}" ]; then
+        print_metrics > "${metric_file}.tmp"
+        mv "${metric_file}.tmp" "${metric_file}"
     fi
+
+    [ "${SUCCESS}" -eq 1 ]
 }
 
-main
+main "$@"

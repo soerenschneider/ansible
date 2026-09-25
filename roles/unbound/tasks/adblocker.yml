@@ -3,9 +3,7 @@
   ansible.builtin.user:
     name: "{{ unbound_adblocker_update_user }}"
     shell: /sbin/nologin
-    home: /nonexistent
     create_home: false
-    append: true
   tags: [unbound, adblocker]
 
 - name: Make sure adblocker db exists

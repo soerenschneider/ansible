@@ -3,7 +3,7 @@
   hosts: seedbox
   become: true
   vars:
-    baseline_enable_firewall: false
+    baseline_firewall_enabled: false
   tasks:
     - name: "Run role platform"
       ansible.builtin.include_role:

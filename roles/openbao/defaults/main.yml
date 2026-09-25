@@ -1,22 +1,12 @@
 ---
+# ============================================================================
+# Installation
+# ============================================================================
 # renovate: datasource=github-releases depName=openbao/openbao
 openbao_version: v2.6.2
 
-# renovate: datasource=github-releases depName=openbao/openbao-plugins
-openbao_plugin_secret_aws_version: "secrets-aws-v0.2.0"
-
 openbao_user: "openbao"
 openbao_group: "openbao"
-
-openbao_address: "http://localhost:{{ openbao_port }}"
-openbao_listen_address: "0.0.0.0:{{ openbao_port }}"
-openbao_port: 8200
-
-openbao_dir: "/etc/openbao.d"
-openbao_plugin_dir: "/opt/openbao/plugins"
-openbao_storage_dir: "{{ openbao_dir }}/storage"
-openbao_config_file: "{{ openbar_dir }}/openbao.hcl"
-openbao_ui: true
 
 openbao_gpg_key_path: "/usr/share/keyrings/openbao-archive-keyring.gpg"
 openbao_apt_repo_uri: "https://pkgs.openbao.org/deb/"
@@ -24,7 +14,19 @@ openbao_apt_repo_file: "/etc/apt/sources.list.d/openbao.sources"
 openbao_rpm_baseurl: "https://pkgs.openbao.org/rpm/$basearch"
 openbao_rpm_repo_file: "/etc/yum.repos.d/openbao.repo"
 openbao_rpm_gpg_key_path: "/etc/pki/rpm-gpg/openbao-gpg-pub.asc"
+openbao_gpg_fingerprint: "66D15FDD87287219C8E15478D200CD702853E6D0"
 
+# ============================================================================
+# Paths
+# ============================================================================
+openbao_config_dir: "/etc/openbao"
+openbao_plugin_dir: "/opt/openbao/plugins"
+openbao_storage_dir: "/opt/openbao/storage"
+openbao_config_file: "{{ openbao_config_dir }}/openbao.hcl"
+
+# ============================================================================
+# Role behaviour
+# ============================================================================
 # openbao_gpg_keys is used to encrypt root token when initializing openbao
 openbao_gpg_keys: {}
 openbao_allow_insecure: false
@@ -32,10 +34,218 @@ openbao_tls_key: ""
 openbao_tls_crt: ""
 openbao_ansible_group_name: vault
 openbao_configure_server: true
-
-openbao_audit_log: "/var/log/openbao-audit.log"
+openbao_force_init: false
 
 openbao_cluster_name: "prod"
-openbao_cluster_nodes_group: "vault"
+openbao_cluster_nodes_group: "openbao"
 openbao_cluster_first_node: "{{ groups[openbao_cluster_nodes_group][0] }}"
-openbao_gpg_fingerprint: "66D15FDD87287219C8E15478D200CD702853E6D0"
+
+# ============================================================================
+# Addresses and listeners
+# ============================================================================
+openbao_port: 8200
+openbao_cluster_port: 8201
+
+openbao_api_scheme: "{{ 'http' if openbao_tls_disable | bool else 'https' }}"
+
+# Local address the role's own tasks use to talk to the server.
+openbao_address: "{{ openbao_api_scheme }}://{{ inventory_hostname }}:{{ openbao_port }}"
+
+# Bind addresses
+openbao_listen_address: "127.0.0.1:{{ openbao_port }}"
+openbao_cluster_listen_address: "127.0.0.1:{{ openbao_cluster_port }}"
+
+# Advertised addresses. The hostname must resolve from clients and peers and
+# be present in the TLS certificate's SANs.
+openbao_api_addr: "{{ openbao_api_scheme }}://{{ inventory_hostname }}:{{ openbao_port }}"
+openbao_cluster_addr: "https://{{ inventory_hostname }}:{{ openbao_cluster_port }}"
+
+openbao_ui: true
+
+# ============================================================================
+# Integrated Storage (Raft)
+# ============================================================================
+openbao_raft_path: "{{ openbao_storage_dir }}"
+openbao_raft_node_id: "{{ inventory_hostname }}"
+openbao_raft_performance_multiplier: 1
+openbao_raft_autopilot_reconcile_interval: "10s"
+openbao_raft_autopilot_update_interval: "2s"
+openbao_raft_retry_join_as_non_voter: false
+
+# One entry per cluster member. The template skips the entry whose api_addr
+# matches this node's openbao_api_addr, so both must be built the same way.
+# Per-peer keys: api_addr, auto_join, auto_join_scheme, auto_join_port,
+# leader_tls_servername.
+openbao_raft_peers: >-
+  {{ groups[openbao_cluster_nodes_group] | default([])
+     | map('regex_replace', '^(.+)$',
+           '{"api_addr": "' ~ openbao_api_scheme ~ '://\1:' ~ openbao_port ~ '"}')
+     | map('from_json')
+     | list }}
+
+openbao_raft_leader_tls_servername: ""
+
+# Optional. The template checks these with `is defined`, so they stay
+# commented out; uncomment to render them.
+# openbao_raft_leader_ca_cert_file: "{{ openbao_config_dir }}/tls/ca.crt"
+# openbao_raft_leader_client_cert_file: "{{ openbao_config_dir }}/tls/client.crt"
+# openbao_raft_leader_client_key_file: "{{ openbao_config_dir }}/tls/client.key"
+# openbao_raft_trailing_logs: 10000
+# openbao_raft_snapshot_threshold: 8192
+# openbao_raft_snapshot_interval: 120
+# openbao_raft_max_entry_size: 1048576
+# openbao_raft_max_transaction_size: 1048576
+
+# ============================================================================
+# TLS (primary listener)
+# ============================================================================
+openbao_tls_disable: false
+openbao_tls_cert_file: "{{ openbao_config_dir }}/tls/tls.crt"
+openbao_tls_key_file: "{{ openbao_config_dir }}/tls/tls.key"
+openbao_tls_min_version: "tls13"
+openbao_tls_max_version: "tls13"
+openbao_tls_cipher_suites: ""
+openbao_tls_require_client_cert: false
+openbao_tls_client_ca_file: ""
+
+# ============================================================================
+# HTTP limits and timeouts
+# ============================================================================
+openbao_http_read_header_timeout: "10s"
+openbao_http_read_timeout: "30s"
+openbao_http_idle_timeout: "5m"
+openbao_http_write_timeout: "0"
+openbao_max_request_size: 33554432
+openbao_max_request_duration: "90s"
+# openbao_max_request_json_memory: 33554432
+# openbao_max_request_json_strings: 1000
+
+openbao_disable_unauthed_rekey_endpoints: true
+openbao_disable_unauthed_generate_root_endpoints: true
+
+# ============================================================================
+# Load balancer / client IP forwarding
+# ============================================================================
+# Addresses allowed to tell OpenBao the real client IP, via the PROXY
+# protocol header or, if enabled, X-Forwarded-For.
+# Empty list = neither is configured; the proxy's address is logged as client.
+openbao_trusted_proxy_cidrs: []
+
+# How the API listener handles the PROXY protocol header (HAProxy
+# `send-proxy`, mode tcp). "" = off. Must be on while HAProxy sends it.
+openbao_proxy_protocol_behavior: "allow_authorized"
+
+# Only for an HTTP-mode load balancer that sets X-Forwarded-For.
+# Leave false with HAProxy in mode tcp; the two settings below are
+# ignored while this is false.
+openbao_x_forwarded_for_enabled: false
+openbao_x_forwarded_for_hop_skips: 0
+openbao_x_forwarded_for_reject_not_present: false
+
+# ============================================================================
+# Metrics and profiling
+# ============================================================================
+openbao_unauthenticated_metrics_access: false
+openbao_unauthenticated_pprof_access: false
+
+openbao_metrics_listener_enabled: false
+openbao_metrics_listen_address: "127.0.0.1:9101"
+openbao_metrics_tls_disable: "{{ openbao_tls_disable }}"
+openbao_metrics_tls_cert_file: "{{ openbao_tls_cert_file }}"
+openbao_metrics_tls_key_file: "{{ openbao_tls_key_file }}"
+openbao_metrics_unauthenticated: true
+openbao_metrics_path: ""
+
+openbao_telemetry:
+  prometheus_retention_time: "24h"
+  disable_hostname: true
+
+# ============================================================================
+# Response headers
+# ============================================================================
+openbao_response_headers:
+  Strict-Transport-Security: ["max-age=31536000", "includeSubDomains"]
+  X-Content-Type-Options: ["nosniff"]
+  X-Frame-Options: ["DENY"]
+  Referrer-Policy: ["no-referrer"]
+
+# ============================================================================
+# Seal
+# ============================================================================
+# Empty = Shamir (manual unseal). Example for auto-unseal via Transit:
+# openbao_seal:
+#   type: transit
+#   config:
+#     address: "https://transit.example.com:8200"
+#     key_name: "autounseal"
+#     mount_path: "transit/"
+#     token: "{{ vault_transit_token }}"
+openbao_seal: {}
+
+# ============================================================================
+# Audit
+# ============================================================================
+openbao_audit_log_dir: "/var/log/openbao"
+openbao_audit_log: "{{ openbao_audit_log_dir }}/audit.log"
+openbao_audit_devices: []
+#  - type: file
+#    path: "file/"
+#    description: "Primary file audit device"
+#    options:
+#      file_path: "{{ openbao_audit_log }}"
+#      mode: "0600"
+
+# ============================================================================
+# Login lockout
+# ============================================================================
+# Empty = upstream defaults. Example:
+# openbao_user_lockout:
+#   all:
+#     lockout_threshold: 5
+#     lockout_duration: "15m"
+#     lockout_counter_reset: "15m"
+openbao_user_lockout: {}
+
+# ============================================================================
+# Logging
+# ============================================================================
+openbao_log_level: "info"
+openbao_log_format: "json"
+# Empty = log to stderr (journald).
+openbao_log_file: ""
+openbao_log_rotate_duration: "24h"
+openbao_log_rotate_max_files: 30
+# openbao_log_rotate_bytes: 104857600
+openbao_log_requests_level: ""
+
+# ============================================================================
+# Leases
+# ============================================================================
+openbao_default_lease_ttl: "768h"
+openbao_max_lease_ttl: "768h"
+openbao_default_max_request_duration: "90s"
+
+# openbao_disable_standby_reads: false
+
+# ============================================================================
+# Plugins
+# ============================================================================
+openbao_plugin_directory: "{{ openbao_plugin_dir }}"
+openbao_plugin_auto_download: true
+openbao_plugin_auto_register: true
+
+openbao_plugins:
+  - type: secret
+    name: aws
+    image: ghcr.io/openbao/openbao-plugin-secrets-aws
+    # renovate: datasource=github-releases depName=openbao/openbao-plugins extractVersion=^secrets-aws-(?<version>v.+)$
+    version: v0.3.1
+    binary_name: openbao-plugin-secrets-aws
+    # Must be updated together with version.
+    sha256sum: "641ae1858c0f660b4c3761286d627e1dcfd33dc35e7c83eb81ca9050b5bdc6d8"
+
+# ============================================================================
+# Escape hatch
+# ============================================================================
+# Raw HCL appended to the end of the config.
+openbao_extra_config: ""

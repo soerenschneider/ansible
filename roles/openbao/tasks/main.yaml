@@ -8,6 +8,10 @@
   tags: [openbao, openbao-install]
   when: ansible_facts["os_family"] == "Debian" or ansible_facts["os_family"] == "RedHat"
 
+- name: "Run tasks configure.yaml"
+  ansible.builtin.include_tasks: "configure.yaml"
+  tags: [openbao, openbao-configure]
+
 - name: "Run tasks init.yaml"
   ansible.builtin.include_tasks: "init.yaml"
   tags: [openbao, openbao-configure, openbao-init]

@@ -7,8 +7,8 @@
   ansible.builtin.include_tasks: sysctl.yml
   tags: [base, base-resilience, sysctl]
 
-- name: "Run tasks net-data-validate.yaml"
-  ansible.builtin.include_tasks: "net-data-validate.yaml"
+- name: "Run tasks net_data_validate.yaml"
+  ansible.builtin.include_tasks: "net_data_validate.yaml"
   tags: [base, network, firewall, always]
 
 - name: "Run tasks firewall_data.yml"

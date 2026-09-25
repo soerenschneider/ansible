@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 LIVE_DIR=/etc/letsencrypt/live/
-OPENBAO_DIR={{ openbao_dir }}
+OPENBAO_DIR={{ openbao_config_dir }}
 WHITELIST="{{ openbao_cert_whitelist | default('')}}"
 RESTART="false"
 

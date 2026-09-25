@@ -8,10 +8,14 @@
 # Requires the `ansible.utils` collection for CIDR containment.
 # Everything else is plain Jinja, and all IP range comparisons are done
 # on octet lists so they need no extra plugins.
+#
+# Every fact set here starts with `baseline_`; scratch facts start with
+# `_baseline_`. baseline_net_pools_flat and baseline_net_hosts_flat stay
+# available after the checks pass.
 
 - name: Flatten pools into a checkable list
   ansible.builtin.set_fact:
-    _net_pools_json: >-
+    _baseline_net_pools_json: >-
       {%- set out = [] -%}
       {%- for site, net in networks.items() -%}
       {%- for dev in net.devices | default([]) -%}
@@ -42,7 +46,7 @@
 
 - name: Flatten hosts into a checkable list
   ansible.builtin.set_fact:
-    _net_hosts_json: >-
+    _baseline_net_hosts_json: >-
       {%- set out = [] -%}
       {%- for site, net in networks.items() -%}
       {%- for dev in net.devices | default([]) -%}
@@ -70,8 +74,8 @@
 
 - name: Decode the flattened lists
   ansible.builtin.set_fact:
-    net_pools_flat: "{{ _net_pools_json | from_json }}"
-    net_hosts_flat: "{{ _net_hosts_json | from_json }}"
+    baseline_net_pools_flat: "{{ _baseline_net_pools_json | from_json }}"
+    baseline_net_hosts_flat: "{{ _baseline_net_hosts_json | from_json }}"
   tags: [always, firewall, baseline]
 
 # ---------------------------------------------------------------------------
@@ -91,7 +95,7 @@
       unexpected keys={{ item.extra_keys }}.
       Unexpected keys usually mean a nested pool -- check the indentation.
     quiet: true
-  loop: "{{ net_pools_flat }}"
+  loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -106,7 +110,7 @@
       {{ item.network }}. Use
       {{ item.network }}/{{ item.cidr | ansible.utils.ipaddr('prefix') }}.
     quiet: true
-  loop: "{{ net_pools_flat }}"
+  loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -122,17 +126,17 @@
       {{ item.dev_cidr | ansible.utils.ipaddr('subnet') }}.
     quiet: true
   when: item.dev_cidr | length > 0
-  loop: "{{ net_pools_flat }}"
+  loop: "{{ baseline_net_pools_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.device }}/{{ item.name }}"
   tags: [always, firewall, baseline]
 
 - name: Find overlapping pools within a device
   ansible.builtin.set_fact:
-    _net_pool_overlaps_json: >-
+    _baseline_net_pool_overlaps_json: >-
       {%- set out = [] -%}
-      {%- for a in net_pools_flat -%}
-      {%- for b in net_pools_flat -%}
+      {%- for a in baseline_net_pools_flat -%}
+      {%- for b in baseline_net_pools_flat -%}
       {%- if a.site == b.site and a.device == b.device and a.name < b.name -%}
       {%- if not (a.last < b.first or a.first > b.last) -%}
       {{- out.append(a.site ~ '/' ~ a.device ~ ': ' ~ a.name ~ ' (' ~ a.cidr ~ ') overlaps ' ~ b.name ~ ' (' ~ b.cidr ~ ')') or '' -}}
@@ -145,16 +149,16 @@
 
 - name: Decode the overlap list
   ansible.builtin.set_fact:
-    _net_pool_overlaps: "{{ _net_pool_overlaps_json | from_json }}"
+    _baseline_net_pool_overlaps: "{{ _baseline_net_pool_overlaps_json | from_json }}"
   tags: [always, firewall, baseline]
 
 - name: Pools within a device do not overlap
   ansible.builtin.assert:
     that:
-      - _net_pool_overlaps | length == 0
+      - _baseline_net_pool_overlaps | length == 0
     fail_msg: |
       Overlapping pools (a host IP must fall in exactly one pool):
-      {% for o in _net_pool_overlaps %}
+      {% for o in _baseline_net_pool_overlaps %}
         - {{ o }}
       {% endfor %}
     quiet: true
@@ -173,7 +177,7 @@
       Host {{ item.site }}/{{ item.name }} has no usable `logical`
       (got {{ item.ip | default('MISSING') }}).
     quiet: true
-  loop: "{{ net_hosts_flat }}"
+  loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -189,7 +193,7 @@
       {{ item.site }}/{{ item.name }} ({{ item.ip }}) is outside pool
       {{ item.pool }} ({{ item.pool_cidr }}).
     quiet: true
-  loop: "{{ net_hosts_flat }}"
+  loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -205,7 +209,7 @@
       Usable range is {{ item.pool_cidr | ansible.utils.ipaddr('range_usable') }}.
     quiet: true
   when: (item.pool_cidr | ansible.utils.ipaddr('prefix') | int) < 31
-  loop: "{{ net_hosts_flat }}"
+  loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -223,7 +227,7 @@
   when:
     - item.dhcp_from | length > 0
     - item.dhcp_to | length > 0
-  loop: "{{ net_hosts_flat }}"
+  loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -237,7 +241,7 @@
       lowercase hex octets separated by colons.
     quiet: true
   when: item.mac | length > 0
-  loop: "{{ net_hosts_flat }}"
+  loop: "{{ baseline_net_hosts_flat }}"
   loop_control:
     label: "{{ item.site }}/{{ item.name }}"
   tags: [always, firewall, baseline]
@@ -248,19 +252,25 @@
 
 - name: Collect keys for uniqueness checks
   ansible.builtin.set_fact:
-    _net_site_ips: "{{ net_hosts_flat | map(attribute='site') | zip(net_hosts_flat | map(attribute='ip')) | map('join', ' ') | list }}"
-    _net_site_names: "{{ net_hosts_flat | map(attribute='site') | zip(net_hosts_flat | map(attribute='name')) | map('join', ' ') | list }}"
-    _net_macs: "{{ net_hosts_flat | map(attribute='mac') | select('!=', '') | list }}"
+    _baseline_net_site_ips: >-
+      {{ baseline_net_hosts_flat | map(attribute='site')
+         | zip(baseline_net_hosts_flat | map(attribute='ip'))
+         | map('join', ' ') | list }}
+    _baseline_net_site_names: >-
+      {{ baseline_net_hosts_flat | map(attribute='site')
+         | zip(baseline_net_hosts_flat | map(attribute='name'))
+         | map('join', ' ') | list }}
+    _baseline_net_macs: "{{ baseline_net_hosts_flat | map(attribute='mac') | select('!=', '') | list }}"
   tags: [always, firewall, baseline]
 
 - name: Addresses are unique within a site
   ansible.builtin.assert:
     that:
-      - _net_site_ips | length == _net_site_ips | unique | length
+      - _baseline_net_site_ips | length == _baseline_net_site_ips | unique | length
     fail_msg: |
       Duplicate addresses:
-      {% for k in _net_site_ips | unique if _net_site_ips.count(k) > 1 %}
-        - {{ k }} ({{ _net_site_ips.count(k) }}x)
+      {% for k in _baseline_net_site_ips | unique if _baseline_net_site_ips.count(k) > 1 %}
+        - {{ k }} ({{ _baseline_net_site_ips.count(k) }}x)
       {% endfor %}
     quiet: true
   tags: [always, firewall, baseline]
@@ -268,32 +278,32 @@
 - name: Hostnames are unique within a site
   ansible.builtin.assert:
     that:
-      - _net_site_names | length == _net_site_names | unique | length
+      - _baseline_net_site_names | length == _baseline_net_site_names | unique | length
     fail_msg: |
       Duplicate hostnames (same name in two pools of one site):
-      {% for k in _net_site_names | unique if _net_site_names.count(k) > 1 %}
-        - {{ k }} ({{ _net_site_names.count(k) }}x)
+      {% for k in _baseline_net_site_names | unique if _baseline_net_site_names.count(k) > 1 %}
+        - {{ k }} ({{ _baseline_net_site_names.count(k) }}x)
       {% endfor %}
     quiet: true
   tags: [always, firewall, baseline]
 
-# - name: MAC addresses are globally unique
-#   ansible.builtin.assert:
-#     that:
-#       - _net_macs | length == _net_macs | unique | length
-#     fail_msg: |
-#       Duplicate MACs. Floating devices belong in `network_floating_devices`
-#       and should appear once per site, not twice in one:
-#       {% for k in _net_macs | unique if _net_macs.count(k) > 1 %}
-#         - {{ k }} ({{ _net_macs.count(k) }}x)
-#       {% endfor %}
-#     quiet: true
-#   tags: [always, firewall, baseline]
+#- name: MAC addresses are globally unique
+#  ansible.builtin.assert:
+#    that:
+#      - _baseline_net_macs | length == _baseline_net_macs | unique | length
+#    fail_msg: |
+#      Duplicate MACs. Floating devices belong in `network_floating_devices`
+#      and should appear once per site, not twice in one:
+#      {% for k in _baseline_net_macs | unique if _baseline_net_macs.count(k) > 1 %}
+#        - {{ k }} ({{ _baseline_net_macs.count(k) }}x)
+#      {% endfor %}
+#    quiet: true
+#  tags: [always, firewall, baseline]
 
 - name: Summarise
   ansible.builtin.debug:
     msg: >-
       networks OK: {{ networks | length }} sites,
-      {{ net_pools_flat | length }} pools,
-      {{ net_hosts_flat | length }} hosts.
+      {{ baseline_net_pools_flat | length }} pools,
+      {{ baseline_net_hosts_flat | length }} hosts.
   tags: [always, firewall, baseline]

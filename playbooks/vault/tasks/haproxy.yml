@@ -23,10 +23,10 @@
         no log
         stats hide-version
 
-      # Vault has a http health endpoint on /v1/sys/health that returns different http codes
-      # depending on the status of the running vault instance.
+      # openbao has a http health endpoint on /v1/sys/health that returns different http codes
+      # depending on the status of the running openbao instance.
       #
-      # See: https://www.vaultproject.io/api/system/health.html#read-health-information
+      # See: https://www.openbaoproject.io/api/system/health.html#read-health-information
       #
       #    * 200 if initialized, unsealed, and active
       #    * 429 if unsealed and standby
@@ -35,24 +35,24 @@
       #    * 501 if not initialized
       #    * 503 if sealed
       # Primary https listener
-      frontend vault_https
+      frontend openbao_https
         mode tcp
         log global
         timeout client 30000
         bind *:443
-        description Vault over https
-        default_backend vault_https
+        description openbao over https
+        default_backend openbao_https
         option tcplog
 
-      backend vault_https
+      backend openbao_https
         mode tcp
         timeout check 5000
         timeout server 30000
         timeout connect 5000
         option httpchk GET /v1/sys/health
         http-check expect rstatus (200|429)
-      {% for node in groups['vault'] %}
-        server vault-{{ loop.index }} {{ node }}:8200 check check-ssl verify none send-proxy inter 5000
+      {% for node in groups['openbao'] %}
+        server openbao-{{ loop.index }} {{ node }}:8200 check ssl verify none send-proxy inter 5000 resolve-prefer ipv4
       {% endfor %}
 
       backend node_exporter

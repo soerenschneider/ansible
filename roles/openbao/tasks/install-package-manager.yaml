@@ -261,6 +261,24 @@
 # Post-install (both families)
 # -------------------------------------------------------------------------
 
+- name: Ensure OpenBao plugin directory exists
+  ansible.builtin.file:
+    path: "{{ openbao_plugin_directory }}"
+    state: directory
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0750"
+  when: openbao_plugin_directory | length > 0
+
+- name: Ensure OpenBao audit directory exists
+  ansible.builtin.file:
+    path: "{{ openbao_audit_log }}"
+    state: directory
+    owner: "{{ openbao_user }}"
+    group: "{{ openbao_group }}"
+    mode: "0700"
+  when: openbao_plugin_directory | length > 0
+
 - name: "Verify OpenBao binary is present"
   tags: [openbao, openbao-install]
   ansible.builtin.command:

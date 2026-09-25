@@ -45,10 +45,6 @@
         daemon_reload: true
       when: wireguard_wg_timer is changed  # noqa: no-handler
 
-- name: "Run tasks validate-networks.yaml"
-  ansible.builtin.include_tasks: validate-networks.yaml
-  tags: [wireguard]
-
 - name: Mesh data is present
   ansible.builtin.assert:
     that:
