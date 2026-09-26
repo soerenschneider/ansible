@@ -1,0 +1,40 @@
+---
+- name: "Create aws dir"
+  ansible.builtin.file:
+    path: "/root/.aws"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0700"
+  tags: [acme, cert]
+
+- name: "Add credentials"
+  tags: [acme, cert]
+  when:
+    - acme_aws_credentials is defined
+    - inventory_hostname in acme_aws_credentials
+  block:
+    - name: "Decrypt AWS secret access key"
+      ansible.builtin.shell:
+        cmd: "set -o pipefail; base64 --decode | gpg --quiet --batch --decrypt"
+        executable: "/bin/bash"
+        stdin: "{{ acme_aws_credentials[inventory_hostname].aws_secret_access_key_encrypted }}"
+        stdin_add_newline: false
+      register: _acme_aws_decrypted
+      changed_when: false
+      check_mode: false
+      no_log: true
+
+    - name: "Set AWS credentials for this host"
+      ansible.builtin.set_fact:
+        acme_aws_access_key_id: "{{ acme_aws_credentials[inventory_hostname].aws_access_key_id }}"
+        acme_aws_secret_access_key: "{{ _acme_aws_decrypted.stdout }}"
+      no_log: true
+
+    - name: "Write AWS config"
+      ansible.builtin.template:
+        src: "templates/aws.config.j2"
+        dest: "/root/.aws/config"
+        owner: "root"
+        group: "root"
+        mode: "0600"

@@ -1,34 +1,56 @@
 #!/usr/bin/env bash
+set -euo pipefail
+shopt -s nullglob
 
-LIVE_DIR=/etc/letsencrypt/live/
+LIVE_DIR=/etc/letsencrypt/live
 OPENBAO_DIR="{{ openbao_config_dir }}/tls"
-WHITELIST="{{ openbao_cert_whitelist | default('')}}"
-RESTART="false"
+OWNER="{{ openbao_user | default('openbao') }}"
+GROUP="{{ openbao_group | default('openbao') }}"
+# space-separated lineage names; empty means all
+ALLOWLIST="{{ [openbao_cert_whitelist | default([])] | flatten | join(' ') }}"
+RELOAD=false
 
-if [ ! -d ${LIVE_DIR} ]; then
-    echo "dir doesn't exist"
-    exit 1
+if [[ ! -d "${LIVE_DIR}" ]]; then
+  echo "${LIVE_DIR} does not exist" >&2
+  exit 1
 fi
 
+allowed() {
+  [[ -z "${ALLOWLIST}" ]] && return 0
+  local a
+  for a in ${ALLOWLIST}; do
+    [[ "${a}" == "$1" ]] && return 0
+  done
+  return 1
+}
+
 for dir in "${LIVE_DIR}"/*/; do
-    dir=${dir%*/}
-    host="$(basename ${dir})"
+  dir=${dir%/}
+  host=$(basename "${dir}")
 
-    if [ -n "${WHITELIST}" ] && [ "${WHITELIST}" != "${host}" ]; then
-	    echo "${host} does not match ${WHITELIST}, continuing"
-	    continue
-    fi
+  if ! allowed "${host}"; then
+    echo "${host} not in allowlist, skipping"
+    continue
+  fi
 
-    if [[ ! -f "${OPENBAO_DIR}/${host}.cer" ]] || ! diff "${dir}/fullchain.pem" "${OPENBAO_DIR}/${host}.cer" > /dev/null; then
-      cp "${dir}/fullchain.pem" "${OPENBAO_DIR}/${host}.cer"
-      cp "${dir}/privkey.pem" "${OPENBAO_DIR}/${host}.key"
-      chown "{{ openbao_user | default('openbao') }}:{{ openbao_group | default('openbao') }}" "${OPENBAO_DIR}/${host}.cer"
-      chown "{{ openbao_user | default('openbao') }}:{{ openbao_group | default('openbao') }}" "${OPENBAO_DIR}/${host}.key"
-      RESTART="true"
-    fi
+  cert="${OPENBAO_DIR}/${host}.cer"
+  key="${OPENBAO_DIR}/${host}.key"
+
+  if [[ -f "${cert}" && -f "${key}" ]] \
+     && cmp -s "${dir}/fullchain.pem" "${cert}" \
+     && cmp -s "${dir}/privkey.pem" "${key}"; then
+    continue
+  fi
+
+  echo "Updating certificate for ${host}"
+  install -m 0640 -o "${OWNER}" -g "${GROUP}" "${dir}/fullchain.pem" "${cert}.tmp"
+  install -m 0600 -o "${OWNER}" -g "${GROUP}" "${dir}/privkey.pem" "${key}.tmp"
+  mv -f "${key}.tmp" "${key}"
+  mv -f "${cert}.tmp" "${cert}"
+  RELOAD=true
 done
 
-if [[ "${RESTART}" = "true" ]]; then
-  echo "Restarting openbao"
-  systemctl restart openbao
+if [[ "${RELOAD}" == "true" ]]; then
+  echo "Reloading openbao"
+  systemctl reload openbao
 fi

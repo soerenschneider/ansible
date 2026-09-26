@@ -67,7 +67,7 @@
 
     - name: Write age public key to common directory
       ansible.builtin.copy:
-        dest: "{{ baseline_pubkey_dir }}/age"
+        dest: "{{ baseline_crypto_pubkey_dir }}/age"
         content: "{{ baseline_age_public_key }}\n"
         owner: root
         group: root

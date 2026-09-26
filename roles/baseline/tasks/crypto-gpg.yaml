@@ -105,7 +105,7 @@
 
     - name: Write GPG public key to common directory
       ansible.builtin.copy:
-        dest: "{{ baseline_pubkey_dir }}/gpg"
+        dest: "{{ baseline_crypto_pubkey_dir }}/gpg"
         content: "{{ baseline_gpg_pubkey_cmd.stdout }}\n"
         owner: root
         group: root
@@ -113,7 +113,7 @@
 
     - name: Write GPG fingerprint to common directory
       ansible.builtin.copy:
-        dest: "{{ baseline_pubkey_dir }}/gpg_fingerprint"
+        dest: "{{ baseline_crypto_pubkey_dir }}/gpg_fingerprint"
         content: "{{ baseline_gpg_fingerprint }}\n"
         owner: root
         group: root

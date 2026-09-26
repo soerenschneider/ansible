@@ -91,13 +91,13 @@ baseline_facts_dir: /etc/ansible/facts.d
 # age
 baseline_age_auto_gen: true
 baseline_age_force_keygen: false
-
 baseline_age_bin: /usr/bin/age-keygen
-baseline_age_key_path: "/etc/baseline/private/age.key"
+baseline_age_key_path: "{{ baseline_crypto_private_dir }}/age.key"
 
 # gpg
 baseline_gpg_auto_gen: true
-baseline_gpg_home: "/etc/host-gpg"
+baseline_gpg_force_keygen: false
+baseline_gpg_home: "{{ baseline_crypto_private_dir }}/gnupg"
 # rsa4096 or ed25519 (ed25519 = EdDSA primary + cv25519 encryption subkey).
 # Only affects newly generated keys; existing keys are left alone.
 baseline_gpg_key_algo: rsa4096

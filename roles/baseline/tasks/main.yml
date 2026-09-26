@@ -157,25 +157,41 @@
   ansible.builtin.include_tasks: "crypto-gpg.yaml"
   tags: always
 
-# Writes {"host_age_keys": {host: key}, "host_gpg_keys": {host: key}}
-# for all hosts in the play that reported keys.
-- name: Write aggregated public key map on controller
-  ansible.builtin.copy:
-    dest: "{{ baseline_pubkey_harvest_file }}"
-    mode: "0644"
-    content: |
-      {%- set out = {'host_age_keys': {}, 'host_gpg_keys': {}} -%}
-      {%- for h in ansible_play_hosts -%}
-      {%-   set k = (hostvars[h].ansible_local | default({})).baseline_pubkeys | default({}) -%}
-      {%-   if k.age is defined %}{% set _ = out.host_age_keys.update({h: k.age}) %}{% endif -%}
-      {%-   if k.gpg is defined %}{% set _ = out.host_gpg_keys.update({h: k.gpg}) %}{% endif -%}
-      {%- endfor -%}
-      {{ out | to_nice_json }}
+# Merges {"host_age_keys": {host: key}, "host_gpg_keys": {host: key}}
+# for all hosts in the play into the existing file. Hosts not in the play
+# keep their entries; hosts in the play get their entries updated.
+- name: Harvest public keys to controller
+  when: baseline_pubkey_harvest_file | default("") | length > 0
   delegate_to: localhost
   become: false
   run_once: true
-  when: baseline_pubkey_harvest_file | default("") | length > 0
   tags: always
+  block:
+    - name: Check for existing public key map
+      ansible.builtin.stat:
+        path: "{{ baseline_pubkey_harvest_file }}"
+      register: baseline_pubkey_harvest_stat
+
+    - name: Read existing public key map
+      ansible.builtin.slurp:
+        src: "{{ baseline_pubkey_harvest_file }}"
+      register: baseline_pubkey_harvest_existing
+      when: baseline_pubkey_harvest_stat.stat.exists
+
+    - name: Write merged public key map
+      ansible.builtin.copy:
+        dest: "{{ baseline_pubkey_harvest_file }}"
+        mode: "0644"
+        content: |
+          {%- set old = (baseline_pubkey_harvest_existing.content | b64decode | from_json)
+                if baseline_pubkey_harvest_stat.stat.exists else {} -%}
+          {%- set new = {'host_age_keys': {}, 'host_gpg_keys': {}} -%}
+          {%- for h in ansible_play_hosts -%}
+          {%-   set k = (hostvars[h].ansible_local | default({})).baseline_pubkeys | default({}) -%}
+          {%-   if k.age is defined %}{% set _ = new.host_age_keys.update({h: k.age}) %}{% endif -%}
+          {%-   if k.gpg is defined %}{% set _ = new.host_gpg_keys.update({h: k.gpg}) %}{% endif -%}
+          {%- endfor -%}
+          {{ old | combine(new, recursive=True) | to_nice_json }}
 
 - name: "Run tasks wake_on_lan.yaml"
   ansible.builtin.include_tasks: wake_on_lan.yaml
