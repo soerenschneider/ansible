@@ -12,13 +12,10 @@
         name: "platform"
       tags: always
 
-    - name: "Run tasks haproxy.yml"
-      ansible.builtin.include_tasks: "tasks/haproxy.yml"
-      tags: "always"
-
     - name: "Run role certbot"
       ansible.builtin.include_role:
         name: "certbot"
+      throttle: 1  # Some of the Lets Encrypt hostname are shared, so make sure we only request one cert at a time
       tags: "always"
 
     - name: "Run tasks haproxy.yml"
