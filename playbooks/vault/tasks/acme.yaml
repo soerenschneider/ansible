@@ -16,14 +16,15 @@
   block:
     - name: "Decrypt AWS secret access key"
       ansible.builtin.shell:
-        cmd: "set -o pipefail; base64 --decode | gpg --quiet --batch --decrypt"
+        cmd: "set -o pipefail; base64 --decode | gpg --homedir {{ baseline_gpg_home }} --quiet --batch --decrypt"
         executable: "/bin/bash"
         stdin: "{{ acme_aws_credentials[inventory_hostname].aws_secret_access_key_encrypted }}"
         stdin_add_newline: false
       register: _acme_aws_decrypted
+      become_user: root
       changed_when: false
       check_mode: false
-      no_log: true
+      no_log: false
 
     - name: "Set AWS credentials for this host"
       ansible.builtin.set_fact:

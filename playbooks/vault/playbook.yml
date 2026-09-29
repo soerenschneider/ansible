@@ -12,6 +12,10 @@
         name: "platform"
       tags: always
 
+    - name: "Run tasks haproxy.yml"
+      ansible.builtin.include_tasks: "tasks/acme.yaml"
+      tags: "always"
+
     - name: "Run role certbot"
       ansible.builtin.include_role:
         name: "certbot"

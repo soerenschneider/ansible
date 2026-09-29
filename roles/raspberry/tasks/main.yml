@@ -1,4 +1,31 @@
 ---
+- name: Look for the firmware config.txt
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - /boot/firmware/config.txt   # Raspberry Pi OS Bookworm+, Ubuntu
+    - /boot/config.txt            # AlmaLinux, older Raspberry Pi OS
+  register: _raspberry_config_txt_candidates
+  when: raspberry_config_txt is not defined
+  tags: [raspberry, hw, bluetooth, leds, wifi]
+
+- name: Select the firmware config.txt path
+  ansible.builtin.set_fact:
+    raspberry_config_txt: >-
+      {{ _raspberry_config_txt_candidates.results
+         | selectattr('stat.exists')
+         | map(attribute='item')
+         | first
+         | default('/boot/config.txt') }}
+  when: raspberry_config_txt is not defined
+  tags: [raspberry, hw, bluetooth, leds, wifi]
+
+- name: Derive the kernel cmdline.txt path
+  ansible.builtin.set_fact:
+    raspberry_cmdline_txt: "{{ raspberry_config_txt | dirname }}/cmdline.txt"
+  when: raspberry_cmdline_txt is not defined
+  tags: [raspberry, hw, bluetooth, leds, wifi, serial]
+
 # ---------------------------------------------------------------------------
 # Detection
 # ---------------------------------------------------------------------------
@@ -70,12 +97,11 @@
 # of config.txt, revisit this.)
 - name: Set UART state in the Raspberry Pi firmware config
   ansible.builtin.lineinfile:
-    path: "{{ raspberry_boot_config_path }}"
+    path: "{{ raspberry_config_txt }}"
     regexp: '^\s*#?\s*enable_uart\s*=.*$'
     line: "enable_uart={{ 1 if (raspberry_enable_serial | default(true) | bool) else 0 }}"
     state: present
     create: false
-    backup: true
   become: true
   when: not (raspberry_serial_helper_used | bool)
   notify: Reboot required for firmware change
@@ -102,10 +128,9 @@
 
 - name: Remove the serial console from the kernel command line
   ansible.builtin.replace:
-    path: "{{ raspberry_boot_cmdline_path }}"
+    path: "{{ raspberry_cmdline_txt }}"
     regexp: '\s*\bconsole=(?:serial0|ttyAMA0|ttyS0),\d+\b'
     replace: ''
-    backup: true
   become: true
   when:
     - not (raspberry_enable_serial | default(true) | bool)
@@ -115,11 +140,10 @@
 
 - name: Add the serial console to the kernel command line
   ansible.builtin.lineinfile:
-    path: "{{ raspberry_boot_cmdline_path }}"
+    path: "{{ raspberry_cmdline_txt }}"
     regexp: '^(?!.*\bconsole=serial0\b)\s*(\S.*\S|\S)\s*$'
     line: '\1 console=serial0,{{ raspberry_serial_baud | default(115200) }}'
     backrefs: true
-    backup: true
   become: true
   when:
     - raspberry_enable_serial | default(true) | bool

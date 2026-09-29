@@ -1,5 +1,4 @@
 ---
-raspberry_boot_config_path: "/boot/firmware/config.txt"
 raspberry_boot_cmdline_path: "/boot/firmware/cmdline.txt"
 
 raspberry_passwordless_sudo: true

@@ -16,7 +16,7 @@
 
 - name: "Set Bluetooth hw status"
   ansible.builtin.lineinfile:
-    path: "/boot/firmware/config.txt"
+    path: "{{ raspberry_config_txt }}"
     insertafter: EOF
     line: dtoverlay=disable-bt
     state: "{% if raspberry_enable_bluetooth %}absent{% else %}present{% endif %}"
@@ -26,7 +26,7 @@
 
 - name: "Set LEDs status"
   ansible.builtin.lineinfile:
-    path: "/boot/firmware/config.txt"
+    path: "{{ raspberry_config_txt }}"
     insertafter: EOF
     line: "{{ item }}"
     state: "{% if raspberry_enable_leds %}absent{% else %}present{% endif %}"
@@ -36,7 +36,7 @@
 
 - name: "Disable HDMI"
   ansible.builtin.lineinfile:
-    path: "/boot/firmware/config.txt"
+    path: "{{ raspberry_config_txt }}"
     insertafter: EOF
     line: "dtoverlay=vc4-kms-v3d,nohdmi"
     state: "{% if raspberry_enable_hdmi %}absent{% else %}present{% endif %}"
@@ -45,7 +45,7 @@
 
 - name: "Set WiFi hardware status"
   ansible.builtin.lineinfile:
-    path: "/boot/firmware/config.txt"
+    path: "{{ raspberry_config_txt }}"
     insertafter: EOF
     line: dtoverlay=disable-wifi
     state: "{% if raspberry_enable_wifi %}absent{% else %}present{% endif %}"
