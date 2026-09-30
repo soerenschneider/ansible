@@ -29,7 +29,7 @@
   ansible.builtin.file:
     path: /etc/systemd/system/apt-daily.timer.d
     state: directory
-    oautoreboot_hourwner: root
+    owner: root
     group: root
     mode: "0750"
   when: automatic_sysupdates_unattended_daily_time | length > 0

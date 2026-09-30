@@ -32,8 +32,8 @@
 
     - name: "Copy cert hook"
       ansible.builtin.template:
-        src: "openbao-cert-hook.sh.j2"
-        dest: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"
+        src: "certbot-deploy-openbao.sh.j2"
+        dest: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"
         owner: "root"
         group: "root"
         mode: "0755"
@@ -43,4 +43,4 @@
   handlers:
     - name: "Run letsencrypt hook for openbao"
       changed_when: false
-      ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/openbao-cert-hook.sh"
+      ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"

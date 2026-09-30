@@ -38,7 +38,7 @@
 - name: "Rotate secret"
   ansible.builtin.include_tasks: run.yml
   with_items: "{{ vault_approles }}"
-  when: lookup('env', 'VAULT_TOKEN') | length > 0
+  when: lookup('env', 'VAULT_TOKEN') | length > 0 or lookup('env', 'BAO_TOKEN') | length > 0
   tags: [vault-approle, vault-approle-install, vault-approle-rotate]
 
 - name: "Restart sc-agent"

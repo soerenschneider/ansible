@@ -1,0 +1,57 @@
+---
+- name: Create baseline crypto and PKI directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: "directory"
+    owner: "root"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ baseline_dir }}", mode: "0755"}
+    - {path: "{{ baseline_crypto_pubkey_dir }}", mode: "0755"}
+    - {path: "{{ baseline_crypto_private_dir }}", mode: "0700"}
+    - {path: "{{ baseline_pki_dir }}", mode: "0755"}
+    - {path: "{{ baseline_pki_ca_dir }}", mode: "0755"}
+    - {path: "{{ baseline_pki_certs_dir }}", mode: "0755"}
+    - {path: "{{ baseline_pki_private_dir }}", mode: "0750", group: "{{ baseline_pki_private_group }}"}
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: "Add private CA"
+  ansible.builtin.copy:
+    content: "{{pki_soerenschneider_ca_crt }}"
+    dest: "{{pki_soerenschneider_ca_file }}"
+    owner: "root"
+    group: "{% if ansible_facts['system'] == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0644"
+  tags: [bootstrap, base, pki]
+
+- name: "Create signify dir"
+  ansible.builtin.file:
+    path: "{{ baseline_crypto_pubkey_dir }}/signify"
+    state: "directory"
+    owner: "root"
+    group: "{% if ansible_facts['system'] == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0755"
+  tags: [signify, base, base-signify]
+
+- name: "Add signify keys"
+  ansible.builtin.copy:
+    dest: "{{ baseline_crypto_pubkey_dir }}/signify/{{ item.filename }}"
+    content: "{{ item.public_key }}"
+    owner: "root"
+    group: "{% if ansible_facts['system'] == 'Linux' %}root{% else %}wheel{% endif %}"
+    mode: "0644"
+  with_items: "{{ signify_keys }}"
+  tags: [signify, base, base-signify]
+
+# TODO: Remove deprecated path from everywhere
+- name: "Link signify keys into /etc/signify"
+  ansible.builtin.file:
+    src: "{{ baseline_crypto_pubkey_dir }}/signify/{{ item.filename }}"
+    dest: "/etc/signify/{{ item.filename }}"
+    state: "link"
+    # replace regular files left behind by the old copy task
+    force: true
+  with_items: "{{ signify_keys }}"
+  tags: [signify, base, base-signify]

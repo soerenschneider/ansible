@@ -14,7 +14,7 @@
     path: /etc/haproxy/haproxy.cfg
     block: |
       listen stats
-        bind *:8405 ssl crt {{ acmevault_pem_file }} ca-file {{ pki_soerenschneider_ca_file }} verify required
+        bind *:8405 ssl crt {{ haproxy_cert_file }} ca-file {{ pki_srn_ca_file }} verify required
         # only allow the following CNs
         http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
@@ -26,7 +26,7 @@
       # openbao has a http health endpoint on /v1/sys/health that returns different http codes
       # depending on the status of the running openbao instance.
       #
-      # See: https://www.openbaoproject.io/api/system/health.html#read-health-information
+      # See: https://www.vaultproject.io/api/system/health.html#read-health-information
       #
       #    * 200 if initialized, unsealed, and active
       #    * 429 if unsealed and standby
@@ -52,8 +52,9 @@
         option httpchk GET /v1/sys/health
         http-check expect rstatus (200|429)
       {% for node in groups['openbao'] %}
-        server openbao-{{ loop.index }} {{ node }}:8200 check ssl verify none send-proxy inter 5000 resolve-prefer ipv4
+        server {{ node.split('.')[0] }} {{ '127.0.0.1' if node == inventory_hostname else node }}:{{ hostvars[node].openbao_port | default(8200) }} check check-ssl verify required ca-file {{ system_ca_bundle }} verifyhost {{ node }} check-sni {{ node }} send-proxy inter 5000
       {% endfor %}
+        #server openbao-1 127.0.0.1:8200 check check-ssl verify required ca-file @system-ca verifyhost bao-1.prd.dd.soeren.cloud check-sni bao-1.prd.dd.soeren.cloud send-proxy inter 5000
 
       backend node_exporter
         option httpchk

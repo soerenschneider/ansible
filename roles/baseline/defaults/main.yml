@@ -78,15 +78,22 @@ baseline_firewall_nftables_conf_by_os_family:
 baseline_firewall_disable_ufw: true
 baseline_firewall_disable_firewalld: true
 
+baseline_facts_dir: /etc/ansible/facts.d
+
 # Common location for public key material on every host (world-readable).
 # One file per key: age, gpg, gpg_fingerprint.
 # All key material lives under one root:
 #   pubkeys/  0755  public keys, one file per key (age, gpg, gpg_fingerprint)
 #   private/  0700  private keys (age.key, gnupg/)
-baseline_dir: /etc/baseline
+baseline_dir: "/etc/soeren.cloud"
 baseline_crypto_pubkey_dir: "{{ baseline_dir }}/pubkeys"
 baseline_crypto_private_dir: "{{ baseline_dir }}/private"
-baseline_facts_dir: /etc/ansible/facts.d
+
+baseline_pki_dir: "{{ baseline_dir }}/pki"
+baseline_pki_ca_dir: "{{ baseline_pki_dir }}/ca"             # trust anchors / intermediates
+baseline_pki_certs_dir: "{{ baseline_pki_dir }}/certs"       # leaf certs + chains
+baseline_pki_private_dir: "{{ baseline_pki_dir }}/private"   # TLS keys, 0700 / 0750 with service group
+baseline_pki_private_group: root
 
 # age
 baseline_age_auto_gen: true

@@ -1,0 +1,54 @@
+---
+- name: "Setup OpenBAO cluster"
+  hosts: "openbao"
+  become: true
+  tasks:
+    - name: Check whether OpenBao is initialized
+      ansible.builtin.uri:
+        url: "https://{{ inventory_hostname }}:8200/v1/sys/init"
+        return_content: true
+      register: openbao_init_status
+      retries: 10
+      delay: 3
+      until: openbao_init_status.status == 200
+
+    - name: "Init OpenBao"
+      when: not openbao_init_status.json.initialized or openbao_force_init | bool
+      tags: [openbao, openbao-configure, openbao-init]
+      block:
+        - name: "Add gpg keys"
+          ansible.builtin.copy:
+            content: "{{ item.value }}"
+            dest: "{{ openbao_config_dir }}/gpg-key-{{ item.key }}"
+            owner: "{{ openbao_user }}"
+            group: "{{ openbao_group }}"
+            mode: "0640"
+          with_items: "{{ openbao_gpg_keys | dict2items }}"
+
+        - name: "Run openbao operator init"
+          ansible.builtin.command:
+            cmd: "bao operator init -n=1 -t=1 -format=json {% if openbao_gpg_keys | length > 0 %}-pgp-keys={% for item in openbao_gpg_keys | dict2items %}{{ openbao_config_dir }}/gpg-key-{{ item.key }}{%- if not loop.last %},{% endif %}{% endfor %} -root-token-pgp-key={% for item in openbao_gpg_keys | dict2items %}{{ openbao_config_dir }}/gpg-key-{{ item.key }}{%- if not loop.last %},{% endif %}{% endfor %}{% endif %}"
+            chdir: "{{ openbao_config_dir }}"
+          environment:
+            BAO_ADDR: "https://{{ inventory_hostname }}:8200"
+          run_once: true
+          changed_when: false
+          register: openbao_init
+
+        - name: "Copy openbao init log"
+          ansible.builtin.copy:
+            content: "{{ openbao_init.stdout }}"
+            dest: "{{ openbao_config_dir }}/openbao-init.json"
+            mode: "0600"
+          delegate_to: "{{ openbao_cluster_first_node }}"
+          run_once: true
+
+        - name: "Download openbao init log"
+          ansible.builtin.copy:
+            content: "{{ openbao_init.stdout }}"
+            dest: "/tmp/openbao-init-{{ openbao_cluster_name }}.json"
+            mode: "0600"
+          when: openbao_gpg_keys | length > 0
+          delegate_to: localhost
+          run_once: true
+          become: false

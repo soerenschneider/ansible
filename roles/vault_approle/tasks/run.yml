@@ -73,11 +73,11 @@
         owner: root
         group: root
         mode: "0600"
-      when: not item.config.unwrap_before_save | default(False)
+      when: not item.config.unwrap_before_save | default(false)
 
     - name: "Unwrap token and store to file"
       ansible.builtin.command: vault-approle-cli -a {{ item.config.vault_address }} --quiet --json-output unwrap-secret-id --secret-id-file="{{ item.config.secret_id_file }}"
       environment:
         VAULT_TOKEN: "{{ vault_approle_wrapped_token }}"
       changed_when: true
-      when: item.config.unwrap_before_save | default(False)
+      when: item.config.unwrap_before_save | default(false)

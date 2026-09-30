@@ -314,6 +314,8 @@ disable_standby_reads = {{ openbao_disable_standby_reads | bool | string | lower
 # plugin_directory and verifies it against sha256sum. With auto-register,
 # it adds the plugin to the catalog, so no `bao plugin register` is needed.
 # The directory must be writable by the service user when auto-download is on.
+# sha256sum may be a string or a map of architecture -> checksum; the entry
+# matching openbao_plugin_arch ({{ openbao_plugin_arch }}) is used.
 # ----------------------------------------------------------------------------
 plugin_directory     = "{{ openbao_plugin_directory }}"
 {% if openbao_plugin_auto_download is defined %}
@@ -326,12 +328,19 @@ plugin_auto_register = {{ openbao_plugin_auto_register | bool | string | lower }
 
 plugin "{{ plugin.type }}" "{{ plugin.name }}" {
 {% for key, value in plugin | dictsort if key not in ['type', 'name'] %}
+{%   if key == 'sha256sum' and value is mapping %}
+{%     if openbao_plugin_arch not in value %}
+{{ undef(hint='openbao_plugins: no sha256sum for plugin "' ~ plugin.name ~ '" on architecture "' ~ openbao_plugin_arch ~ '"') }}
+{%     endif %}
+  {{ key }} = {{ hcl(value[openbao_plugin_arch]) }}
+{%   else %}
   {{ key }} = {{ hcl(value) }}
+{%   endif %}
 {% endfor %}
 }
 {% endfor %}
 {% elif openbao_plugins | default([]) %}
-{{ "openbao_plugins is set but openbao_plugin_directory is empty" | mandatory }}
+{{ undef(hint='openbao_plugins is set but openbao_plugin_directory is empty') }}
 {% endif %}
 
 

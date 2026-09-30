@@ -234,6 +234,21 @@ openbao_plugin_directory: "{{ openbao_plugin_dir }}"
 openbao_plugin_auto_download: true
 openbao_plugin_auto_register: true
 
+# Maps Ansible's architecture fact to the Go/OCI platform names used by OpenBao.
+openbao_plugin_arch_map:
+  x86_64: amd64
+  amd64: amd64
+  aarch64: arm64
+  arm64: arm64
+  armv7l: arm
+  ppc64le: ppc64le
+  s390x: s390x
+  riscv64: riscv64
+
+openbao_plugin_arch: >-
+  {{ openbao_plugin_arch_map[ansible_facts['architecture']]
+     | default(ansible_facts['architecture']) }}
+
 openbao_plugins:
   - type: secret
     name: aws
@@ -241,11 +256,16 @@ openbao_plugins:
     # renovate: datasource=github-releases depName=openbao/openbao-plugins extractVersion=^secrets-aws-(?<version>v.+)$
     version: v0.3.1
     binary_name: openbao-plugin-secrets-aws
-    # Must be updated together with version.
-    sha256sum: "641ae1858c0f660b4c3761286d627e1dcfd33dc35e7c83eb81ca9050b5bdc6d8"
+    # Must be updated together with version (one entry per architecture).
+    # To find out values, run: crane export --platform linux/arm64 ghcr.io/openbao/openbao-plugin-secrets-aws:v0.3.1 - | tar -xO openbao-plugin-secrets-aws | sha256sum
+    sha256sum:
+      amd64: "641ae1858c0f660b4c3761286d627e1dcfd33dc35e7c83eb81ca9050b5bdc6d8"
+      arm64: "3eac1f04852876dd1ead9bfd555cafa805af6c87b64b65c3b4a85ff65e98712c"
 
 # ============================================================================
 # Escape hatch
 # ============================================================================
 # Raw HCL appended to the end of the config.
 openbao_extra_config: ""
+
+openbao_rpm_repo_gpgcheck: false

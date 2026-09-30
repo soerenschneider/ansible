@@ -10,7 +10,7 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $(basename "$0") <init-output.json> <cluster>" >&2
+    echo "Usage: $(basename "$0") <openbao-init-<cluster>.json>" >&2
     exit 1
 }
 
@@ -19,11 +19,20 @@ die() {
     exit 1
 }
 
-[ $# -eq 2 ] || usage
+[ $# -eq 1 ] || usage
 FILE=$1
-CLUSTER=$2
 
 [ -f "$FILE" ] || die "file '$FILE' not found"
+
+# Derive the cluster name from the file name: openbao-init-<cluster>.json
+base=$(basename "$FILE")
+case "$base" in
+    openbao-init-?*.json) ;;
+    *) die "cannot derive cluster name from '${base}' (expected openbao-init-<cluster>.json)" ;;
+esac
+CLUSTER=${base#openbao-init-}
+CLUSTER=${CLUSTER%.json}
+
 [ -n "$CLUSTER" ] || die "cluster name must not be empty"
 
 for cmd in jq base64 gpg pass; do

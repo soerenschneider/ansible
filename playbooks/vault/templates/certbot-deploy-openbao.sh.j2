@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+# {{ ansible_managed }}
+#
+# Deploys a single certbot lineage from /etc/letsencrypt/live to the OpenBao
+# TLS certificate/key paths and reloads the service if anything changed.
+# Writes node_exporter textfile metrics on every run (success or failure).
+set -euo pipefail
+shopt -s nullglob
+
+LIVE_DIR=/etc/letsencrypt/live
+CERT="{{ openbao_tls_cert_file }}"
+KEY="{{ openbao_tls_key_file }}"
+OWNER="{{ openbao_user | default('openbao') }}"
+GROUP="{{ openbao_group | default('openbao') }}"
+# lineage to deploy; empty means "the only lineage in LIVE_DIR"
+LINEAGE="{{ openbao_cert_lineage | default('') }}"
+# name of this deploy hook, used as metric label and in the metrics file name
+HOOK="openbao"
+# empty disables metrics (e.g. node_exporter not installed)
+TEXTFILE_DIR="{{ node_exporter_textfile_dir | default('') }}"
+METRICS_FILE="${TEXTFILE_DIR}/certbot_deploy_${HOOK}.prom"
+
+on_exit() {
+  local rc=$?
+  set +eu
+
+  # never leave half-written files behind
+  rm -f "${CERT}.tmp" "${KEY}.tmp"
+
+  [[ -n "${TEXTFILE_DIR}" && -d "${TEXTFILE_DIR}" ]] || return
+
+  local success=1 tmp labels end expiry
+  (( rc != 0 )) && success=0
+
+  labels="hook=\"${HOOK}\""
+  [[ -n "${LINEAGE}" ]] && labels+=",lineage=\"${LINEAGE}\""
+
+  # Temp name must not end in .prom, or node_exporter may read a partial file.
+  tmp=$(mktemp "${TEXTFILE_DIR}/.certbot_deploy_${HOOK}.XXXXXX") || return
+  {
+    # HELP texts are kept hook-neutral: node_exporter merges metrics from all
+    # textfiles, and the same metric must have identical HELP/TYPE everywhere.
+    echo "# HELP certbot_deploy_success Whether the last run of a certbot deploy hook succeeded."
+    echo "# TYPE certbot_deploy_success gauge"
+    echo "certbot_deploy_success{hook=\"${HOOK}\"} ${success}"
+
+    echo "# HELP certbot_deploy_last_run_timestamp_seconds Unix time of the last run of a certbot deploy hook."
+    echo "# TYPE certbot_deploy_last_run_timestamp_seconds gauge"
+    echo "certbot_deploy_last_run_timestamp_seconds{hook=\"${HOOK}\"} $(date +%s)"
+
+    if [[ -n "${LINEAGE}" ]]; then
+      echo "# HELP certbot_deploy_lineage_success Whether the last deploy of a certbot lineage by a hook succeeded."
+      echo "# TYPE certbot_deploy_lineage_success gauge"
+      echo "certbot_deploy_lineage_success{${labels}} ${success}"
+    fi
+
+    if [[ -f "${CERT}" ]] \
+       && end=$(openssl x509 -noout -enddate -in "${CERT}" 2>/dev/null) \
+       && expiry=$(date -d "${end#notAfter=}" +%s 2>/dev/null); then
+      echo "# HELP certbot_deploy_cert_expiry_timestamp_seconds Expiry (notAfter) of the certificate deployed by a hook."
+      echo "# TYPE certbot_deploy_cert_expiry_timestamp_seconds gauge"
+      echo "certbot_deploy_cert_expiry_timestamp_seconds{${labels}} ${expiry}"
+    fi
+  } > "${tmp}"
+
+  chmod 0644 "${tmp}"
+  mv -f "${tmp}" "${METRICS_FILE}"
+}
+# Runs on every exit, including aborts from set -e; the original exit code is preserved.
+trap on_exit EXIT
+
+if [[ ! -d "${LIVE_DIR}" ]]; then
+  echo "${LIVE_DIR} does not exist" >&2
+  exit 1
+fi
+
+if [[ -z "${LINEAGE}" ]]; then
+  # Positional parameters instead of an array: the array-length syntax would
+  # open a Jinja comment and break templating.
+  set -- "${LIVE_DIR}"/*/
+  if (( $# != 1 )); then
+    echo "expected exactly one lineage in ${LIVE_DIR}, found $#;" \
+         "set openbao_cert_lineage to pick one" >&2
+    exit 1
+  fi
+  LINEAGE=$(basename "$1")
+fi
+
+SRC="${LIVE_DIR}/${LINEAGE}"
+if [[ ! -r "${SRC}/fullchain.pem" || ! -r "${SRC}/privkey.pem" ]]; then
+  echo "${LINEAGE}: fullchain.pem or privkey.pem missing in ${SRC}" >&2
+  exit 1
+fi
+
+if [[ -f "${CERT}" && -f "${KEY}" ]] \
+   && cmp -s "${SRC}/fullchain.pem" "${CERT}" \
+   && cmp -s "${SRC}/privkey.pem" "${KEY}"; then
+  exit 0
+fi
+
+echo "Deploying certificate ${LINEAGE} to ${HOOK}"
+install -m 0640 -o "${OWNER}" -g "${GROUP}" "${SRC}/fullchain.pem" "${CERT}.tmp"
+install -m 0600 -o "${OWNER}" -g "${GROUP}" "${SRC}/privkey.pem" "${KEY}.tmp"
+mv -f "${KEY}.tmp" "${KEY}"
+mv -f "${CERT}.tmp" "${CERT}"
+
+echo "Reloading openbao"
+systemctl reload openbao

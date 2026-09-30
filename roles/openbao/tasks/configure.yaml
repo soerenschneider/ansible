@@ -8,6 +8,32 @@
     mode: "0750"
   tags: [openbao, openbao-configure]
 
+- name: Validate OpenBao plugin configuration
+  ansible.builtin.assert:
+    that:
+      - openbao_plugin_directory | default('') | length > 0
+    fail_msg: openbao_plugins is set but openbao_plugin_directory is empty
+    quiet: true
+  when: openbao_plugins | default([]) | length > 0
+
+- name: Validate OpenBao plugin checksums for target architecture
+  ansible.builtin.assert:
+    that:
+      - item.sha256sum is defined
+      - item.sha256sum is string or openbao_plugin_arch in item.sha256sum
+      - (item.sha256sum if item.sha256sum is string
+        else item.sha256sum[openbao_plugin_arch]) | length > 0
+    fail_msg: >-
+      openbao_plugins: plugin "{{ item.type }}/{{ item.name }}" has no sha256sum
+      for architecture "{{ openbao_plugin_arch }}"
+      (available: {{ (item.sha256sum.keys() | list)
+                     if item.sha256sum is defined and item.sha256sum is mapping
+                     else 'none' }})
+    quiet: true
+  loop: "{{ openbao_plugins | default([]) }}"
+  loop_control:
+    label: "{{ item.type }}/{{ item.name }}"
+
 - name: Template OpenBao server configuration
   ansible.builtin.template:
     src: "openbao.hcl.j2"
@@ -19,3 +45,60 @@
     mode: "0640"
   notify: Restart openbao
   tags: [openbao, openbao-configure]
+
+- name: Ensure OpenBao TLS directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: "directory"
+    owner: "root"
+    group: "{{ openbao_group }}"
+    mode: "0750"
+  loop: "{{ [openbao_tls_cert_file | dirname, openbao_tls_key_file | dirname] | unique }}"
+  when: not (openbao_tls_disable | bool)
+  tags: [openbao, openbao-configure, openbao-tls]
+
+- name: Check for existing OpenBao TLS certificate and key
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ openbao_tls_cert_file }}"
+    - "{{ openbao_tls_key_file }}"
+  register: openbao_tls_stat
+  when: not (openbao_tls_disable | bool)
+  tags: [openbao, openbao-configure, openbao-tls]
+
+- name: Generate placeholder self-signed TLS certificate for OpenBao
+  when:
+    - not (openbao_tls_disable | bool)
+    - openbao_tls_stat.results | rejectattr('stat.exists') | list | length > 0
+  tags: [openbao, openbao-configure, openbao-tls]
+  block:
+    - name: Create self-signed certificate and key with openssl
+      # umask so the key is never world-readable, even briefly.
+      ansible.builtin.shell: >
+        umask 077 &&
+        openssl req -x509 -nodes
+        -newkey rsa:2048
+        -days 365
+        -keyout {{ openbao_tls_key_file | quote }}
+        -out {{ openbao_tls_cert_file | quote }}
+        -subj {{ ('/CN=' ~ ansible_facts['fqdn']) | quote }}
+        -addext {{ ('subjectAltName=DNS:' ~ ansible_facts['fqdn']
+                    ~ ',DNS:' ~ ansible_facts['hostname']
+                    ~ ',DNS:localhost,IP:127.0.0.1') | quote }}
+      changed_when: true
+      notify: Restart openbao
+
+    - name: Set ownership and permissions on OpenBao TLS key
+      ansible.builtin.file:
+        path: "{{ openbao_tls_key_file }}"
+        owner: "root"
+        group: "{{ openbao_group }}"
+        mode: "0640"
+
+    - name: Set ownership and permissions on OpenBao TLS certificate
+      ansible.builtin.file:
+        path: "{{ openbao_tls_cert_file }}"
+        owner: "root"
+        group: "{{ openbao_group }}"
+        mode: "0644"

@@ -1,0 +1,8 @@
+---
+- name: "Run certbot hooks"
+  ansible.builtin.command: 'find /etc/letsencrypt/renewal-hooks/{{ item }}/ -type f -exec bash {} \;'
+  changed_when: false
+  with_items:
+    - "deploy"
+    - "post"
+  tags: [certbot, certbot-configure, certbot-hooks]
