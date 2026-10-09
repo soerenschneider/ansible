@@ -74,8 +74,8 @@
   loop:
     - "blackhole.db"
     - "local.db"
-    - "virtual-ips.db"
     - "wildcards.db"
+    - "split-horizon.db"
   notify: "Restart unbound"
   tags: [unbound, unbound-configure, unbound-config, dns-config, dns]
 

@@ -1,9 +1,0 @@
-{% for loc in (virtual_ips | dict2items | selectattr('key', '==', location) | list) + (virtual_ips | dict2items | selectattr('key', '!=', location) | list) -%}
-{% for network_domain in network_domains %}
-{% for host in loc.value %}
-{% if loc.key == location %}
-local-data: "{{ host.host }}.{{ network_domain }}. {{ host.ttl | default(60) }} IN A {{ host.logical }}"
-{% endif %}
-{% endfor %}
-{% endfor %}
-{% endfor %}

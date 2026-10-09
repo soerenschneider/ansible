@@ -13,15 +13,28 @@
   ansible.builtin.blockinfile:
     path: /etc/haproxy/haproxy.cfg
     block: |
-      listen stats
+      frontend metrics
         bind *:8405 ssl crt {{ haproxy_cert_file }} ca-file {{ pki_srn_ca_file }} verify required
-        # only allow the following CNs
+        mode http
+        no log
+
         http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
 
+        http-request use-service prometheus-exporter if { path /metrics/haproxy }
+        use_backend metrics_node    if { path /metrics/node }
+        use_backend metrics_openbao if { path /metrics/openbao }
+
+        http-request deny deny_status 404
+
+        backend metrics_node
         mode http
-        http-request use-service prometheus-exporter if { path /metrics }
-        no log
-        stats hide-version
+        http-request set-path /metrics
+        server node_exporter 127.0.0.1:9100
+
+        backend metrics_openbao
+        mode http
+        http-request set-path {{ openbao_metrics_path }}
+        server openbao_metrics {{ openbao_metrics_listen_address }}
 
       # openbao has a http health endpoint on /v1/sys/health that returns different http codes
       # depending on the status of the running openbao instance.
@@ -55,10 +68,6 @@
         server {{ node.split('.')[0] }} {{ '127.0.0.1' if node == inventory_hostname else node }}:{{ hostvars[node].openbao_port | default(8200) }} check check-ssl verify required ca-file {{ system_ca_bundle }} verifyhost {{ node }} check-sni {{ node }} send-proxy inter 5000
       {% endfor %}
         #server openbao-1 127.0.0.1:8200 check check-ssl verify required ca-file @system-ca verifyhost bao-1.prd.dd.soeren.cloud check-sni bao-1.prd.dd.soeren.cloud send-proxy inter 5000
-
-      backend node_exporter
-        option httpchk
-        server node_exporter 127.0.0.1:9100 check inter 5m
 
   notify: Restart haproxy
   tags: [haproxy]

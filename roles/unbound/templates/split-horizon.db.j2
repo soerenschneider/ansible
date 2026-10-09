@@ -1,0 +1,13 @@
+#jinja2: lstrip_blocks: True
+# {{ ansible_managed }}
+# Split horizon: internal answers for names that resolve to public IPs outside.
+{% for name, entry in (network_split_horizon | default({})).items() | sort %}
+  {% if entry.locations is not defined or location in entry.locations %}
+# {{ name }}
+    {% for record in entry.records %}
+      {% for network_domain in network_domains %}
+local-data: "{{ record }}.{{ network_domain }}. {{ entry.ttl | default(60) }} IN A {{ entry.internal }}"
+      {% endfor %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}

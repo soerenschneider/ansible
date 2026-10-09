@@ -150,7 +150,8 @@ table ip global {
         # MEDIA
         ################################################
         # allow access to nas for media boxes
-        iifname $IF_MEDIA ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname $IF_SERVERS ip daddr @tag_nas tcp dport { 80, 443 } accept
+        # TODO: check if 6600 is needed
+        iifname $IF_MEDIA ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname $IF_SERVERS ip daddr @tag_nas tcp dport { 80, 443, 6600 } accept
 
         # allow access to openbao for raspberry PIs
         iifname $IF_MEDIA ip saddr $POOL_MEDIA_MPD oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
@@ -158,7 +159,7 @@ table ip global {
         ################################################
         # GUEST
         # allow access to kubernetes
-        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_kubernetes tcp dport 443 accept
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_kubernetes tcp dport { 443, 6443 } accept
 
         # allow access to local openbao
         iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
@@ -175,10 +176,21 @@ table ip global {
 
         ################################################
         # Incoming Wireguard
-
+        ################################################
         # allow access for remote nas to talk to local syncthing
         iifname $WG_IF_SOEREN_CLOUD ip saddr $NET_PRIVATE ip saddr @tag_nas oifname $IF_SERVERS ip daddr @tag_nas tcp dport 22000 accept
         iifname $WG_IF_SOEREN_CLOUD ip saddr $NET_PRIVATE ip saddr @tag_nas oifname $IF_SERVERS ip daddr @tag_nas udp dport 22000 accept
+
+        # EZ -> Local
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_SOEREN, $POOL_EZ_DEFAULT_USERS, $POOL_EZ_DEFAULT_WORK_DEVICES } oifname $IF_SERVERS ip daddr $NET_DD_SERVERS tcp dport { 22, 443 } accept
+
+        # allow syncthing clients via wireguard -> nas
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, $POOL_WG_SOEREN_CLOUD_CLIENTS } ip saddr @tag_syncthing oifname $IF_SERVERS ip daddr @tag_nas tcp dport 22000 accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $POOL_EZ_DEFAULT_USERS, $NET_PT_USERS, $POOL_WG_SOEREN_CLOUD_CLIENTS } ip saddr @tag_syncthing oifname $IF_SERVERS ip daddr @tag_nas udp dport 22000 accept
+
+        # allow local nas to talk to remote syncthing
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname { $IF_USERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_syncthing tcp dport 22000 accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname { $IF_USERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_syncthing udp dport 22000 accept
 
         # allow seedbox to talk to fetcharr on nas
         iifname $WG_IF_SOEREN_CLOUD ip saddr $TAG_WG_SOEREN_CLOUD_SEEDBOX oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport {{ fetcharr_webhook_port }} accept
@@ -186,9 +198,16 @@ table ip global {
         # allow seedbox to talk to kubernetes services
         iifname $WG_IF_SOEREN_CLOUD ip saddr $TAG_WG_SOEREN_CLOUD_SEEDBOX oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
 
-        # allow routers over wireguard to talk to nas
+        # allow routers over wireguard to access nas
         iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $IP_WG_SOEREN_CLOUD_PT } oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443, 445, 6600 } accept
 
+        # allow cam clients over wireguard to access cams
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $IP_WG_SOEREN_CLOUD_PT } ip saddr @tag_camclient oifname $IF_CAM ip daddr $NET_CAM tcp dport { 80, 554, 8554 } accept
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $IP_WG_SOEREN_CLOUD_PT } ip saddr @tag_camclient oifname $IF_CAM ip daddr $NET_CAM udp dport { 554, 8554 } accept
+
+        ################################################
+        # Forwarding to internet
+        ################################################
         # deny internet to selected hosts
         ip saddr @tag_nointernet oifname $DEV_WORLD counter drop
         # allow forwarding

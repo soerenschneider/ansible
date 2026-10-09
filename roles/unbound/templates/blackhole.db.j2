@@ -1,4 +1,3 @@
-{% for domain in unbound_blackhole_domains %}
-local-zone: "{{ domain }}" redirect
-local-data: "{{ domain }} A 0.0.0.0"
+{% for domain in unbound_blackhole_domains | map('lower') | map('regex_replace', '^\\*\\.', '') | unique %}
+  local-zone: "{{ domain }}" always_null
 {% endfor %}

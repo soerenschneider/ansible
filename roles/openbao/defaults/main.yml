@@ -142,19 +142,51 @@ openbao_x_forwarded_for_enabled: false
 openbao_x_forwarded_for_hop_skips: 0
 openbao_x_forwarded_for_reject_not_present: false
 
-# ============================================================================
-# Metrics and profiling
-# ============================================================================
+# ----------------------------------------------------------------------------
+# Main API listener: metrics and profiling access
+# ----------------------------------------------------------------------------
+# Allow /v1/sys/metrics on the main API listener without a token.
+# NOTE: Only takes effect when openbao_metrics_listener_enabled is false.
+# When the dedicated metrics listener is enabled, the main listener renders
+# `disallow_metrics = true` instead and this variable is ignored. Use
+# openbao_metrics_unauthenticated to control access on the dedicated listener.
 openbao_unauthenticated_metrics_access: false
+
+# Allow /v1/sys/pprof/* on the main API listener without a token.
+# Keep false in production; profiling data can leak sensitive runtime details.
 openbao_unauthenticated_pprof_access: false
 
-openbao_metrics_listener_enabled: false
+# ----------------------------------------------------------------------------
+# Dedicated metrics listener
+# ----------------------------------------------------------------------------
+# When true, a second TCP listener is rendered that serves ONLY metrics
+# (metrics_only = true) and blocks all other API requests. The main API
+# listener then stops serving metrics (disallow_metrics = true), so
+# openbao_unauthenticated_metrics_access above has no effect.
+openbao_metrics_listener_enabled: true
+
+# Bind to a loopback or internal/management address only. This listener
+# is meant for Prometheus scraping and should not be publicly reachable.
 openbao_metrics_listen_address: "127.0.0.1:9101"
+
+# TLS settings for the metrics listener. They inherit from the main listener
+# by default; override them to use a separate certificate or to disable TLS
+# on a loopback-only bind.
 openbao_metrics_tls_disable: "{{ openbao_tls_disable }}"
 openbao_metrics_tls_cert_file: "{{ openbao_tls_cert_file }}"
 openbao_metrics_tls_key_file: "{{ openbao_tls_key_file }}"
+
+# Allow scraping the dedicated metrics listener without a token.
+# This defaults to true (unlike openbao_unauthenticated_metrics_access) because
+# the listener serves nothing but metrics and should be bound to an internal
+# address. Set it to false if the bind address is reachable from untrusted
+# networks.
+# Only takes effect when openbao_metrics_listener_enabled is true.
 openbao_metrics_unauthenticated: true
-openbao_metrics_path: ""
+
+# Custom path the metrics listener serves metrics on. Leave empty to use
+# the OpenBao default (/v1/sys/metrics).
+openbao_metrics_path: "/metrics"
 
 openbao_telemetry:
   prometheus_retention_time: "24h"
