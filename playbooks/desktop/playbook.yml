@@ -81,8 +81,8 @@
     - name: Add private CA
       become: true
       ansible.builtin.copy:
-        content: "{{ pki_soerenschneider_ca_crt }}"
-        dest: "{{ pki_soerenschneider_ca_file }}"
+        content: "{{ pki_srn_ca_crt }}"
+        dest: "{{ pki_srn_ca_file }}"
         owner: root
         group: "{% if ansible_system == 'Linux' %}root{% else %}wheel{% endif %}"
         mode: "0644"

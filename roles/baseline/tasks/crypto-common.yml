@@ -16,11 +16,12 @@
     - {path: "{{ baseline_pki_private_dir }}", mode: "0750", group: "{{ baseline_pki_private_group }}"}
   loop_control:
     label: "{{ item.path }}"
+  tags: [bootstrap, base, pki]
 
 - name: "Add private CA"
   ansible.builtin.copy:
-    content: "{{pki_soerenschneider_ca_crt }}"
-    dest: "{{pki_soerenschneider_ca_file }}"
+    content: "{{ pki_srn_ca_crt }}"
+    dest: "{{ pki_srn_ca_file }}"
     owner: "root"
     group: "{% if ansible_facts['system'] == 'Linux' %}root{% else %}wheel{% endif %}"
     mode: "0644"
