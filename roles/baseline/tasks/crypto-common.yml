@@ -55,4 +55,5 @@
     # replace regular files left behind by the old copy task
     force: true
   with_items: "{{ signify_keys }}"
+  ignore_errors: true  # noqa ignore-errors
   tags: [signify, base, base-signify]

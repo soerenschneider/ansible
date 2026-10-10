@@ -132,7 +132,7 @@
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ sc_agent_checksum_file }}
+      ansible.builtin.command: "signify -V -p {{ baseline_crypto_pubkey_dir }}/signify/soerenschneider-github.pub -m {{ sc_agent_checksum_file }}"
       changed_when: false
 
     - name: Stop service
@@ -164,4 +164,7 @@
       ansible.builtin.service:
         name: "{{ service_name }}"
         state: restarted
-      when: sc_agent_stopped_service is defined and sc_agent_stopped_service is changed
+      when:
+        - sc_agent_stopped_service is defined
+        - sc_agent_stopped_service is mapping
+        - sc_agent_stopped_service.changed | default(false)

@@ -37,11 +37,11 @@
         group: root
 
 - name: Install packages
-  when: ansible_os_family | lower == "redhat"
+  when: "ansible_facts['os_family'] | lower == 'redhat'"
   tags: [bootstrap, base, packages]
   block:
     - name: Enable crb/powertools repo for redhat
-      ansible.builtin.command: dnf config-manager --set-enabled crb
+      ansible.builtin.command: "dnf config-manager --set-enabled crb"
       changed_when: false
 
     - name: Install epel release

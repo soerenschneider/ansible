@@ -41,4 +41,5 @@
   ansible.builtin.command: "certbot certonly --non-interactive --expand --agree-tos --email={{ certbot_email }} --dns-route53 -d {{ item }} -n"
   with_items: "{{ certbot_dns_domains }}"
   changed_when: false
+  throttle: 1  # needed so that txt records do not interfere for shared records
   tags: [certbot, certbot-configure, certbot-hooks]

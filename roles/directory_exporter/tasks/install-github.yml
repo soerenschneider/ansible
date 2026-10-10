@@ -129,7 +129,7 @@
       delay: 2
 
     - name: Verify signature
-      ansible.builtin.command: signify -V -p /etc/signify/soerenschneider-github.pub -m {{ directory_exporter_checksum_file }}
+      ansible.builtin.command: signify -V -p {{ baseline_crypto_pubkey_dir }}/signify/soerenschneider-github.pub -m {{ directory_exporter_checksum_file }}
       changed_when: false
 
     - name: Stop service
