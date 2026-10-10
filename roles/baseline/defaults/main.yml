@@ -44,7 +44,7 @@ baseline_firewall_base_rules:
 # Host/group specific rules.
 #
 #   - ports:   list of ports or ranges ("8000-8100" or ufw-style "8000:8100")
-#     proto:   tcp (default) | udp | any
+#     proto:   tcp (default) | udp | any | vrrp (no ports, 'from' required)
 #     from:    list of IPv4 addresses or CIDRs (inbound is IPv4 only)
 #              omitted or "any" -> open to everyone
 #              empty list       -> rule is skipped (never opened to everyone)

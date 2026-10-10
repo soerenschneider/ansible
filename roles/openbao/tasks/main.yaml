@@ -11,3 +11,8 @@
 - name: "Run tasks configure.yaml"
   ansible.builtin.include_tasks: "configure.yaml"
   tags: [openbao, openbao-configure]
+
+- name: "Run tasks keepalived.yaml"
+  ansible.builtin.include_tasks: "keepalived.yaml"
+  tags: [openbao, openbao-keepalived]
+  when: openbao_keepalived_enabled | bool

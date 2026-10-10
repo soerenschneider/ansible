@@ -1,0 +1,19 @@
+#!/bin/sh
+# {{ ansible_managed }}
+#
+# keepalived health check for the OpenBao VIP: succeeds while the local
+# HAProxy accepts connections and forwards them to an unsealed OpenBao node
+# (active or standby). Runs as {{ openbao_keepalived_script_user }}.
+#
+# --insecure: HAProxy passes TLS through to whichever backend it picks, so
+# the presented certificate belongs to that node and cannot be pinned to one
+# name. This is a liveness probe over loopback that sends no credentials, so
+# skipping verification exposes nothing.
+exec /usr/bin/curl \
+  --silent \
+  --fail \
+  --insecure \
+  --proto '=https' \
+  --max-time {{ openbao_keepalived_check_timeout | int }} \
+  --output /dev/null \
+  'https://127.0.0.1:{{ openbao_keepalived_check_port | int }}/v1/sys/health?standbyok=true&perfstandbyok=true'

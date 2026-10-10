@@ -295,6 +295,57 @@ openbao_plugins:
       arm64: "3eac1f04852876dd1ead9bfd555cafa805af6c87b64b65c3b4a85ff65e98712c"
 
 # ============================================================================
+# Virtual IP (keepalived) — tasks/keepalived.yaml
+# ============================================================================
+# Only enabled when the cluster has more than one node.
+openbao_keepalived_enabled: "{{ groups[openbao_cluster_nodes_group] | default([]) | length > 1 }}"
+
+# Required. IPv4 CIDR, e.g. "10.0.0.10/24". Add the VIP's hostname to the
+# OpenBao TLS certificates' SANs if clients connect by that name.
+openbao_keepalived_vip: ""
+
+# Must be unique per VRRP group on the L2 segment.
+openbao_keepalived_virtual_router_id: 51
+
+# Required, exactly 8 characters (keepalived truncates anything longer).
+# Keep it in vault/sops. AH authenticates adverts with an HMAC; PASS sends
+# the key in clear text and only guards against misconfiguration.
+openbao_keepalived_auth_type: "AH"
+openbao_keepalived_auth_pass: ""
+
+# Per host. Empty = the default IPv4 route's address/interface.
+openbao_keepalived_address: ""
+openbao_keepalived_interface: ""
+
+# Per host. 0 = derived from the position in openbao_cluster_nodes_group
+# (first node 200, then 190, ...).
+openbao_keepalived_priority: 0
+
+openbao_keepalived_advert_int: 1
+openbao_keepalived_nopreempt: true
+
+# Health check: HTTPS to the local HAProxy frontend; fails when no unsealed
+# OpenBao node is reachable through it. Runs as the unprivileged user below.
+openbao_keepalived_check_port: 443
+openbao_keepalived_check_interval: 2
+openbao_keepalived_check_timeout: 2
+openbao_keepalived_check_fall: 3
+openbao_keepalived_check_rise: 2
+openbao_keepalived_check_script: "/usr/local/sbin/openbao-keepalived-check"
+openbao_keepalived_script_user: "keepalived_script"
+
+# Process whose absence releases the VIP immediately. "" = disabled.
+openbao_keepalived_track_process: "haproxy"
+
+# The baseline nftables firewall drops VRRP. Allow it from the peers only,
+# e.g. in group_vars for the openbao group:
+#
+#   baseline_firewall_rules:
+#     - comment: vrrp openbao
+#       proto: vrrp
+#       from: [10.0.0.11, 10.0.0.12, 10.0.0.13]
+
+# ============================================================================
 # Escape hatch
 # ============================================================================
 # Raw HCL appended to the end of the config.

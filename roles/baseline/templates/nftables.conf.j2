@@ -43,7 +43,7 @@ table inet baseline_firewall {
   }
 {% endif %}
 {% for rule in _rules %}
-{%   set rate = rate_of(rule) %}
+{%   set rate = rate_of(rule) if rule.proto | default('tcp') != 'vrrp' else '' %}
 {%   if rate %}
 
   # Per-source-IP state for rule "{{ rule.comment | default(loop.index) }}". Entries expire
@@ -80,14 +80,24 @@ table inet baseline_firewall {
     icmpv6 type { destination-unreachable, packet-too-big, time-exceeded, parameter-problem, nd-router-advert, nd-neighbor-solicit, nd-neighbor-advert, mld-listener-query } accept
 {% for rule in _rules %}
 {%   set proto = rule.proto | default('tcp') %}
-{%   set ports = [rule.ports] | flatten | map('string') | map('replace', ':', '-') | unique | join(', ') %}
+{%   set ports = [rule.ports | default([])] | flatten | map('string') | map('replace', ':', '-') | unique | join(', ') %}
 {%   set label = rule.comment | default(proto ~ '/' ~ ports | replace(' ', '')) | replace('"', "'") %}
-{%   if proto not in ['tcp', 'udp', 'any'] %}
+{%   if proto not in ['tcp', 'udp', 'any', 'vrrp'] %}
 {{     __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': invalid proto '" ~ proto ~ "'") }}
 {%   endif %}
-{%   set l4 = (proto ~ ' dport') if proto != 'any' else 'meta l4proto { tcp, udp } th dport' %}
-{%   set match = l4 ~ ' { ' ~ ports ~ ' }' %}
-{%   set rate = rate_of(rule) %}
+{%   if proto == 'vrrp' %}
+{#     VRRP (IP protocol 112) has no ports. Only ever from listed peers, and
+       never rate limited: adverts arrive every advert_int seconds. #}
+{%     if 'from' not in rule or rule['from'] == 'any' %}
+{{       __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': proto vrrp requires an explicit 'from' list") }}
+{%     endif %}
+{%     set match = 'ip protocol 112' %}
+{%     set rate = '' %}
+{%   else %}
+{%     set l4 = (proto ~ ' dport') if proto != 'any' else 'meta l4proto { tcp, udp } th dport' %}
+{%     set match = l4 ~ ' { ' ~ ports ~ ' }' %}
+{%     set rate = rate_of(rule) %}
+{%   endif %}
 {%   set burst_raw = rule.rate_burst | default(baseline_firewall_rate_burst) | string | trim %}
 {%   if burst_raw is not match('^[0-9]+$') %}
 {{     __baseline_firewall_fail | mandatory("baseline_firewall rule '" ~ label ~ "': invalid rate_burst '" ~ burst_raw ~ "', expected a whole number") }}

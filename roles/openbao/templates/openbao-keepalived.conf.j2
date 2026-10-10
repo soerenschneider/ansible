@@ -1,0 +1,82 @@
+# ============================================================================
+# Managed by Ansible — do not edit by hand. Changes will be overwritten.
+# Node: {{ inventory_hostname }}
+# ============================================================================
+
+global_defs {
+    router_id {{ inventory_hostname }}
+
+    # Refuse to run scripts that a non-root user could modify, and run them
+    # as an unprivileged user instead of root.
+    enable_script_security
+    script_user {{ openbao_keepalived_script_user }}
+
+    # Re-announce the VIP shortly after a takeover so switches and ARP
+    # caches converge even if the first gratuitous ARP was lost.
+    vrrp_garp_master_delay 5
+    vrrp_garp_master_repeat 3
+}
+
+vrrp_script chk_openbao {
+    script "{{ openbao_keepalived_check_script }}"
+    interval {{ openbao_keepalived_check_interval | int }}
+    timeout {{ openbao_keepalived_check_timeout | int }}
+    fall {{ openbao_keepalived_check_fall | int }}
+    rise {{ openbao_keepalived_check_rise | int }}
+    # No weight: a failing check puts the node in FAULT, releasing the VIP.
+}
+{% if openbao_keepalived_track_process | default('') %}
+
+vrrp_track_process trk_{{ openbao_keepalived_track_process | regex_replace('[^A-Za-z0-9_]', '_') }} {
+    process {{ openbao_keepalived_track_process }}
+    quorum 1
+    delay 2
+}
+{% endif %}
+
+vrrp_instance openbao_{{ openbao_cluster_name | regex_replace('[^A-Za-z0-9_]', '_') }} {
+    # All nodes start as BACKUP: required for nopreempt, and the priority
+    # decides the initial election.
+    state BACKUP
+    interface {{ _openbao_keepalived_interface }}
+    virtual_router_id {{ openbao_keepalived_virtual_router_id | int }}
+    priority {{ _openbao_keepalived_priority | int }}
+    advert_int {{ openbao_keepalived_advert_int | int }}
+{% if openbao_keepalived_nopreempt | bool %}
+    # Keep the VIP where it is after a failover instead of moving it back
+    # when the higher-priority node returns; avoids a second interruption.
+    nopreempt
+{% endif %}
+
+    # VRRPv2: VRRPv3 has no authentication.
+    version 2
+
+    # Unicast to the known peers only; adverts from any other source are
+    # dropped.
+    unicast_src_ip {{ _openbao_keepalived_src_ip }}
+    check_unicast_src
+    unicast_peer {
+{% for peer in _openbao_keepalived_peers %}
+        {{ peer }}
+{% endfor %}
+    }
+
+    authentication {
+        auth_type {{ openbao_keepalived_auth_type }}
+        auth_pass {{ openbao_keepalived_auth_pass }}
+    }
+
+    virtual_ipaddress {
+        {{ openbao_keepalived_vip }} dev {{ _openbao_keepalived_interface }}
+    }
+
+    track_script {
+        chk_openbao
+    }
+{% if openbao_keepalived_track_process | default('') %}
+
+    track_process {
+        trk_{{ openbao_keepalived_track_process | regex_replace('[^A-Za-z0-9_]', '_') }}
+    }
+{% endif %}
+}
