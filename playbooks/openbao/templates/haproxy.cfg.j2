@@ -1,0 +1,112 @@
+# {{ ansible_managed }}
+
+#---------------------------------------------------------------------
+# Global settings
+#---------------------------------------------------------------------
+global
+    log         {{ haproxy_log_target }} local2
+    chroot      /var/lib/haproxy
+    pidfile     /var/run/haproxy.pid
+    maxconn     {{ haproxy_global_maxconn | default(4000) }}
+    user        haproxy
+    group       haproxy
+    daemon
+
+    # stats unix socket
+    stats socket /var/lib/haproxy/stats
+
+    # use system-wide crypto-policies
+    ssl-default-bind-ciphers   PROFILE=SYSTEM
+    ssl-default-server-ciphers PROFILE=SYSTEM
+
+#---------------------------------------------------------------------
+# HTTP defaults (apply to all sections until the next 'defaults')
+#---------------------------------------------------------------------
+defaults
+    mode                    http
+    log                     global
+    option                  httplog
+    option                  dontlognull
+    option                  http-server-close
+    option                  forwardfor except 127.0.0.0/8
+    option                  redispatch
+    retries                 3
+    timeout http-request    10s
+    timeout queue           1m
+    timeout connect         10s
+    timeout client          1m
+    timeout server          1m
+    timeout http-keep-alive 10s
+    timeout check           10s
+    maxconn                 {{ haproxy_defaults_maxconn | default(3000) }}
+
+#---------------------------------------------------------------------
+# Metrics (mTLS, scrapers allowed by client cert CN)
+#---------------------------------------------------------------------
+frontend metrics
+    bind *:{{ haproxy_metrics_port }} ssl crt {{ haproxy_cert_file }} ca-file {{ pki_srn_ca_file }} verify required
+    mode http
+    no log
+
+    acl allowed_scraper ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }}
+    http-request deny if !allowed_scraper
+
+    http-request use-service prometheus-exporter if { path /metrics/haproxy }
+
+    use_backend metrics_node    if { path /metrics/node }
+    use_backend metrics_openbao if { path /metrics/openbao }
+    default_backend metrics_not_found
+
+backend metrics_node
+    mode http
+    http-request set-path /metrics
+    server node_exporter {{ haproxy_node_exporter_address }}
+
+backend metrics_openbao
+    mode http
+    http-request set-path {{ openbao_metrics_path }}
+    server openbao_metrics {{ openbao_metrics_listen_address }}
+
+backend metrics_not_found
+    mode http
+    http-request deny deny_status 404
+
+#---------------------------------------------------------------------
+# TCP defaults (avoids HTTP-only option warnings on TCP proxies)
+#---------------------------------------------------------------------
+defaults
+    mode                    tcp
+    log                     global
+    option                  tcplog
+    option                  dontlognull
+    option                  redispatch
+    retries                 3
+    timeout connect         5s
+    timeout client          30s
+    timeout server          30s
+    timeout check           5s
+    maxconn                 {{ haproxy_defaults_maxconn }}
+
+#---------------------------------------------------------------------
+# OpenBao (TLS passthrough)
+#
+# Health endpoint /v1/sys/health returns:
+#   200 initialized, unsealed, active
+#   429 unsealed, standby
+#   472 DR secondary, active
+#   473 performance standby
+#   501 not initialized
+#   503 sealed
+#---------------------------------------------------------------------
+frontend openbao_https
+    description openbao over https
+    bind *:{{ haproxy_openbao_port }}
+    default_backend openbao_https
+
+backend openbao_https
+    option httpchk GET /v1/sys/health
+    http-check expect rstatus (200|429)
+    default-server check check-ssl verify required ca-file {{ system_ca_bundle }} send-proxy inter 5s
+{% for node in groups['openbao'] %}
+    server {{ node.split('.')[0] }} {{ '127.0.0.1' if node == inventory_hostname else node }}:{{ hostvars[node].openbao_port | default(8200) }} verifyhost {{ node }} check-sni {{ node }}
+{% endfor %}

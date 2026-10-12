@@ -29,18 +29,3 @@
       ansible.builtin.include_role:
         name: "openbao"
       tags: always
-
-    - name: "Copy cert hook"
-      ansible.builtin.template:
-        src: "certbot-deploy-openbao.sh.j2"
-        dest: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"
-        owner: "root"
-        group: "root"
-        mode: "0755"
-      notify: "Run letsencrypt hook for openbao"
-      tags: [openbao, openbao-cert]
-
-  handlers:
-    - name: "Run letsencrypt hook for openbao"
-      changed_when: false
-      ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"

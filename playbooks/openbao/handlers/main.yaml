@@ -1,0 +1,9 @@
+---
+- name: Reload haproxy
+  ansible.builtin.service:
+    name: haproxy
+    state: reloaded
+
+- name: "Run letsencrypt hook for openbao"
+  changed_when: false
+  ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"

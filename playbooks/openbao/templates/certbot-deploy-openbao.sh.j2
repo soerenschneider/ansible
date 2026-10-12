@@ -104,5 +104,10 @@ install -m 0600 -o "${OWNER}" -g "${GROUP}" "${SRC}/privkey.pem" "${KEY}.tmp"
 mv -f "${KEY}.tmp" "${KEY}"
 mv -f "${CERT}.tmp" "${CERT}"
 
-echo "Reloading openbao"
-systemctl reload openbao
+if systemctl is-active --quiet openbao; then
+    echo "Reloading openbao"
+    systemctl reload openbao
+else
+    echo "openbao not running, restarting"
+    systemctl restart openbao
+fi

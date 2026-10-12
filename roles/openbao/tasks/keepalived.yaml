@@ -46,7 +46,7 @@
       openbao_keepalived_script_user, and run the play against all members of
       group "{{ openbao_cluster_nodes_group }}" so every node knows its peers.
     quiet: true
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Determine this node's VRRP address and interface"
   ansible.builtin.set_fact:
@@ -61,7 +61,7 @@
     _openbao_keepalived_priority: >-
       {{ openbao_keepalived_priority | int
          or 200 - 10 * groups[openbao_cluster_nodes_group].index(inventory_hostname) }}
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Collect peer addresses"
   ansible.builtin.set_fact:
@@ -70,7 +70,7 @@
          | difference([inventory_hostname])
          | map('extract', hostvars, '_openbao_keepalived_src_ip')
          | list }}
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Validate derived addresses"
   ansible.builtin.assert:
@@ -92,7 +92,7 @@
       Set openbao_keepalived_address / openbao_keepalived_interface per host;
       the VIP must not be a node address.
     quiet: true
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Install packages"
   ansible.builtin.package:
@@ -100,7 +100,7 @@
       - keepalived
       - curl
     state: present
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Create unprivileged health check user"
   ansible.builtin.user:
@@ -110,7 +110,7 @@
     create_home: false
     home: "/nonexistent"
     password: "!"
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 # root-owned in a root-owned directory: enable_script_security refuses to run
 # a script if it, or any directory above it, is writable by a non-root user.
@@ -121,7 +121,7 @@
     owner: "root"
     group: "root"
     mode: "0755"
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Ensure config directory exists"
   ansible.builtin.file:
@@ -130,7 +130,7 @@
     owner: "root"
     group: "root"
     mode: "0700"
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Template configuration"
   ansible.builtin.template:
@@ -143,7 +143,7 @@
   # The file contains the VRRP auth key.
   diff: false
   notify: Restart keepalived
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Ensure systemd drop-in directory exists"
   ansible.builtin.file:
@@ -152,7 +152,7 @@
     owner: "root"
     group: "root"
     mode: "0755"
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 # keepalived needs CAP_NET_ADMIN/CAP_NET_RAW to manage addresses and send
 # adverts, and setuid/setgid to drop to the script user, so capabilities are
@@ -166,7 +166,6 @@
     content: |
       # Managed by Ansible — do not edit.
       [Service]
-      NoNewPrivileges=true
       ProtectSystem=full
       ProtectHome=true
       PrivateTmp=true
@@ -177,7 +176,7 @@
       LockPersonality=true
       RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK AF_PACKET
   notify: Restart keepalived
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
 
 - name: "[keepalived] Enable and start keepalived"
   ansible.builtin.systemd_service:
@@ -185,4 +184,4 @@
     enabled: true
     state: started
     daemon_reload: true
-  tags: [openbao, openbao-keepalived]
+  tags: [openbao, openbao-keepalived, keepalived]
