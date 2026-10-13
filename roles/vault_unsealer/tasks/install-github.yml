@@ -94,7 +94,7 @@
       ansible.builtin.set_fact:
         vault_unsealer_release_checksum: "{{ item.split(' ')[0] }}"
       when: [vault_unsealer_full_filename in item, (not vault_unsealer_local_binary.stat.exists or vault_unsealer_installed_version != vault_unsealer_desired_version)]
-      with_items: ["{{ lookup('url', 'https://github.com/{{ github_repo }}/releases/download/' + vault_unsealer_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
+      with_items: ["{{ lookup('url', 'https://github.com/' + github_repo + '/releases/download/' + vault_unsealer_desired_version + '/checksum.sha256', wantlist=True) | list }}"]
 
     - name: Download binary
       become: false
@@ -163,4 +163,7 @@
       ansible.builtin.systemd:
         name: "{{ service_name }}"
         state: restarted
-      when: vault_unsealer_stopped_service is defined and vault_unsealer_stopped_service is changed
+      when:
+        - vault_unsealer_stopped_service is defined
+        - vault_unsealer_stopped_service is mapping
+        - vault_unsealer_stopped_service is changed | default(false)
