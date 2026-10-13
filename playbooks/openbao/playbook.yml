@@ -28,4 +28,13 @@
     - name: "Run role openbao"
       ansible.builtin.include_role:
         name: "openbao"
-      tags: always
+      tags: "always"
+
+    - name: "Run role vault_unsealer"
+      ansible.builtin.include_role:
+        name: "vault_unsealer"
+      tags: "always"
+
+    - name: "Run tasks vault_unsealer.yaml"
+      ansible.builtin.include_tasks: "tasks/vault_unsealer.yaml"
+      tags: "always"

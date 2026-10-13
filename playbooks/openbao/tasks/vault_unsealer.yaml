@@ -1,0 +1,30 @@
+---
+- name: "Create vault-unsealer systemd drop-in directory"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/vault-unsealer.service.d"
+    state: "directory"
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  tags: [openbao, vault-unsealer]
+
+- name: "Add vault-unsealer systemd override to load secret-id credential"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/vault-unsealer.service.d/override.conf"
+    content: |
+      # {{ ansible_managed }}
+      [Service]
+      LoadCredential=secret-id:/etc/vault-unsealer/secret-id
+    owner: "root"
+    group: "root"
+    mode: "0644"
+  register: "vault_unsealer_override"
+  tags: [openbao, vault-unsealer]
+
+- name: "Restart vault-unsealer to apply systemd override"
+  ansible.builtin.systemd:
+    name: "vault-unsealer"
+    daemon_reload: true
+    state: "restarted"
+  when: "vault_unsealer_override is changed"
+  tags: [openbao, vault-unsealer]
