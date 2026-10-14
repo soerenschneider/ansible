@@ -3,7 +3,7 @@ collections:
   - name: community.general
     version: 12.6.5
   - name: community.docker
-    version: 5.2.2
+    version: 5.4.0
   - name: community.sops
     version: 2.4.0
   - name: "community.crypto"
