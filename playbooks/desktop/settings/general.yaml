@@ -20,7 +20,7 @@ terragrunt_version: v1.1.4
 # renovate: datasource=github-releases depName=soerenschneider/sc
 sc_version: v1.11.0
 # renovate: datasource=github-releases depName=nats-io/natscli
-nats_version: v0.4.0
+nats_version: v0.5.0
 # renovate: datasource=github-releases depName=mathismqn/godeez
 godeez_version: v1.5.1
 # renovate: datasource=github-releases depName=FiloSottile/age
