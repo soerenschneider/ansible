@@ -135,6 +135,15 @@
   ansible.builtin.include_tasks: "crypto-gpg.yaml"
   tags: always
 
+# Facts were gathered before the fact script and the key files above existed,
+# so ansible_local has to be refreshed before harvesting.
+- name: Refresh local facts
+  ansible.builtin.setup:
+    filter: ansible_local
+    fact_path: "{{ baseline_facts_dir }}"
+  when: baseline_pubkey_harvest_file | default("") | length > 0
+  tags: always
+
 # Merges {"host_age_keys": {host: key}, "host_gpg_keys": {host: key}}
 # for all hosts in the play into the existing file. Hosts not in the play
 # keep their entries; hosts in the play get their entries updated.
