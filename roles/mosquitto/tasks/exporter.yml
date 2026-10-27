@@ -1,4 +1,13 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - mosquitto_exporter_user | length > 0
+      - mosquitto_exporter_user not in ["root", "toor", "nobody"]
+    fail_msg: "mosquitto_exporter_user must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [mosquitto, mosquitto_exporter]
+
 - name: Add user
   ansible.builtin.user:
     name: "{{ mosquitto_exporter_user }}"

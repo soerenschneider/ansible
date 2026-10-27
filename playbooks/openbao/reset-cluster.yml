@@ -1,21 +1,36 @@
 ---
-- name: Reset a Vault cluster
-  hosts: vault
+- name: Reset a openbao cluster
+  hosts: openbao
   become: true
   vars_prompt:
-    - name: destroy_vault
-      prompt: Do you want to destroy the Vault cluster (yes/no)?
+    - name: destroy_openbao
+      prompt: Do you really want to destroy the OpenBao cluster (yes/no)?
       private: false
   tasks:
-    - name: "Stop vault and delete storage dir"
-      when: destroy_vault | bool
+    - name: "Stop openbao and delete storage dir"
+      when: destroy_openbao | bool
       block:
-        - name: Make sure vault is stopped
+        - name: "Make sure openbao is stopped"
           ansible.builtin.systemd:
-            name: vault
+            name: openbao
             state: stopped
 
-        - name: Delete storage dir
+        - name: "Find contents of storage dir"
+          ansible.builtin.find:
+            paths: "{{ openbao_storage_dir }}"
+            file_type: any
+            hidden: true
+          register: openbao_storage_contents
+
+        - name: "Delete contents of storage dir"
           ansible.builtin.file:
-            path: /etc/vault.d/storage
+            path: "{{ item.path }}"
             state: absent
+          loop: "{{ openbao_storage_contents.files }}"
+          loop_control:
+            label: "{{ item.path }}"
+
+        - name: "Start openbao"
+          ansible.builtin.systemd:
+            name: openbao
+            state: started

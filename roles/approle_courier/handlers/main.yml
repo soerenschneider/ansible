@@ -1,0 +1,16 @@
+---
+- name: Restart approle-courier
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ approle_courier_service_name }}"
+    state: restarted
+
+- name: Restart approle-courier secret_id watcher
+  ansible.builtin.systemd:
+    daemon_reload: true
+    name: "{{ approle_courier_service_name }}-secret-id.path"
+    state: restarted
+
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true

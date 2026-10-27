@@ -1,4 +1,9 @@
 ---
+- name: "Run tasks migrate.yml"
+  ansible.builtin.include_tasks: migrate.yml
+  when: silo_migrate_from_minio | bool
+  tags: always
+
 - name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: always
@@ -6,10 +11,10 @@
 - name: "Run tasks install-github.yml"
   ansible.builtin.include_tasks: install-github.yml
   vars:
-    binary_name: "minio"
-    github_repo: "pgsty/minio"
-    service_name: "minio"
-    version_wanted: "{{ minio_version }}"
+    binary_name: "silo"
+    github_repo: "pgsty/silo"
+    service_name: "silo"
+    version_wanted: "{{ silo_server_version }}"
   tags: always
 
 - name: "Run tasks configure.yaml"

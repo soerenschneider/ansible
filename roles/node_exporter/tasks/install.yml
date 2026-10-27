@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - node_exporter_user | length > 0
+      - node_exporter_user not in ["root", "toor", "nobody"]
+      - node_exporter_group | length > 0
+      - node_exporter_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "node_exporter_user/node_exporter_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [monitoring, node_exporter, node_exporter-install]
+
 - name: Add {{ node_exporter_group }} system group
   ansible.builtin.group:
     name: "{{ node_exporter_group }}"

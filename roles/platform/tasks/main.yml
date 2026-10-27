@@ -27,5 +27,5 @@
 - name: Including role 'vault_approle'
   ansible.builtin.include_role:
     name: vault_approle
-  when: false and vault_approles | default([]) | length > 0
+  when: false and openbao_approle_clients | default([]) | length > 0
   tags: always

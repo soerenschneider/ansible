@@ -2,6 +2,9 @@
 - name: "Setup OpenBAO cluster"
   hosts: "openbao"
   become: true
+  handlers:
+    - name: "Import handlers"
+      ansible.builtin.import_tasks: "handlers/main.yaml"
   tasks:
     - name: "Print user info"
       ansible.builtin.debug:
@@ -28,6 +31,11 @@
     - name: "Run role openbao"
       ansible.builtin.include_role:
         name: "openbao"
+      tags: "always"
+
+    - name: "Run approle-courier"
+      ansible.builtin.include_role:
+        name: "approle_courier"
       tags: "always"
 
     - name: "Run role vault_unsealer"

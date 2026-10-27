@@ -1,40 +1,51 @@
 ---
-- name: Add minio group
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - silo_user | length > 0
+      - silo_user not in ["root", "toor", "nobody"]
+      - silo_group | length > 0
+      - silo_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "silo_user/silo_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [silo, silo-install]
+
+- name: Add silo group
   ansible.builtin.group:
-    name: "{{ minio_group }}"
-  tags: [minio, minio-install]
+    name: "{{ silo_group }}"
+  tags: [silo, silo-install]
 
-- name: Add minio user
+- name: Add silo user
   ansible.builtin.user:
-    name: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    name: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     shell: "/usr/sbin/nologin"
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
-- name: Add minio certs dir
+- name: Add silo certs dir
   ansible.builtin.file:
-    path: "/home/{{ minio_user }}/.minio/certs"
+    path: "/home/{{ silo_user }}/.silo/certs"
     state: "directory"
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0750"
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
 - name: Add base dir
   ansible.builtin.file:
-    path: "{{ minio_base_dir }}"
+    path: "{{ silo_base_dir }}"
     state: "directory"
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0700"
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
 - name: Add volume dirs
   ansible.builtin.file:
     path: "{{ item }}"
     state: "directory"
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0700"
-  with_items: "{{ minio_volumes }}"
-  tags: [minio, minio-install]
+  with_items: "{{ silo_volumes }}"
+  tags: [silo, silo-install]

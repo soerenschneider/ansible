@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - device_stalker_user | length > 0
+      - device_stalker_user not in ["root", "toor", "nobody"]
+      - device_stalker_group | length > 0
+      - device_stalker_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "device_stalker_user/device_stalker_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [device-stalker, device-stalker-install]
+
 - name: Add group
   ansible.builtin.group:
     name: "{{ device_stalker_group }}"
@@ -10,7 +21,7 @@
     name: "{{ device_stalker_user }}"
     shell: "/bin/false"
     system: true
-    groups: "{{ device_stalker_group }}"
+    group: "{{ device_stalker_group }}"
   tags: [device-stalker, device-stalker-install]
 
 - name: "Include tasks"

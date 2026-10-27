@@ -127,6 +127,17 @@
         state: restarted
       when: switchbot_exporter_bluez_conf.changed  # noqa: no-handler
 
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - switchbot_exporter_user | length > 0
+      - switchbot_exporter_user not in ["root", "toor", "nobody"]
+      - switchbot_exporter_group | length > 0
+      - switchbot_exporter_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "switchbot_exporter_user/switchbot_exporter_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [switchbot_exporter, switchbot_exporter_user]
+
 - name: Create the service group
   become: true
   tags: [switchbot_exporter, switchbot_exporter_user]

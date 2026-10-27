@@ -43,14 +43,14 @@
 
           http-request redirect code 301 prefix / drop-query append-slash if { path /browse }
           http-request redirect code 301 prefix / drop-query append-slash if { path /media }
-          http-request redirect code 301 prefix / drop-query append-slash if { path /minio-ui }
+          http-request redirect code 301 prefix / drop-query append-slash if { path /silo-ui }
           http-request redirect code 301 prefix / drop-query append-slash if { path /pub }
           http-request redirect code 301 prefix / drop-query append-slash if { path /syncthing }
           http-request redirect code 301 prefix / drop-query append-slash if { path /videos }
 
           acl filebrowser path_beg,url_dec -m beg /browse/
           acl media path_beg,url_dec -m beg /media/
-          acl minio_ui path_beg,url_dec -m beg /minio-ui/
+          acl silo_ui path_beg,url_dec -m beg /silo-ui/
           acl pub path_beg,url_dec -m beg /pub/
           acl syncthing path_beg,url_dec -m beg /syncthing/
           acl videos path_beg,url_dec -m beg /videos/
@@ -60,12 +60,12 @@
 
           use_backend filebrowser if filebrowser
           use_backend nginx if media || pub || videos
-          use_backend minio_ui if minio_ui
+          use_backend silo_ui if silo_ui
           use_backend syncthing if syncthing
 
           #http-request deny if syncthing !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
 
-          default_backend minio
+          default_backend silo
 
       frontend directory_exporter
           bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
@@ -127,21 +127,21 @@
         http-check expect status 404
         server node_exporter 127.0.0.1:2112 check inter 30s
 
-      backend minio
+      backend silo
         option httpchk
         option forwardfor
-        http-check send meth GET uri /minio/health/live ver HTTP/1.1 hdr Host {{ minio_server_url | default(inventory_hostname) }}
+        http-check send meth GET uri /minio/health/live ver HTTP/1.1 hdr Host {{ silo_server_url | default(inventory_hostname) }}
         http-request set-header X-Forwarded-Port %[dst_port]
         http-request add-header X-Forwarded-Proto https if { ssl_fc }
-        server minio 127.0.0.1:9000 ssl verify none check inter 30s
+        server silo 127.0.0.1:9000 ssl verify none check inter 30s
 
-      backend minio_ui
+      backend silo_ui
         option httpchk
         option forwardfor
         http-check send meth GET  uri /minio/health/live
         http-request set-header X-Forwarded-Port %[dst_port]
         http-request add-header X-Forwarded-Proto https if { ssl_fc }
-        http-request set-path '%[path,regsub("^/minio-ui(/|$)","/")]'
-        server minio-ui 127.0.0.1:9009 ssl verify none check inter 30s
+        http-request set-path '%[path,regsub("^/silo-ui(/|$)","/")]'
+        server silo-ui 127.0.0.1:9009 ssl verify none check inter 30s
   notify: Restart haproxy
   tags: [haproxy]

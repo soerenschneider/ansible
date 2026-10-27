@@ -1,0 +1,33 @@
+---
+# Directory that is searched (recursively) for base images. For domains, the newest image whose
+# file name contains the domain's "os" (case-insensitive) is used. "Newest" is determined by an
+# 8-digit date (YYYYMMDD) in the file name.
+libvirt_volumes_base_image_dir: "/var/lib/libvirt/images/base"
+
+libvirt_volumes_default_size_g: 20
+
+# Optional URL to fetch the domain definitions from. If set, it takes precedence over
+# libvirt_volumes_domains. Example:
+# libvirt_volumes_domains_url: "https://raw.githubusercontent.com/soerenschneider/tf-libvirt/refs/heads/master/envs/{{ ansible_facts['fqdn'] }}/domains.yaml"
+libvirt_volumes_domains_url: ""
+
+# Domain definitions (same format as tf-libvirt's domains.yaml). Only the first block device of
+# the form /dev/mapper/<vg>-<lv> is managed, domains without such a device are skipped.
+# - name: vm1
+#   os: debian-12
+#   disk_size_g: 30
+#   block_devices: ["/dev/mapper/libvirt-vm1"]
+libvirt_volumes_domains: []
+
+# Additional volumes with an explicit base image.
+# - vg: libvirt
+#   lv: scratch
+#   size_g: 10
+#   image: /var/lib/libvirt/images/base/debian-12-20240101.qcow2
+#   domain: scratch  # optional, defaults to lv
+libvirt_volumes_extra: []
+
+# Existing volumes are never touched unless listed here (by "lv" or "vg/lv"). Listed volumes are
+# deleted and re-created from their base image; a running domain is destroyed and started again.
+# Usage: ansible-playbook ... -e '{"libvirt_volumes_recreate": ["vm1"]}'
+libvirt_volumes_recreate: []

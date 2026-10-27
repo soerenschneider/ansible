@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - ip_plz_user | length > 0
+      - ip_plz_user not in ["root", "toor", "nobody"]
+      - ip_plz_group | length > 0
+      - ip_plz_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "ip_plz_user/ip_plz_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [ip-plz, ip-plz-install]
+
 - name: Add group
   ansible.builtin.group:
     name: "{{ ip_plz_group }}"
@@ -10,7 +21,7 @@
     name: "{{ ip_plz_user }}"
     shell: /bin/false
     system: true
-    groups: "{{ ip_plz_group }}"
+    group: "{{ ip_plz_group }}"
   tags: [ip-plz, ip-plz-install]
 
 - name: Add dir

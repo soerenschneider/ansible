@@ -1,4 +1,13 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - jellyfin_user | length > 0
+      - jellyfin_user not in ["root", "toor", "nobody"]
+    fail_msg: "jellyfin_user must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [jellyfin]
+
 - name: Create jellyfin user
   ansible.builtin.user:
     name: "{{ jellyfin_user }}"

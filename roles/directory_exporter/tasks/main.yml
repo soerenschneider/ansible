@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - directory_exporter_user | length > 0
+      - directory_exporter_user not in ["root", "toor", "nobody"]
+      - directory_exporter_group | length > 0
+      - directory_exporter_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "directory_exporter_user/directory_exporter_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [directory-exporter, directory-exporter-install]
+
 - name: Add group
   ansible.builtin.group:
     name: "{{ directory_exporter_group }}"
@@ -10,7 +21,7 @@
     name: "{{ directory_exporter_user }}"
     shell: /bin/false
     system: true
-    groups: "{{ directory_exporter_group }}"
+    group: "{{ directory_exporter_group }}"
   tags: [directory-exporter, directory-exporter-install]
 
 - name: Including tasks

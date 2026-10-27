@@ -1,4 +1,15 @@
 ---
+- name: "Validate service account"
+  ansible.builtin.assert:
+    that:
+      - vector_user | length > 0
+      - vector_user not in ["root", "toor", "nobody"]
+      - vector_group | length > 0
+      - vector_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "vector_user/vector_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [vector, vector-install, deps]
+
 - name: "Create group for vector"
   ansible.builtin.group:
     name: "{{ vector_group }}"

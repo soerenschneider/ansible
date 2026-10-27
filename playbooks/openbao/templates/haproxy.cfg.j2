@@ -72,6 +72,112 @@ backend metrics_not_found
     http-request deny deny_status 404
 
 #---------------------------------------------------------------------
+# Monitor for the keepalived health check (loopback only)
+#
+# Answers from HAProxy's own view of the OpenBao backend: 200 while at
+# least one node passes its health check (unsealed, active or standby),
+# 503 otherwise. Connection refused if HAProxy is down.
+#---------------------------------------------------------------------
+frontend openbao_monitor
+    mode http
+    bind 127.0.0.1:{{ haproxy_monitor_port | default(8404) }}
+    no log
+    monitor-uri /healthz
+    monitor fail if { nbsrv(openbao) lt 1 }
+    http-request deny deny_status 404
+
+{% if approle_courier_enabled | default(false) %}
+#---------------------------------------------------------------------
+# approle-courier
+#
+# HAProxy terminates TLS (haproxy_cert_file must cover the name machines
+# connect to and every node's inventory name) and forwards plain HTTP to the
+# local approle-courier. Other nodes are reached through their own HAProxy on
+# haproxy_approle_courier_port, verified against system_ca_bundle and their
+# inventory name, so approle-courier can bind to loopback everywhere.
+#
+# A request arriving from another node's HAProxy has already been balanced and
+# goes to the local approle-courier only. Nodes are recognised by
+# ansible_default_ipv4, which must be the address they connect from.
+#
+# The client address is passed on with the PROXY protocol if this node sets
+# approle_courier_proxy_protocol, and in X-Forwarded-For otherwise; either
+# way approle-courier needs every OpenBao node's address in trusted_proxies.
+# A PROXY header sent to a node not expecting one is answered with 400. A node
+# that sets approle_courier_tls_cert is spoken to over TLS, verified against
+# haproxy_approle_courier_ca_file and its inventory name.
+#
+# Challenges are kept in memory per instance, so a machine's challenge and
+# its SecretID request must reach the same instance. Hashing the client
+# address consistently sends both to the same node, whichever HAProxy they
+# enter through, as long as every node lists the same servers in the same
+# order.
+#
+# Health endpoint /readyz returns:
+#   200 ready
+#   503 registry unreadable, Vault token expired or shutting down
+#---------------------------------------------------------------------
+{%   set courier_nodes = [] %}
+{%   for node in groups['openbao'] if hostvars[node].approle_courier_enabled | default(false) %}
+{%     set _ = courier_nodes.append(node) %}
+{%   endfor %}
+{%   set peer_addresses = [] %}
+{%   for node in courier_nodes if node != inventory_hostname %}
+{%     set _ = peer_addresses.append(hostvars[node].ansible_default_ipv4.address) %}
+{%   endfor %}
+{%   macro local_courier_server() %}
+{%-    set addr = approle_courier_listen_address | default('') %}
+{%-    if addr in ['', '0.0.0.0', '::', 'localhost'] %}
+{%-      set addr = '127.0.0.1' %}
+{%-    elif ':' in addr and not addr.startswith('[') %}
+{%-      set addr = '[' ~ addr ~ ']' %}
+{%-    endif %}
+    server {{ inventory_hostname.split('.')[0] }} {{ addr }}:{{ approle_courier_port | default(8300) }}
+{%-    if approle_courier_proxy_protocol | default(false) %} send-proxy-v2 check-send-proxy{% endif %}
+{%-    if approle_courier_tls_cert | default("") %} ssl verify required ca-file {{ haproxy_approle_courier_ca_file | mandatory }} sni str({{ inventory_hostname }}) verifyhost {{ inventory_hostname }} check-sni {{ inventory_hostname }}{% endif %}
+{%   endmacro %}
+frontend approle_courier_https
+    description approle-courier over https
+    mode http
+    option httplog
+    bind *:{{ haproxy_approle_courier_port }} ssl crt {{ haproxy_cert_file }}
+{%   if peer_addresses %}
+    acl from_courier_peer src {{ peer_addresses | join(' ') }}
+    use_backend approle_courier_local if from_courier_peer
+{%   endif %}
+    default_backend approle_courier
+
+# Not named like the frontend: HAProxy 3.3 rejects a frontend and a backend
+# sharing a name.
+backend approle_courier
+    mode http
+    balance source
+    hash-type consistent
+    option httpchk GET /readyz
+    http-check expect status 200
+    # Ignored by nodes using the PROXY protocol: the client address it
+    # gives is not a trusted proxy.
+    option forwardfor
+    default-server check inter 2s fall 2 rise 2
+{%   for node in courier_nodes %}
+{%     if node == inventory_hostname %}
+{{ local_courier_server() }}
+{%     else %}
+    server {{ node.split('.')[0] }} {{ node }}:{{ hostvars[node].haproxy_approle_courier_port | default(haproxy_approle_courier_port) }} ssl verify required ca-file {{ system_ca_bundle }} sni str({{ node }}) verifyhost {{ node }} check-sni {{ node }}
+{%     endif %}
+{%   endfor %}
+
+# Requests other nodes' HAProxy already balanced to this node.
+backend approle_courier_local
+    mode http
+    option httpchk GET /readyz
+    http-check expect status 200
+    option forwardfor
+    default-server check inter 2s fall 2 rise 2
+{{ local_courier_server() }}
+{% endif %}
+
+#---------------------------------------------------------------------
 # TCP defaults (avoids HTTP-only option warnings on TCP proxies)
 #---------------------------------------------------------------------
 defaults
@@ -101,9 +207,9 @@ defaults
 frontend openbao_https
     description openbao over https
     bind *:{{ haproxy_openbao_port }}
-    default_backend openbao_https
+    default_backend openbao
 
-backend openbao_https
+backend openbao
     option httpchk GET /v1/sys/health
     http-check expect rstatus (200|429)
     default-server check check-ssl verify required ca-file {{ system_ca_bundle }} send-proxy inter 5s

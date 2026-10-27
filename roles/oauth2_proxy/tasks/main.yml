@@ -7,6 +7,17 @@
     service_name: oauth2-proxy
   tags: [oauth2-proxy, oauth2-proxy-install]
 
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - oauth2_proxy_user | length > 0
+      - oauth2_proxy_user not in ["root", "toor", "nobody"]
+      - oauth2_proxy_group | length > 0
+      - oauth2_proxy_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "oauth2_proxy_user/oauth2_proxy_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [oauth2-proxy, oauth2-proxy-configure]
+
 - name: Create oauth2-proxy system group
   ansible.builtin.group:
     name: "{{ oauth2_proxy_group }}"

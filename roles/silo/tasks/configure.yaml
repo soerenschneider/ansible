@@ -1,66 +1,77 @@
 ---
-- name: Add minio group
-  ansible.builtin.group:
-    name: "{{ minio_group }}"
-  tags: [minio, minio-install]
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - silo_user | length > 0
+      - silo_user not in ["root", "toor", "nobody"]
+      - silo_group | length > 0
+      - silo_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "silo_user/silo_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [silo, silo-install]
 
-- name: Add minio user
+- name: Add silo group
+  ansible.builtin.group:
+    name: "{{ silo_group }}"
+  tags: [silo, silo-install]
+
+- name: Add silo user
   ansible.builtin.user:
-    name: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    name: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     system: true
     shell: /usr/sbin/nologin
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
 - name: Add base dir
   ansible.builtin.file:
-    path: "{{ minio_base_dir }}"
+    path: "{{ silo_base_dir }}"
     state: directory
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0700"
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
 - name: Add volume dirs
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0700"
-  with_items: "{{ minio_volumes }}"
-  tags: [minio, minio-install]
+  with_items: "{{ silo_volumes }}"
+  tags: [silo, silo-install]
 
-- name: Add minio config
+- name: Add silo config
   ansible.builtin.template:
-    src: minio.conf.j2
-    dest: /etc/minio.conf
-    owner: "{{ minio_user }}"
-    group: "{{ minio_group }}"
+    src: silo.conf.j2
+    dest: /etc/silo.conf
+    owner: "{{ silo_user }}"
+    group: "{{ silo_group }}"
     mode: "0600"
-  notify: Restart minio
-  tags: [minio, minio-install]
+  notify: Restart silo
+  tags: [silo, silo-install]
 
-- name: Add minio systemd file
+- name: Add silo systemd file
   ansible.builtin.template:
-    src: minio.service.j2
-    dest: /etc/systemd/system/minio.service
+    src: silo.service.j2
+    dest: /etc/systemd/system/silo.service
     owner: root
     group: root
     mode: "0644"
-  notify: Restart minio
-  tags: [minio, minio-install]
+  notify: Restart silo
+  tags: [silo, silo-install]
 
-- name: Enable/disable minio
+- name: Enable/disable silo
   ansible.builtin.systemd:
-    name: minio
-    enabled: "{% if minio_disabled | default(False) %}false{% else %}true{% endif %}"
-    state: "{% if minio_disabled | default(False) %}stopped{% else %}started{% endif %}"
+    name: silo
+    enabled: "{% if silo_disabled | default(False) %}false{% else %}true{% endif %}"
+    state: "{% if silo_disabled | default(False) %}stopped{% else %}started{% endif %}"
     daemon_reload: true
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]
 
-- name: Start minio
+- name: Start silo
   ansible.builtin.systemd:
-    name: minio
+    name: silo
     state: started
-  tags: [minio, minio-install]
+  tags: [silo, silo-install]

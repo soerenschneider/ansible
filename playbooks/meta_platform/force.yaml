@@ -4,8 +4,10 @@
   strategy: free
   become: true
   tasks:
-    - name: Rotate secret
-      ansible.builtin.include_tasks: tasks/run.yml
-      with_items: "{{ vault_approles }}"
-      when: [vault_approles is defined and vault_approles | length > 0, "lookup('env', 'VAULT_TOKEN') | length > 0"]
-      tags: [vault-approle, vault-approle-install]
+    - name: Including role
+      ansible.builtin.include_role:
+        name: vault_approle
+      vars:
+        vault_approle_force_rotate: true
+      when: openbao_approle_clients | default([]) | length > 0
+      tags: always

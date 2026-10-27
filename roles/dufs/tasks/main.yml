@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - dufs_user | length > 0
+      - dufs_user not in ["root", "toor", "nobody"]
+      - dufs_group | length > 0
+      - dufs_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "dufs_user/dufs_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [dufs, dufs-install]
+
 - name: Add group
   ansible.builtin.group:
     name: "{{ dufs_group }}"
@@ -10,7 +21,7 @@
     name: "{{ dufs_user }}"
     shell: /bin/false
     system: true
-    groups: "{{ dufs_group }}"
+    group: "{{ dufs_group }}"
   tags: [dufs, dufs-install]
 
 - name: "Run tasks install-github.yml"

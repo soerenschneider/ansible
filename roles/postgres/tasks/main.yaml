@@ -1,9 +1,19 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - postgres_user | length > 0
+      - postgres_user not in ["root", "toor", "nobody"]
+      - postgres_group | length > 0
+      - postgres_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "postgres_user/postgres_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [postgres]
+
 - name: Create postgres group
-  ansible.builtin.user:
+  ansible.builtin.group:
     name: "{{ postgres_group }}"
     system: true
-  when: postgres_group != "root"
   tags: [postgres]
 
 - name: Create postgres user
@@ -11,7 +21,6 @@
     name: "{{ postgres_user }}"
     group: "{{ postgres_group }}"
     system: true
-  when: postgres_user != "root"
   tags: [postgres]
 
 - name: Get UID for generated user

@@ -1,4 +1,13 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - unbound_adblocker_update_user | length > 0
+      - unbound_adblocker_update_user not in ["root", "toor", "nobody"]
+    fail_msg: "unbound_adblocker_update_user must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [unbound, adblocker]
+
 - name: Add user for updating adblocker
   ansible.builtin.user:
     name: "{{ unbound_adblocker_update_user }}"

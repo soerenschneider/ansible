@@ -1,4 +1,13 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - keycloak_user | length > 0
+      - keycloak_user not in ["root", "toor", "nobody"]
+    fail_msg: "keycloak_user must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [keycloak, keycloak-install, bootstrap]
+
 - name: Create keycloak user
   ansible.builtin.user:
     name: "{{ keycloak_user }}"

@@ -1,138 +1,138 @@
 ---
 - name: "Set variables"
   ansible.builtin.set_fact:
-    minio_local_binary: ""
-    minio_installed_version: ""
-    minio_desired_version: "{{ minio_version | default('') }}"
-    minio_download_archive: ""
-    minio_download_signature: ""
-    minio_stopped_service: ""
-    minio_github_release: ""
-    minio_go_os: ""
-    minio_go_arch: ""
-    minio_checksum_signature_file: ""
-    minio_checksum_file: ""
-    minio_full_filename: ""
-    minio_release_checksum: ""
-  tags: [minio, minio-install, deps]
+    silo_local_binary: ""
+    silo_installed_version: ""
+    silo_desired_version: "{{ version_wanted | default('') }}"
+    silo_download_archive: ""
+    silo_download_signature: ""
+    silo_stopped_service: ""
+    silo_github_release: ""
+    silo_go_os: ""
+    silo_go_arch: ""
+    silo_checksum_signature_file: ""
+    silo_checksum_file: ""
+    silo_full_filename: ""
+    silo_release_checksum: ""
+  tags: [silo, silo-install, deps]
 
 - name: Check for existing binary
   ansible.builtin.stat:
     path: /usr/local/bin/{{ binary_name }}
-  register: minio_local_binary
-  tags: [minio, minio-install, deps]
+  register: silo_local_binary
+  tags: [silo, silo-install, deps]
 
 - name: Check installed version
-  when: minio_local_binary.stat.exists
-  tags: [minio, minio-install, deps]
+  when: silo_local_binary.stat.exists
+  tags: [silo, silo-install, deps]
   block:
     - name: Check installed version
       ansible.builtin.shell:
         cmd: "set -o pipefail && /usr/local/bin/{{ binary_name }} --version 2>&1 | head -n1 | awk '{print $3}'"
         executable: /bin/bash
-      register: minio_installed_version
+      register: silo_installed_version
       changed_when: false
 
     - name: Register local version
       ansible.builtin.set_fact:
-        minio_installed_version: "{{ minio_installed_version.stdout }}"
+        silo_installed_version: "{{ silo_installed_version.stdout }}"
       changed_when: false
 
     - name: Print debug information
       ansible.builtin.debug:
-        msg: "Installed version: {{ minio_installed_version }}"
+        msg: "Installed version: {{ silo_installed_version }}"
       changed_when: false
 
 - name: Fetch latest release information from github
-  when: minio_desired_version is not defined or not minio_desired_version
-  tags: [minio, minio-install, deps]
+  when: silo_desired_version is not defined or not silo_desired_version
+  tags: [silo, silo-install, deps]
   block:
     - name: Print debug information
       ansible.builtin.uri:
         url: https://api.github.com/repos/{{ github_repo }}/releases/latest
         return_content: true
-      register: minio_github_release
+      register: silo_github_release
       retries: 3
       delay: 5
-      until: minio_github_release is not failed
+      until: silo_github_release is not failed
 
     - name: Set github release
       ansible.builtin.set_fact:
-        minio_desired_version: "{{ minio_github_release.json.tag_name }}"
+        silo_desired_version: "{{ silo_github_release.json.tag_name }}"
       changed_when: false
 
     - name: Print latest GitHub version
       ansible.builtin.debug:
-        msg: "Latest GitHub version: {{ minio_desired_version }}"
+        msg: "Latest GitHub version: {{ silo_desired_version }}"
       changed_when: false
 
 - name: "Download artifacts"
-  when: not minio_local_binary.stat.exists or minio_desired_version != minio_installed_version
-  tags: [minio, minio-install, deps]
+  when: not silo_local_binary.stat.exists or silo_desired_version != silo_installed_version
+  tags: [silo, silo-install, deps]
   block:
     - name: Generate temp dir
       become: false
       ansible.builtin.tempfile:
         state: directory
         suffix: "{{ binary_name }}"
-      register: minio_download_dir
+      register: silo_download_dir
 
     - name: Set vars for generating download link
       ansible.builtin.set_fact:
-        minio_go_os: "{{ ansible_system | lower }}"
-        minio_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
-        minio_download_dir: "{{ minio_download_dir.path }}"
-        minio_extraction_dir: "{{ minio_download_dir.path }}/{{ binary_name }}"
+        silo_go_os: "{{ ansible_system | lower }}"
+        silo_go_arch: "{{ 'amd64' if ansible_architecture == 'x86_64' else 'arm' if ansible_architecture == 'armv7l' else 'arm64' if ansible_architecture == 'aarch64' }}"
+        silo_download_dir: "{{ silo_download_dir.path }}"
+        silo_extraction_dir: "{{ silo_download_dir.path }}/{{ binary_name }}"
       changed_when: false
 
     - name: Set filenames
       ansible.builtin.set_fact:
-        minio_full_filename: >-
+        silo_full_filename: >-
           {{
-            'minio_' +
+            binary_name + '_' +
             (
-              minio_desired_version
+              silo_desired_version
               | regex_replace('^RELEASE\.', '')
               | regex_replace('[-T:Z]', '')
             )
-            + '.0.0_' + minio_go_os + '_' + minio_go_arch + '.tar.gz'
+            + '.0.0_' + silo_go_os + '_' + silo_go_arch + '.tar.gz'
           }}
-        minio_url: ""
+        silo_url: ""
       changed_when: false
 
     - name: Query GitHub API for release metadata
       ansible.builtin.uri:
-        url: "https://api.github.com/repos/{{ github_repo }}/releases/tags/{{ minio_desired_version }}"
+        url: "https://api.github.com/repos/{{ github_repo }}/releases/tags/{{ silo_desired_version }}"
         return_content: true
-      register: minio_release_data
+      register: silo_release_data
 
     - name: Extract asset info for this architecture
       ansible.builtin.set_fact:
-        minio_selected_asset: >-
+        silo_selected_asset: >-
           {{
-            (minio_release_data.json.assets
-            | selectattr('name','equalto', minio_full_filename)
+            (silo_release_data.json.assets
+            | selectattr('name','equalto', silo_full_filename)
             | list)[0]
           }}
 
     - name: Ensure asset was found
       ansible.builtin.fail:
-        msg: "Asset {{ minio_full_filename }} not found in release"
-      when: minio_selected_asset is not defined
+        msg: "Asset {{ silo_full_filename }} not found in release"
+      when: silo_selected_asset is not defined
 
     - name: "Print URL and digest"
       ansible.builtin.debug:
-        msg: "Downloading {{ minio_selected_asset.browser_download_url }} with {{ minio_selected_asset.digest | trim | to_json }}"
+        msg: "Downloading {{ silo_selected_asset.browser_download_url }} with {{ silo_selected_asset.digest | trim | to_json }}"
 
-    - name: Download minio with verified checksum
+    - name: Download silo with verified checksum
       become: false
       ansible.builtin.get_url:
-        url: "{{ minio_selected_asset.browser_download_url }}"
-        dest: "{{ minio_download_dir }}/{{ minio_full_filename }}"
+        url: "{{ silo_selected_asset.browser_download_url }}"
+        dest: "{{ silo_download_dir }}/{{ silo_full_filename }}"
         mode: "0644"
-        checksum: "{{ minio_selected_asset.digest | trim }}"
-      register: minio_download_archive
-      until: minio_download_archive is succeeded
+        checksum: "{{ silo_selected_asset.digest | trim }}"
+      register: silo_download_archive
+      until: silo_download_archive is succeeded
       retries: 5
       delay: 2
 
@@ -141,21 +141,21 @@
         name: "{{ service_name }}"
         state: stopped
       failed_when: false
-      notify: "Restart minio"
-      register: minio_stopped_service
+      notify: "Restart silo"
+      register: silo_stopped_service
 
     - name: Unpack binaries from archive
       become: false
       ansible.builtin.unarchive:
-        src: "{{ minio_download_dir }}/{{ minio_full_filename }}"
-        dest: "{{ minio_download_dir }}"
-        creates: "{{ minio_download_dir }}/{{ binary_name }}"
+        src: "{{ silo_download_dir }}/{{ silo_full_filename }}"
+        dest: "{{ silo_download_dir }}"
+        creates: "{{ silo_download_dir }}/{{ binary_name }}"
         remote_src: true
       check_mode: false
 
     - name: Copy binaries
       ansible.builtin.copy:
-        src: "{{ minio_download_dir }}/{{ item }}"
+        src: "{{ silo_download_dir }}/{{ item }}"
         dest: /usr/local/bin/{{ item }}
         remote_src: true
         mode: "0755"
@@ -167,5 +167,5 @@
 #      ansible.builtin.file:
 #        state: absent
 #        path: "{{ item }}"
-#      with_items: ["{{ minio_download_dir }}"]
+#      with_items: ["{{ silo_download_dir }}"]
 #      failed_when: false

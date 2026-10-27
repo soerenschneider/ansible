@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - alertmanager_user | length > 0
+      - alertmanager_user not in ["root", "toor", "nobody"]
+      - alertmanager_group | length > 0
+      - alertmanager_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "alertmanager_user/alertmanager_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [monitoring, alertmanager, alertmanager-install]
+
 - name: Create alertmanager system group
   ansible.builtin.group:
     name: "{{ alertmanager_group }}"
@@ -11,7 +22,7 @@
     name: "{{ alertmanager_user }}"
     system: true
     shell: "/sbin/nologin"
-    group: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
     createhome: false
   tags: [monitoring, alertmanager, alertmanager-install]
 
@@ -20,7 +31,7 @@
     path: "{{ alertmanager_db_dir }}"
     state: "directory"
     owner: "{{ alertmanager_user }}"
-    group: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
     mode: "0755"
   tags: [monitoring, alertmanager, alertmanager-install]
 
@@ -29,7 +40,7 @@
     path: "{{ item }}"
     state: "directory"
     owner: "{{ alertmanager_user }}"
-    group: "{{ alertmanager_user }}"
+    group: "{{ alertmanager_group }}"
     mode: "0770"
   with_items:
     - "{{ alertmanager_config_dir }}"

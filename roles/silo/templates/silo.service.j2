@@ -1,9 +1,9 @@
 [Unit]
-Description=MinIO
-Documentation=https://docs.min.io
+Description=Silo (MinIO fork)
+Documentation=https://silo.pgsty.com/docs/
 Wants=network-online.target
 After=network-online.target
-AssertFileIsExecutable=/usr/local/bin/minio
+AssertFileIsExecutable={{ silo_server_bin }}
 
 # restart forever
 StartLimitIntervalSec=0
@@ -14,8 +14,8 @@ ProtectControlGroups=true
 ProtectKernelTunables=true
 ProtectSystem=full
 RestrictSUIDSGID=true
-ReadWritePaths={{ minio_volumes }}
-ReadOnlyPaths=/etc/minio.conf /home/{{ minio_user }}/.minio/certs/public.crt /home/{{ minio_user }}/.minio/certs/private.key
+ReadWritePaths={{ silo_volumes }}
+ReadOnlyPaths=/etc/silo.conf /home/{{ silo_user }}/.silo/certs/public.crt /home/{{ silo_user }}/.silo/certs/private.key
 
 # --- Privilege restrictions ---
 NoNewPrivileges=true
@@ -48,13 +48,13 @@ IPAddressAllow=127.0.0.0/8
 IPAddressAllow=::1/128
 IPAddressAllow=192.168.0.0/16
 
-User={{ minio_user }}
-Group={{ minio_group }}
+User={{ silo_user }}
+Group={{ silo_group }}
 ProtectProc=invisible
 
-EnvironmentFile=/etc/minio.conf
-ExecStartPre=/bin/bash -c "if [ -z \"${MINIO_VOLUMES}\" ]; then echo \"Variable MINIO_VOLUMES not set in /etc/minio.conf\"; exit 1; fi"
-ExecStart=/usr/local/bin/minio server $MINIO_OPTS $MINIO_VOLUMES
+EnvironmentFile=/etc/silo.conf
+ExecStartPre=/bin/bash -c "if [ -z \"${MINIO_VOLUMES}\" ]; then echo \"Variable MINIO_VOLUMES not set in /etc/silo.conf\"; exit 1; fi"
+ExecStart={{ silo_server_bin }} server $MINIO_OPTS $MINIO_VOLUMES
 
 # Let systemd restart this service always
 Restart=always

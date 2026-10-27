@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - mariadb_user | length > 0
+      - mariadb_user not in ["root", "toor", "nobody"]
+      - mariadb_group | length > 0
+      - mariadb_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "mariadb_user/mariadb_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [mariadb, exporter, mariadb-install, bootstrap]
+
 - name: Create mariadb group
   ansible.builtin.group:
     name: "{{ mariadb_group }}"

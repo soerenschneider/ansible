@@ -1,0 +1,172 @@
+---
+- name: "Set variables"
+  ansible.builtin.set_fact:
+    approle_courier_installed_version: ""
+    approle_courier_desired_version: "{{ approle_courier_version | default('') }}"
+    approle_courier_stopped_service: ""
+    approle_courier_release_checksum: ""
+  tags: [approle-courier, approle-courier-install, deps]
+
+- name: Check for existing binary
+  ansible.builtin.stat:
+    path: /usr/local/bin/{{ binary_name }}
+  register: approle_courier_local_binary
+  tags: [approle-courier, approle-courier-install, deps]
+
+- name: Check installed version
+  when: approle_courier_local_binary.stat.exists
+  tags: [approle-courier, approle-courier-install, deps]
+  block:
+    - name: Check installed version
+      ansible.builtin.command: /usr/local/bin/{{ binary_name }} -version
+      register: approle_courier_installed_version_cmd
+      changed_when: false
+      check_mode: false
+
+    - name: Register local version
+      ansible.builtin.set_fact:
+        approle_courier_installed_version: "{{ approle_courier_installed_version_cmd.stdout | trim }}"
+
+    - name: Print debug information
+      ansible.builtin.debug:
+        msg: "Installed version: {{ approle_courier_installed_version }}"
+
+- name: Fetch latest release information from github
+  when: not approle_courier_desired_version
+  tags: [approle-courier, approle-courier-install, deps]
+  block:
+    - name: Fetch latest release
+      ansible.builtin.uri:
+        url: https://api.github.com/repos/{{ github_repo }}/releases/latest
+        return_content: true
+      register: approle_courier_github_release
+      retries: 3
+      delay: 5
+      until: approle_courier_github_release is not failed
+
+    - name: Set github release
+      ansible.builtin.set_fact:
+        approle_courier_desired_version: "{{ approle_courier_github_release.json.tag_name }}"
+
+    - name: Print latest GitHub version
+      ansible.builtin.debug:
+        msg: "Latest GitHub version: {{ approle_courier_desired_version }}"
+
+- name: "Download artifacts"
+  when: not approle_courier_local_binary.stat.exists or approle_courier_desired_version != approle_courier_installed_version
+  tags: [approle-courier, approle-courier-install, deps]
+  block:
+    - name: Set vars for generating download link
+      ansible.builtin.set_fact:
+        approle_courier_release_url: "https://github.com/{{ github_repo }}/releases/download/{{ approle_courier_desired_version }}"
+        approle_courier_full_filename: "{{ binary_name }}-{{ ansible_system | lower }}-{{ 'amd64' if ansible_architecture == 'x86_64' else 'armv6' if ansible_architecture == 'armv6l' else 'armv7' if ansible_architecture == 'armv7l' else 'aarch64' if ansible_architecture == 'aarch64' }}"
+
+    - name: Generate temp dir on controller
+      become: false
+      delegate_to: localhost
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ binary_name }}"
+      register: approle_courier_controller_dir
+
+    - name: Download release checksum to controller
+      become: false
+      delegate_to: localhost
+      ansible.builtin.get_url:
+        url: "{{ approle_courier_release_url }}/{{ item }}"
+        dest: "{{ approle_courier_controller_dir.path }}/{{ item }}"
+        mode: "0640"
+      register: approle_courier_download_checksum
+      until: approle_courier_download_checksum is succeeded
+      retries: 5
+      delay: 2
+      loop: [checksum.sha256, checksum.sha256.sigstore.json]
+
+    - name: Verify checksum signature
+      become: false
+      delegate_to: localhost
+      when: approle_courier_verify_signature
+      ansible.builtin.command:
+        argv:
+          - "{{ approle_courier_cosign_binary }}"
+          - verify-blob
+          - --bundle
+          - "{{ approle_courier_controller_dir.path }}/checksum.sha256.sigstore.json"
+          - --certificate-identity-regexp
+          - "{{ approle_courier_cosign_identity_regexp }}"
+          - --certificate-oidc-issuer
+          - "{{ approle_courier_cosign_oidc_issuer }}"
+          - "{{ approle_courier_controller_dir.path }}/checksum.sha256"
+      changed_when: false
+
+    - name: Get checksum for binary from verified checksum file
+      ansible.builtin.set_fact:
+        approle_courier_release_checksum: "{{ item.split()[0] }}"
+      when: item.endswith('/' + approle_courier_full_filename) or item.endswith(' ' + approle_courier_full_filename)
+      loop: "{{ lookup('ansible.builtin.file', approle_courier_controller_dir.path + '/checksum.sha256').splitlines() }}"
+
+    - name: Ensure checksum was found
+      ansible.builtin.assert:
+        that: approle_courier_release_checksum | length == 64
+        fail_msg: "No checksum found for {{ approle_courier_full_filename }}"
+        quiet: true
+
+    - name: Generate temp dir
+      become: false
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "{{ binary_name }}"
+      register: approle_courier_download_dir
+
+    - name: Download binary
+      become: false
+      ansible.builtin.get_url:
+        url: "{{ approle_courier_release_url }}/{{ approle_courier_full_filename }}"
+        dest: "{{ approle_courier_download_dir.path }}/{{ approle_courier_full_filename }}"
+        checksum: sha256:{{ approle_courier_release_checksum }}
+        mode: "0640"
+      register: approle_courier_download_binary
+      until: approle_courier_download_binary is succeeded
+      retries: 5
+      delay: 2
+
+    - name: Stop service
+      ansible.builtin.service:
+        name: "{{ service_name }}"
+        state: stopped
+      failed_when: false
+      register: approle_courier_stopped_service
+
+    - name: Copy binary
+      ansible.builtin.copy:
+        src: "{{ approle_courier_download_dir.path }}/{{ approle_courier_full_filename }}"
+        dest: /usr/local/bin/{{ binary_name }}
+        remote_src: true
+        mode: "0755"
+        owner: root
+        group: root
+
+  always:
+    - name: Delete downloaded files on controller
+      become: false
+      delegate_to: localhost
+      ansible.builtin.file:
+        state: absent
+        path: "{{ approle_courier_controller_dir.path }}"
+      when: approle_courier_controller_dir.path is defined
+      failed_when: false
+
+    - name: Delete downloaded files
+      ansible.builtin.file:
+        state: absent
+        path: "{{ approle_courier_download_dir.path }}"
+      when: approle_courier_download_dir.path is defined
+      failed_when: false
+
+    - name: Restart service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: restarted
+      when:
+        - approle_courier_stopped_service is mapping
+        - approle_courier_stopped_service is changed

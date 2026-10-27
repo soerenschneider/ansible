@@ -1,0 +1,14 @@
+---
+- name: Install approle-courier
+  hosts: approle-courier
+  become: true
+  tasks:
+    - name: "Run role approle_courier"
+      ansible.builtin.include_role:
+        name: approle_courier
+      tags: always
+
+    - name: "Run role platform"
+      ansible.builtin.include_role:
+        name: platform
+      tags: always

@@ -33,9 +33,9 @@
         name: "filebrowser"
       tags: always
 
-    - name: "Run role minio"
+    - name: "Run role silo"
       ansible.builtin.include_role:
-        name: minio
+        name: silo
       tags: always
 
     - name: "Run role flac_converter"

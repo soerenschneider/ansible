@@ -1,0 +1,57 @@
+{#-
+  approle-courier configuration. Every variable is documented in
+  defaults/main.yml; approle_courier_config is merged recursively over the
+  result, for settings without a variable of their own.
+-#}
+{%- set trusted_proxies = approle_courier_trusted_proxies
+      or (groups.get(approle_courier_proxy_group, [])
+          | map('extract', hostvars, ['ansible_default_ipv4', 'address'])
+          | select('defined') | list) -%}
+{%- set listen_address = approle_courier_listen_address -%}
+{%- if ':' in listen_address and not listen_address.startswith('[') -%}
+{%-   set listen_address = '[' ~ listen_address ~ ']' -%}
+{%- endif -%}
+{%- set listen = {
+  "api": listen_address ~ ":" ~ approle_courier_port,
+  "metrics": approle_courier_metrics_listen,
+  "proxy_protocol": approle_courier_proxy_protocol,
+  "trusted_proxies": (["127.0.0.1"] + trusted_proxies) | unique | list,
+} -%}
+{%- if approle_courier_tls_cert or approle_courier_tls_key -%}
+{%-   set listen = listen | combine({
+        "tls_cert": approle_courier_tls_cert,
+        "tls_key": approle_courier_tls_key,
+      }) -%}
+{%- endif -%}
+{%- set vault = {} -%}
+{%- if approle_courier_vault_address -%}
+{%-   set vault = {"address": approle_courier_vault_address} -%}
+{%- elif haproxy_openbao_port is defined -%}
+{%-   set vault = {"address": "https://" ~ inventory_hostname ~ ":" ~ haproxy_openbao_port} -%}
+{%- endif -%}
+{%- set approle = {"mount": approle_courier_approle_mount} -%}
+{%- if approle_courier_role_id -%}
+{%-   set approle = approle | combine({"role_id": approle_courier_role_id}) -%}
+{%- endif -%}
+{%- if approle_courier_secret_id_file -%}
+{%-   set approle = approle | combine({
+        "secret_id_file": "/run/credentials/" ~ approle_courier_service_name ~ ".service/secret-id",
+      }) -%}
+{%- endif -%}
+{%- set config = {
+  "listen": listen,
+  "limits": {
+    "exclusive_secret_id": approle_courier_exclusive_secret_id,
+    "bind_client_address": approle_courier_bind_client_address,
+  },
+  "log": {
+    "level": approle_courier_log_level,
+  },
+  "registry": {
+    "kv_mount": approle_courier_registry_kv_mount,
+    "kv_path": approle_courier_registry_kv_path,
+    "cache_ttl": approle_courier_registry_cache_ttl,
+  },
+  "vault": vault | combine({"approle": approle}),
+} | combine(approle_courier_config, recursive=True) -%}
+{{ config | to_nice_json }}

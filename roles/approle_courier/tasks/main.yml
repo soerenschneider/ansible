@@ -1,0 +1,112 @@
+---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - approle_courier_user | length > 0
+      - approle_courier_user not in ["root", "toor", "nobody"]
+      - approle_courier_group | length > 0
+      - approle_courier_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "approle_courier_user/approle_courier_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [approle-courier, approle-courier-install]
+
+- name: Add group
+  ansible.builtin.group:
+    name: "{{ approle_courier_group }}"
+    system: true
+  tags: [approle-courier, approle-courier-install]
+
+- name: Add user
+  ansible.builtin.user:
+    name: "{{ approle_courier_user }}"
+    shell: /bin/false
+    system: true
+    group: "{{ approle_courier_group }}"
+  tags: [approle-courier, approle-courier-install]
+
+- name: Including tasks
+  ansible.builtin.include_tasks: install-github.yml
+  vars:
+    binary_name: approle-courier
+    github_repo: soerenschneider/approle-courier
+    service_name: "{{ approle_courier_service_name }}"
+  tags: [approle-courier, approle-courier-install, deps]
+
+- name: Validate TLS settings
+  ansible.builtin.assert:
+    that:
+      - (approle_courier_tls_cert | length > 0) == (approle_courier_tls_key | length > 0)
+    fail_msg: "approle_courier_tls_cert and approle_courier_tls_key must be set together"
+    quiet: true
+  tags: [approle-courier, approle-courier-configure]
+
+- name: Add config
+  ansible.builtin.template:
+    src: approle-courier.json.j2
+    dest: "{{ approle_courier_config_file }}"
+    validate: /usr/local/bin/approle-courier -config %s -print-config
+    owner: "{{ approle_courier_user }}"
+    group: "{{ approle_courier_group }}"
+    mode: "0400"
+  notify: Restart approle-courier
+  tags: [approle-courier, approle-courier-configure]
+
+- name: Add systemd service
+  ansible.builtin.template:
+    src: approle-courier.service.j2
+    dest: /etc/systemd/system/{{ approle_courier_service_name }}.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart approle-courier
+  tags: [approle-courier, approle-courier-configure]
+
+- name: Enable approle-courier
+  ansible.builtin.service:
+    name: "{{ approle_courier_service_name }}"
+    enabled: true
+  tags: [approle-courier, approle-courier-configure]
+
+- name: Add secret_id watcher
+  when: approle_courier_secret_id_file != ""
+  tags: [approle-courier, approle-courier-configure]
+  block:
+    - name: Add secret_id watcher units
+      ansible.builtin.template:
+        src: "approle-courier-secret-id.{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ approle_courier_service_name }}-secret-id.{{ item }}"
+        owner: root
+        group: root
+        mode: "0644"
+      loop: [path, service]
+      notify: Restart approle-courier secret_id watcher
+
+    - name: Enable secret_id watcher
+      ansible.builtin.systemd:
+        name: "{{ approle_courier_service_name }}-secret-id.path"
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Remove secret_id watcher
+  when: approle_courier_secret_id_file == ""
+  tags: [approle-courier, approle-courier-configure]
+  block:
+    - name: Check for secret_id watcher
+      ansible.builtin.stat:
+        path: "/etc/systemd/system/{{ approle_courier_service_name }}-secret-id.path"
+      register: approle_courier_secret_id_path_unit
+
+    - name: Disable secret_id watcher
+      ansible.builtin.systemd:
+        name: "{{ approle_courier_service_name }}-secret-id.path"
+        enabled: false
+        state: stopped
+      when: approle_courier_secret_id_path_unit.stat.exists
+
+    - name: Remove secret_id watcher units
+      ansible.builtin.file:
+        path: "/etc/systemd/system/{{ approle_courier_service_name }}-secret-id.{{ item }}"
+        state: absent
+      loop: [path, service]
+      notify: Reload systemd

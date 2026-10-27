@@ -46,7 +46,7 @@
         name: dbus
         state: started
 
-- name: Set timezone
+- name: "Set timezone"
   community.general.timezone:
     name: "{{ baseline_timezone | default('UTC') }}"
   tags: [bootstrap, base, timezone]
@@ -71,5 +71,12 @@
     dest: "{{ item }}"
     mode: "0640"
   with_items: [/root/.bashrc, "{{ ansible_env.HOME }}/.bashrc"]
+  when: ansible_system == "Linux"
+  tags: [bootstrap, base]
+
+- name: "Set system-wide environment variables"
+  ansible.builtin.lineinfile:
+    line: |
+      VAULT_ADDR={{ bao_addr }}
   when: ansible_system == "Linux"
   tags: [bootstrap, base]

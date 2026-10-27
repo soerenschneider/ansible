@@ -1,21 +1,25 @@
 ---
-# Minio binaries path
-minio_server_bin: /usr/local/bin/minio
-minio_client_bin: /usr/local/bin/mc
-# renovate: datasource=github-releases depName=pgsty/minio versioning=regex:^RELEASE\.(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})T\d{2}-\d{2}-\d{2}Z$
-minio_server_version: RELEASE.2026-08-06T00-00-00Z
+# Silo (pgsty/silo, formerly pgsty/minio) server binary
+silo_server_bin: /usr/local/bin/silo
+# renovate: datasource=github-releases depName=pgsty/silo versioning=regex:^RELEASE\.(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})T\d{2}-\d{2}-\d{2}Z$
+silo_server_version: RELEASE.2026-10-15T00-00-00Z
 
-# renovate: datasource=github-releases depName=pgsty/minio versioning=regex:^RELEASE\.(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})T\d{2}-\d{2}-\d{2}Z$
-minio_client_version: RELEASE.2026-08-06T00-00-00Z
+silo_group: silo
+silo_user: silo
 
-minio_group: minio
-minio_user: minio
+silo_address: :9000
+silo_console_address: :9009
+silo_base_dir: /var/lib/silo
+# silo_volumes: "{{ silo_local_volumes[0] }}{% if silo_local_volumes | length > 1 %}{1...{{ silo_local_volumes | length }}}{% else %}"
+silo_volumes: '{% if silo_local_volumes | length > 1 %}{{ silo_local_volumes[0][:-1] }}{1...{{ silo_local_volumes | length }}}{% else %}{{ silo_local_volumes[0] }}{% endif %}'
+silo_local_volumes: ["{{ silo_base_dir }}/ssd-1"]
+silo_root_user: root
+silo_root_password: changeme
 
-minio_address: :9000
-minio_console_address: :9009
-minio_base_dir: /var/lib/minio
-# minio_volumes: "{{ minio_local_volumes[0] }}{% if minio_local_volumes | length > 1 %}{1...{{ minio_local_volumes | length }}}{% else %}"
-minio_volumes: '{% if minio_local_volumes | length > 1 %}{{ minio_local_volumes[0][:-1] }}{1...{{ minio_local_volumes | length }}}{% else %}{{ minio_local_volumes[0] }}{% endif %}'
-minio_local_volumes: ["{{ minio_base_dir }}/ssd-1"]
-minio_root_user: root
-minio_root_password: changeme
+# Migrate an existing installation done by the former "minio" role: renames the
+# service account (keeping its uid/gid), moves the base dir and certs, and
+# removes the legacy unit, config and binary.
+silo_migrate_from_minio: true
+silo_legacy_user: minio
+silo_legacy_group: minio
+silo_legacy_base_dir: /var/lib/minio

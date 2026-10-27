@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - aplos_user | length > 0
+      - aplos_user not in ["root", "toor", "nobody"]
+      - aplos_group | length > 0
+      - aplos_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "aplos_user/aplos_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [aplos, aplos-install]
+
 - name: Add aplos group
   ansible.builtin.group:
     name: "{{ aplos_group }}"

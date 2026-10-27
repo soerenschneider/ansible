@@ -4,13 +4,14 @@
   gather_facts: true
   become: true
   tasks:
-    - name: Check for vault token
-      ansible.builtin.fail:
-        msg: No vault token specified
-      when: lookup('env', 'VAULT_TOKEN') | length == 0
+    - name: Including role
+      ansible.builtin.include_role:
+        name: baseline
+      when: openbao_approle_clients | default([]) | length > 0
+      tags: always
 
     - name: Including role
       ansible.builtin.include_role:
         name: vault_approle
-      when: vault_approles | default([]) | length > 0
+      when: openbao_approle_clients | default([]) | length > 0
       tags: always

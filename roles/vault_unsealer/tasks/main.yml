@@ -1,4 +1,15 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - vault_unsealer_user | length > 0
+      - vault_unsealer_user not in ["root", "toor", "nobody"]
+      - vault_unsealer_group | length > 0
+      - vault_unsealer_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "vault_unsealer_user/vault_unsealer_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [vault-unsealer, vault-unsealer-install]
+
 - name: Add group
   ansible.builtin.group:
     name: "{{ vault_unsealer_group }}"
@@ -10,7 +21,7 @@
     name: "{{ vault_unsealer_user }}"
     shell: /bin/false
     system: true
-    groups: "{{ vault_unsealer_group }}"
+    group: "{{ vault_unsealer_group }}"
   tags: [vault-unsealer, vault-unsealer-install]
 
 - name: Including tasks

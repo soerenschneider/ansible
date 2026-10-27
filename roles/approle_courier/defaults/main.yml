@@ -1,0 +1,72 @@
+---
+approle_courier_user: "courier"
+approle_courier_group: "courier"
+approle_courier_service_name: "approle-courier"
+
+approle_courier_config_file: "/etc/approle-courier.json"
+
+# Configuration, rendered by templates/approle-courier.json.j2. Settings without a
+# variable of their own go in approle_courier_config, which is merged recursively
+# over the rendered configuration, see
+# https://github.com/soerenschneider/approle-courier#configuration
+approle_courier_config: {}
+
+# Address to bind the API to; "" binds to all addresses. With a loopback address
+# only the local HAProxy reaches this instance.
+approle_courier_listen_address: "127.0.0.1"
+approle_courier_port: 8300
+# Prometheus metrics listener; "" disables it.
+approle_courier_metrics_listen: "127.0.0.1:9090"
+
+# Optional TLS for the API listener; set both or neither. Without them the API
+# speaks plain HTTP and the reverse proxy terminates TLS. The certificate (chain)
+# is reloaded when it changes; the key must be readable by approle_courier_user.
+approle_courier_tls_cert: ""
+approle_courier_tls_key: ""
+
+# Expect a PROXY protocol header from approle_courier_trusted_proxies (HAProxy
+# send-proxy-v2).
+approle_courier_proxy_protocol: false
+# Reverse proxies whose PROXY protocol or X-Forwarded-For header gives the client
+# address. Empty: the default IPv4 address (from facts) of every host in
+# approle_courier_proxy_group. 127.0.0.1 is always added.
+approle_courier_trusted_proxies: []
+approle_courier_proxy_group: "openbao"
+
+# Vault/OpenBao address. Empty: https://<inventory_hostname>:<haproxy_openbao_port>
+# if haproxy_openbao_port is set, otherwise left to BAO_ADDR/VAULT_ADDR from
+# approle_courier_env_file.
+approle_courier_vault_address: ""
+# AppRole approle-courier logs in with. Empty role_id: left to BAO_ROLE_ID, or a
+# token (BAO_TOKEN) from approle_courier_env_file.
+approle_courier_approle_mount: "approle"
+approle_courier_role_id: ""
+
+approle_courier_registry_kv_mount: "secret"
+approle_courier_registry_kv_path: "approle-courier/registry"
+approle_courier_registry_cache_ttl: "30s"
+
+# mount/role patterns, e.g. ["approle/vm-*"]
+approle_courier_exclusive_secret_id: []
+approle_courier_bind_client_address: []
+
+approle_courier_log_level: "info"
+
+# renovate: datasource=github-releases depName=soerenschneider/approle-courier
+approle_courier_version: ""
+
+# Optional file containing BAO_TOKEN/VAULT_TOKEN or BAO_ADDR etc.
+approle_courier_env_file: ""
+
+# Optional path on the host to approle-courier's own AppRole secret_id. If set, it is
+# passed via systemd LoadCredential and available to the service at
+# /run/credentials/<approle_courier_service_name>.service/secret-id, which the
+# rendered configuration points vault.approle.secret_id_file to.
+approle_courier_secret_id_file: ""
+
+# Releases are signed keyless with cosign, verification runs on the controller and
+# requires cosign to be installed there.
+approle_courier_verify_signature: true
+approle_courier_cosign_binary: "cosign"
+approle_courier_cosign_identity_regexp: "^https://github.com/soerenschneider/approle-courier/"
+approle_courier_cosign_oidc_issuer: "https://token.actions.githubusercontent.com"

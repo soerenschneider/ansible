@@ -1,0 +1,41 @@
+# {{ ansible_managed }}
+[Unit]
+Description=approle-courier
+After=network-online.target
+Wants=network-online.target
+
+# restart forever
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ approle_courier_user }}
+Group={{ approle_courier_group }}
+ExecStart=/usr/local/bin/approle-courier -config "{{ approle_courier_config_file }}"
+
+{% if approle_courier_env_file != "" %}
+EnvironmentFile={{ approle_courier_env_file }}
+{% endif %}
+{% if approle_courier_secret_id_file != "" %}
+LoadCredential=secret-id:{{ approle_courier_secret_id_file }}
+{% endif %}
+
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=true
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelTunables=true
+ProtectSystem=strict
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+SyslogIdentifier=approle-courier
+
+# restart forever
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

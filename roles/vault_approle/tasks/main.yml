@@ -1,34 +1,4 @@
 ---
-- name: Install dependencies
-  ansible.builtin.package:
-    name: [python3-iso8601, python3-requests]
-  tags: [vault-approle, vault-approle-install]
-
-- name: Fetch scripts repo
-  ansible.builtin.git:
-    repo: https://github.com/soerenschneider/scripts
-    dest: /opt/scripts
-    version: main
-  tags: [vault-approle, vault-approle-install]
-
-- name: Copy vault_approle_cli script
-  ansible.builtin.file:
-    src: /opt/scripts/vault/vault-approle-cli.py
-    dest: /usr/local/bin/vault-approle-cli
-    state: link
-    owner: root
-    mode: "0555"
-  tags: [vault-approle, vault-approle-install]
-
-- name: Create config dir
-  ansible.builtin.file:
-    path: /etc/vault-approle
-    state: directory
-    owner: root
-    group: root
-    mode: "0700"
-  tags: [vault-approle, vault-approle-install]
-
 - name: "Stop sc-agent"
   ansible.builtin.systemd:
     name: "sc-agent"
@@ -37,8 +7,9 @@
 
 - name: "Rotate secret"
   ansible.builtin.include_tasks: run.yml
-  with_items: "{{ vault_approles }}"
-  when: lookup('env', 'VAULT_TOKEN') | length > 0 or lookup('env', 'BAO_TOKEN') | length > 0
+  loop: "{{ openbao_approle_clients }}"
+  loop_control:
+    label: "{{ item.role_name }}"
   tags: [vault-approle, vault-approle-install, vault-approle-rotate]
 
 - name: "Restart sc-agent"

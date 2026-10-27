@@ -1,0 +1,106 @@
+---
+- name: Install dependencies
+  ansible.builtin.package:
+    name: "{{ ['lvm2', 'qemu-utils'] if ansible_os_family == 'Debian' else ['lvm2', 'qemu-img'] }}"
+  tags: [libvirt_volumes, deps]
+
+- name: "Fetch domain definitions"
+  ansible.builtin.uri:
+    url: "{{ libvirt_volumes_domains_url }}"
+    return_content: true
+  register: _libvirt_volumes_domains_response
+  check_mode: false
+  when: libvirt_volumes_domains_url | length > 0
+  tags: [libvirt_volumes]
+
+- name: "Set domain definitions"
+  ansible.builtin.set_fact:
+    _libvirt_volumes_domains: >-
+      {{ (_libvirt_volumes_domains_response.content | from_yaml)
+         if libvirt_volumes_domains_url | length > 0 else libvirt_volumes_domains }}
+    _libvirt_volumes_wanted: []
+  tags: [libvirt_volumes]
+
+- name: "Find base images"
+  ansible.builtin.find:
+    paths: "{{ libvirt_volumes_base_image_dir }}"
+    recurse: true
+    file_type: file
+  register: _libvirt_volumes_images
+  when: _libvirt_volumes_domains | length > 0
+  tags: [libvirt_volumes]
+
+- name: "Build volumes from domain definitions"
+  ansible.builtin.set_fact:
+    _libvirt_volumes_wanted: "{{ _libvirt_volumes_wanted + [_volume] }}"
+  vars:
+    _device: >-
+      {{ item.block_devices | default([], true)
+         | select('match', '^/dev/mapper/[A-Za-z0-9_]+-[A-Za-z0-9_]+$') | list | first | default('') }}
+    _image: >-
+      {%- set ns = namespace(path='', date='') -%}
+      {%- for f in _libvirt_volumes_images.files | default([]) -%}
+      {%-   set name = f.path | basename | lower -%}
+      {%-   if (item.os | lower) in name -%}
+      {%-     set date = name | regex_search('[0-9]{8}') | default('', true) -%}
+      {%-     if ns.path == '' or date > ns.date -%}
+      {%-       set ns.path = f.path -%}
+      {%-       set ns.date = date -%}
+      {%-     endif -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.path }}
+    _volume:
+      vg: "{{ _device | regex_replace('^/dev/mapper/([^-]+)-.*$', '\\1') }}"
+      lv: "{{ _device | regex_replace('^/dev/mapper/[^-]+-(.*)$', '\\1') }}"
+      size_g: "{{ item.disk_size_g | default(libvirt_volumes_default_size_g, true) }}"
+      image: "{{ _image }}"
+      domain: "{{ item.name }}"
+  loop: "{{ _libvirt_volumes_domains }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: _device | length > 0
+  tags: [libvirt_volumes]
+
+- name: "Merge volumes"
+  ansible.builtin.set_fact:
+    _libvirt_volumes_wanted: "{{ _libvirt_volumes_wanted + libvirt_volumes_extra }}"
+  tags: [libvirt_volumes]
+
+- name: "Gather existing volume groups"
+  ansible.builtin.command: vgs --noheadings -o vg_name
+  register: _libvirt_volumes_vgs
+  changed_when: false
+  check_mode: false
+  tags: [libvirt_volumes]
+
+- name: "Gather existing logical volumes"
+  ansible.builtin.command: lvs --noheadings --separator / -o vg_name,lv_name
+  register: _libvirt_volumes_lvs
+  changed_when: false
+  check_mode: false
+  tags: [libvirt_volumes]
+
+- name: "Validate volumes"
+  ansible.builtin.assert:
+    that:
+      - item.vg | default('') | length > 0
+      - item.lv | default('') | length > 0
+      - item.vg in (_libvirt_volumes_vgs.stdout_lines | map('trim') | list)
+      - item.image | default('') | length > 0
+    fail_msg: >-
+      Invalid volume {{ item.vg | default('?') }}/{{ item.lv | default('?') }}: volume group must exist
+      and a base image must be found (searched in {{ libvirt_volumes_base_image_dir }})
+    quiet: true
+  loop: "{{ _libvirt_volumes_wanted }}"
+  loop_control:
+    label: "{{ item.vg | default('?') }}/{{ item.lv | default('?') }}"
+  tags: [libvirt_volumes]
+
+- name: "Manage volumes"
+  ansible.builtin.include_tasks: volume.yml
+  loop: "{{ _libvirt_volumes_wanted }}"
+  loop_control:
+    loop_var: volume
+    label: "{{ volume.vg }}/{{ volume.lv }}"
+  tags: [libvirt_volumes]

@@ -5,8 +5,19 @@
     line: VAULT_ADDR={{ vault_addr }}
   tags: [vault, vault-configure]
 
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - vault_user | length > 0
+      - vault_user not in ["root", "toor", "nobody"]
+      - vault_group | length > 0
+      - vault_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "vault_user/vault_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [vault, vault-configure]
+
 - name: Add group vault
-  ansible.builtin.user:
+  ansible.builtin.group:
     name: "{{ vault_group }}"
     system: true
   tags: [vault, vault-configure]
@@ -16,7 +27,7 @@
     name: "{{ vault_user }}"
     system: true
     shell: /bin/false
-    group: vault
+    group: "{{ vault_group }}"
     groups: "{{ vault_user_additional_groups | default([]) }}"
   tags: [vault, vault-configure]
 

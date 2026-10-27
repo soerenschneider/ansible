@@ -102,6 +102,36 @@
     state: present
   tags: [openbao, openbao-keepalived, keepalived]
 
+# The health check runs confined in keepalived's SELinux domain, which may
+# connect to http_port_t but not to an unlabelled port such as HAProxy's
+# monitor frontend.
+- name: "[keepalived] Allow health check to reach the HAProxy monitor (SELinux)"
+  when:
+    - ansible_facts.selinux is defined
+    - ansible_facts.selinux.status == "enabled"
+  tags: [openbao, openbao-keepalived, keepalived]
+  block:
+    - name: "[keepalived] Install SELinux management tools"
+      ansible.builtin.package:
+        name: policycoreutils-python-utils
+        state: present
+
+    - name: "[keepalived] Label health check port as http_port_t"
+      community.general.seport:
+        ports: "{{ openbao_keepalived_check_port | int }}"
+        proto: tcp
+        setype: http_port_t
+        state: present
+
+- name: "Validate service account"
+  ansible.builtin.assert:
+    that:
+      - openbao_keepalived_script_user | length > 0
+      - openbao_keepalived_script_user not in ["root", "toor", "nobody"]
+    fail_msg: "openbao_keepalived_script_user must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [openbao, openbao-keepalived, keepalived]
+
 - name: "[keepalived] Create unprivileged health check user"
   ansible.builtin.user:
     name: "{{ openbao_keepalived_script_user }}"

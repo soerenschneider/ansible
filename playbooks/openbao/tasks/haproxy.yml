@@ -40,6 +40,12 @@
   notify: Reload haproxy
   tags: haproxy
 
+# Reload now, not at the end of the play: the keepalived check configured by
+# the openbao role queries HAProxy's monitor frontend.
+- name: Apply haproxy config
+  ansible.builtin.meta: flush_handlers
+  tags: haproxy
+
 - name: Ensure haproxy is running
   ansible.builtin.service:
     name: haproxy

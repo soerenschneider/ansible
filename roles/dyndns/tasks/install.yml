@@ -1,10 +1,20 @@
 ---
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - dyndns_user | length > 0
+      - dyndns_user not in ["root", "toor", "nobody"]
+      - dyndns_group | length > 0
+      - dyndns_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "dyndns_user/dyndns_group must be a dedicated unprivileged service account"
+    quiet: true
+  tags: [dyndns, dyndns-install]
+
 - name: Create dyndns system group
   ansible.builtin.group:
     name: "{{ dyndns_group }}"
     system: true
     state: present
-  when: dyndns_group != "root"
   tags: [dyndns, dyndns-install]
 
 - name: Create dyndns system user
@@ -12,9 +22,8 @@
     name: "{{ dyndns_user }}"
     system: true
     shell: /sbin/nologin
-    group: "{{ dyndns_user }}"
+    group: "{{ dyndns_group }}"
     createhome: "{% if dyndns_server_config is defined %}true{% else %}false{% endif %}"
-  when: dyndns_user != "root"
   tags: [dyndns, dyndns-install]
 
 - name: Create dyndns config dir

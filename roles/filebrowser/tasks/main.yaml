@@ -1,33 +1,27 @@
 ---
-- name: Check if group exists
-  ansible.builtin.getent:
-    database: group
-    key: "{{ filebrowser_group }}"
-  register: _filebrowser_group_check
-  ignore_errors: true
+- name: Validate service account
+  ansible.builtin.assert:
+    that:
+      - filebrowser_user | length > 0
+      - filebrowser_user not in ["root", "toor", "nobody"]
+      - filebrowser_group | length > 0
+      - filebrowser_group not in ["root", "wheel", "sudo", "admin", "adm", "shadow", "disk", "kmem", "docker", "lxd", "nogroup"]
+    fail_msg: "filebrowser_user/filebrowser_group must be a dedicated unprivileged service account"
+    quiet: true
   tags: [filebrowser, filebrowser-install]
 
 - name: Create group
   ansible.builtin.group:
     name: "{{ filebrowser_group }}"
-    state: absent
-  when: _filebrowser_group_check is failed
-  tags: [filebrowser, filebrowser-install]
-
-- name: Check if user exists
-  ansible.builtin.getent:
-    database: passwd
-    key: "{{ filebrowser_user }}"
-  register: _filebrowser_user_check
-  ignore_errors: true
+    system: true
   tags: [filebrowser, filebrowser-install]
 
 - name: Create user
   ansible.builtin.user:
     name: "{{ filebrowser_user }}"
-    state: absent
+    group: "{{ filebrowser_group }}"
     shell: /bin/false
-  when: _filebrowser_user_check is failed
+    system: true
   tags: [filebrowser, filebrowser-install]
 
 - name: Including tasks

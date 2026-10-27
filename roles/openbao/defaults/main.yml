@@ -324,9 +324,10 @@ openbao_keepalived_priority: 0
 openbao_keepalived_advert_int: 1
 openbao_keepalived_nopreempt: true
 
-# Health check: HTTPS to the local HAProxy frontend; fails when no unsealed
-# OpenBao node is reachable through it. Runs as the unprivileged user below.
-openbao_keepalived_check_port: 443
+# Health check: asks the local HAProxy's monitor frontend (bound to loopback
+# on haproxy_monitor_port), which fails when HAProxy has no healthy OpenBao
+# node. Runs as the unprivileged user below. Keep timeout < interval.
+openbao_keepalived_check_port: "{{ haproxy_monitor_port | default(8404) }}"
 openbao_keepalived_check_interval: 2
 openbao_keepalived_check_timeout: 2
 openbao_keepalived_check_fall: 3
