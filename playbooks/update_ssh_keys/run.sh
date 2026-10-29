@@ -1,3 +1,3 @@
 #!/bin/bash
 
-ap --tags authorized_keys playbook.yml
+ansible-playbook --tags=authorized_keys playbook.yml
