@@ -1,7 +1,8 @@
 ---
 - name: Converge
   hosts: all
-  become: true
+  # the docker connection is already root, sudo only adds PAM in the way
+  become: false
   # /etc/hosts is bind-mounted by docker and can't be replaced atomically
   environment:
     ANSIBLE_UNSAFE_WRITES: "1"
