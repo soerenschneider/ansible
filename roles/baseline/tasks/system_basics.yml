@@ -76,7 +76,8 @@
 
 - name: "Set system-wide environment variables"
   ansible.builtin.lineinfile:
-    line: |
-      VAULT_ADDR={{ bao_addr }}
+    path: /etc/environment
+    regexp: ^VAULT_ADDR=
+    line: VAULT_ADDR={{ bao_addr }}
   when: ansible_system == "Linux"
   tags: [bootstrap, base]

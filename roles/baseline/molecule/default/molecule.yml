@@ -1,0 +1,125 @@
+---
+dependency:
+  name: galaxy
+  options:
+    requirements-file: ../../requirements.yml
+    role-file: ""
+
+driver:
+  name: docker
+
+# systemd-enabled images, the role manages services and journald
+platforms:
+  - name: baseline-debian12
+    image: geerlingguy/docker-debian12-ansible:latest
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /tmp
+  - name: baseline-debian13
+    image: geerlingguy/docker-debian13-ansible:latest
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /tmp
+  - name: baseline-rocky9
+    image: geerlingguy/docker-rockylinux9-ansible:latest
+    pre_build_image: true
+    privileged: true
+    cgroupns_mode: host
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    tmpfs:
+      - /run
+      - /tmp
+
+provisioner:
+  name: ansible
+  # kernel-global sysctls (default_qdisc, kernel.panic) can't be set from a
+  # container, they need a VM to be tested
+  options:
+    skip-tags: molecule-notest,notest,sysctl
+  env:
+    ANSIBLE_ROLES_PATH: ${MOLECULE_PROJECT_DIRECTORY}/..
+  inventory:
+    group_vars:
+      all:
+        bao_addr: https://bao.molecule.test:8200
+        pki_srn_ca_file: /etc/soeren.cloud/pki/ca/molecule-ca.crt
+        pki_srn_ca_crt: |
+          -----BEGIN CERTIFICATE-----
+          bW9sZWN1bGUgdGVzdCBjYSwgbm90IGEgcmVhbCBjZXJ0aWZpY2F0ZQ==
+          -----END CERTIFICATE-----
+        signify_keys:
+          - filename: molecule.pub
+            public_key: |
+              untrusted comment: molecule test key
+              RWQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+        authorized_keys_users: [root]
+        baseline_authorized_keys_soft:
+          - id: molecule-soft
+            pub: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeSoftKeyMoleculeSoftKeyMolecule01 molecule-soft
+        baseline_authorized_keys_hw:
+          - id: molecule-hw
+            pub: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMoleculeHardKeyMoleculeHardKeyMolecule01 molecule-hw
+
+        # the Docker Desktop kernel has no tcp_bbr module
+        baseline_linux_sysctl_congestion_control: cubic
+        baseline_systemd_journal_storage: persistent
+        baseline_firewall_rate_limit: 20/minute
+        baseline_firewall_rules:
+          - comment: node_exporter
+            ports: [9100]
+            from: "{{ baseline_fw_tags_global_monitoring }}"
+          - comment: dns
+            ports: [53]
+            proto: any
+            from: [10.10.0.0/24]
+            rate_limit: none
+
+        networks:
+          lab:
+            devices:
+              - name: lan
+                address: 10.10.0.1/24
+                dhcp:
+                  from: 10.10.0.100
+                  to: 10.10.0.200
+                pools:
+                  servers:
+                    cidr: 10.10.0.0/27
+                    hosts:
+                      prometheus:
+                        logical: 10.10.0.10
+                        physical: 02:42:0a:0a:00:0a
+                        fw_tags: [monitoring]
+                      nas:
+                        logical: 10.10.0.11
+                        physical: 02:42:0a:0a:00:0b
+
+verifier:
+  name: ansible
+
+scenario:
+  test_sequence:
+    - dependency
+    - destroy
+    - syntax
+    - create
+    - prepare
+    - converge
+    - idempotence
+    - verify
+    - destroy

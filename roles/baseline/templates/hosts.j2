@@ -1,2 +1,6 @@
-127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4 {{ ansible_host }}
-::1         localhost localhost.localdomain localhost6 localhost6.localdomain6 {{ ansible_host }}
+127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4
+::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+{# own name first, so `hostname -f` resolves to it and not to localhost.localdomain #}
+127.0.1.1   {{ ([inventory_hostname, inventory_hostname.split('.')[0]]
+                + ([ansible_host] if ansible_host is defined and not ansible_host | ansible.utils.ipaddr('bool') else []))
+               | unique | join(' ') }}

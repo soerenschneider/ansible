@@ -1,0 +1,224 @@
+---
+- name: Verify
+  hosts: all
+  become: true
+  gather_facts: true
+  tasks:
+    - name: Load role defaults
+      ansible.builtin.include_vars:
+        file: ../../defaults/main.yml
+
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+
+    - name: Gather service facts
+      ansible.builtin.service_facts:
+
+    # packages
+
+    # check mode resolves virtual names like vim -> vim-enhanced on RHEL
+    - name: Check wanted packages are installed
+      ansible.builtin.package:
+        name: "{{ baseline_packages + ['age', 'nftables', 'gnupg'] }}"
+      check_mode: true
+      register: baseline_verify_wanted_packages
+
+    - name: Assert wanted packages are installed
+      ansible.builtin.assert:
+        that: baseline_verify_wanted_packages is not changed
+
+    - name: Assert unwanted packages are absent
+      ansible.builtin.assert:
+        that: item not in ansible_facts.packages
+        fail_msg: "package {{ item }} should have been removed"
+        quiet: true
+      loop: [snapd, modemmanager]
+
+    - name: Read apt config
+      ansible.builtin.slurp:
+        src: /etc/apt/apt.conf.d/01norecommend
+      register: baseline_verify_apt_conf
+      when: ansible_os_family == "Debian"
+
+    - name: Assert apt does not install recommends
+      ansible.builtin.assert:
+        that: "'APT::Install-Recommends \"0\";' in (baseline_verify_apt_conf.content | b64decode)"
+      when: ansible_os_family == "Debian"
+
+    - name: Check signify binary
+      ansible.builtin.stat:
+        path: /usr/bin/signify
+      register: baseline_verify_signify
+
+    - name: Assert signify is callable as /usr/bin/signify
+      ansible.builtin.assert:
+        that: baseline_verify_signify.stat.exists
+
+    # firewall
+
+    # service_facts reports oneshot units as "exited", not "running"
+    - name: Check nftables is active
+      ansible.builtin.command: systemctl is-active nftables  # noqa: command-instead-of-module
+      changed_when: false
+
+    - name: Assert nftables is enabled
+      ansible.builtin.assert:
+        that: ansible_facts.services['nftables.service'].status == 'enabled'
+
+    - name: Read the active ruleset
+      ansible.builtin.command: nft list ruleset
+      register: baseline_verify_ruleset
+      changed_when: false
+
+    - name: Assert the ruleset contains the expected rules
+      ansible.builtin.assert:
+        that: baseline_verify_ruleset.stdout is search(item)
+        fail_msg: "ruleset does not match '{{ item }}'"
+        quiet: true
+      loop:
+        - 'hook input priority filter; policy drop;'
+        - 'tcp dport 22 .*accept comment "ssh"'
+        # global rate limit applies to rules without their own
+        - 'tcp dport 22 update @rl_\d+ \{ ip saddr limit rate 20/minute burst 10 packets \}'
+        # fw tag from the networks fixture resolves to the tagged host only
+        - 'ip saddr 10\.10\.0\.10 tcp dport 9100 .*accept comment "node_exporter"'
+        # rate_limit: none, proto: any
+        - 'ip saddr 10\.10\.0\.0/24 meta l4proto \{ tcp, udp \} th dport 53 accept comment "dns"'
+
+    - name: Assert the node_exporter port is not open to the tag-less host
+      ansible.builtin.assert:
+        that: baseline_verify_ruleset.stdout is not search('10\.10\.0\.11')
+
+    # crypto
+
+    - name: Check age private key
+      ansible.builtin.stat:
+        path: /etc/soeren.cloud/private/age.key
+      register: baseline_verify_age_key
+
+    - name: Assert age private key is private
+      ansible.builtin.assert:
+        that:
+          - baseline_verify_age_key.stat.exists
+          - baseline_verify_age_key.stat.mode == '0600'
+          - baseline_verify_age_key.stat.pw_name == 'root'
+
+    - name: Read published public keys
+      ansible.builtin.slurp:
+        src: "/etc/soeren.cloud/pubkeys/{{ item }}"
+      register: baseline_verify_pubkeys
+      loop: [age, gpg, gpg_fingerprint]
+
+    - name: Assert public keys look sane
+      ansible.builtin.assert:
+        that:
+          - (baseline_verify_pubkeys.results[0].content | b64decode | trim) is match('^age1[a-z0-9]{58}$')
+          - (baseline_verify_pubkeys.results[1].content | b64decode | trim) | length > 100
+          - (baseline_verify_pubkeys.results[2].content | b64decode | trim) is match('^[0-9A-F]{40}$')
+
+    - name: List GPG secret keys
+      ansible.builtin.command:
+        argv: [gpg, --homedir, /etc/soeren.cloud/private/gnupg, --batch, --with-colons, --list-secret-keys]
+      register: baseline_verify_gpg_keys
+      changed_when: false
+
+    - name: Assert there is exactly one GPG host key, named after the host and published
+      vars:
+        baseline_verify_fprs: "{{ baseline_verify_gpg_keys.stdout_lines | select('match', '^fpr:') | map('split', ':') | map(attribute=9) | list }}"
+        baseline_verify_uids: "{{ baseline_verify_gpg_keys.stdout_lines | select('match', '^uid:') | map('split', ':') | map(attribute=9) | list }}"
+      ansible.builtin.assert:
+        that:
+          - baseline_verify_uids == [inventory_hostname ~ ' <root@' ~ inventory_hostname ~ '>']
+          # primary key fingerprint comes first, then the subkey
+          - baseline_verify_fprs | first == (baseline_verify_pubkeys.results[2].content | b64decode | trim)
+
+    - name: Read local facts
+      ansible.builtin.setup:
+        filter: ansible_local
+        fact_path: /etc/ansible/facts.d
+
+    - name: Assert the local fact exposes the public keys
+      ansible.builtin.assert:
+        that:
+          - ansible_local.baseline_pubkeys.age == (baseline_verify_pubkeys.results[0].content | b64decode | trim)
+          - ansible_local.baseline_pubkeys.gpg_fingerprint == (baseline_verify_pubkeys.results[2].content | b64decode | trim)
+
+    - name: Check private CA and signify key
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      register: baseline_verify_crypto_files
+      loop:
+        - "{{ pki_srn_ca_file }}"
+        - /etc/soeren.cloud/pubkeys/signify/molecule.pub
+
+    - name: Assert private CA and signify key are deployed
+      ansible.builtin.assert:
+        that: item.stat.exists
+        fail_msg: "{{ item.item }} is missing"
+        quiet: true
+      loop: "{{ baseline_verify_crypto_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    # ssh
+
+    - name: Read root's authorized_keys
+      ansible.builtin.slurp:
+        src: /root/.ssh/authorized_keys
+      register: baseline_verify_authorized_keys
+
+    - name: Assert authorized_keys is managed exclusively and soft keys are confined
+      vars:
+        baseline_verify_lines: "{{ baseline_verify_authorized_keys.content | b64decode | trim | split('\n') }}"
+      ansible.builtin.assert:
+        that:
+          - baseline_verify_lines | length == 2
+          - baseline_verify_lines | select('search', 'molecule-hw$') | first is match('^ssh-ed25519 ')
+          - baseline_verify_lines | select('search', 'molecule-soft$') | first is match('^from="192.168.0.0/16,10.0.0.0/8" ssh-ed25519 ')
+
+    # journald
+
+    - name: Find journald.conf
+      ansible.builtin.stat:
+        path: /usr/lib/systemd/journald.conf
+      register: baseline_verify_journald_lib
+
+    - name: Read journald.conf
+      ansible.builtin.slurp:
+        src: "{{ '/usr/lib/systemd/journald.conf' if baseline_verify_journald_lib.stat.exists else '/etc/systemd/journald.conf' }}"
+      register: baseline_verify_journald_conf
+
+    - name: Assert journald limits are set
+      ansible.builtin.assert:
+        that: (baseline_verify_journald_conf.content | b64decode) is search('(?m)^' ~ item ~ '$')
+        fail_msg: "journald.conf lacks {{ item }}"
+        quiet: true
+      loop:
+        - SystemMaxUse=512M
+        - SystemMaxFileSize=32M
+
+    - name: Check persistent journal dir
+      ansible.builtin.stat:
+        path: /var/log/journal
+      register: baseline_verify_journal_dir
+
+    - name: Assert persistent journal dir exists
+      ansible.builtin.assert:
+        that:
+          - baseline_verify_journal_dir.stat.isdir
+          - baseline_verify_journal_dir.stat.gr_name == 'systemd-journal'
+
+    # system basics
+
+    - name: Read system files
+      ansible.builtin.slurp:
+        src: "{{ item }}"
+      register: baseline_verify_system_files
+      loop: [/etc/environment, /etc/hosts]
+
+    - name: Assert system files are configured
+      ansible.builtin.assert:
+        that:
+          - (baseline_verify_system_files.results[0].content | b64decode) is search('(?m)^VAULT_ADDR=' ~ bao_addr ~ '$')
+          - (baseline_verify_system_files.results[1].content | b64decode) is search('(?m)^127\.0\.1\.1 +' ~ inventory_hostname ~ '( |$)')
+          - ansible_facts.fqdn == inventory_hostname

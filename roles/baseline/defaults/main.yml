@@ -108,7 +108,9 @@ baseline_gpg_home: "{{ baseline_crypto_private_dir }}/gnupg"
 # rsa4096 or ed25519 (ed25519 = EdDSA primary + cv25519 encryption subkey).
 # Only affects newly generated keys; existing keys are left alone.
 baseline_gpg_key_algo: rsa4096
-baseline_gpg_uid: "{{ ansible_facts['fqdn'] | default(inventory_hostname) }}"
+# Not the fqdn fact: it is gathered before this role sets the hostname, so
+# it changes between the first and second run on a fresh host.
+baseline_gpg_uid: "{{ inventory_hostname }}"
 
 # Controller path for the aggregated key map (e.g. a Terraform
 # *.auto.tfvars.json). Empty string disables harvesting.

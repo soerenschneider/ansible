@@ -1,0 +1,28 @@
+---
+# Bring the minimal container images closer to a stock server install
+- name: Prepare
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+      when: ansible_os_family == "Debian"
+
+    - name: Install packages present on a stock server install (RHEL)
+      ansible.builtin.dnf:
+        name: [cronie, dnf-plugins-core]
+      when: ansible_os_family == "RedHat"
+
+    - name: Create sysctl.d, missing from the minimal RHEL image
+      ansible.builtin.file:
+        path: /etc/sysctl.d
+        state: directory
+        mode: "0755"
+
+    - name: Create fstab, missing from the minimal RHEL image
+      ansible.builtin.copy:
+        content: ""
+        dest: /etc/fstab
+        force: false
+        mode: "0644"

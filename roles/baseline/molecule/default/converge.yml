@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  # /etc/hosts is bind-mounted by docker and can't be replaced atomically
+  environment:
+    ANSIBLE_UNSAFE_WRITES: "1"
+  tasks:
+    - name: "Include role baseline"
+      ansible.builtin.include_role:
+        name: baseline
