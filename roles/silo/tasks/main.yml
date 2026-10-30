@@ -1,9 +1,4 @@
 ---
-- name: "Run tasks migrate.yml"
-  ansible.builtin.include_tasks: migrate.yml
-  when: silo_migrate_from_minio | bool
-  tags: always
-
 - name: "Run tasks install.yml"
   ansible.builtin.include_tasks: install.yml
   tags: always

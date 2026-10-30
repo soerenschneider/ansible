@@ -8,8 +8,8 @@
       ansible.builtin.include_role:
         name: baseline
       tags: always
-    
-    - name: sc
+
+    - name: Run sc_agent
       ansible.builtin.include_role:
         name: sc_agent
       tags: always

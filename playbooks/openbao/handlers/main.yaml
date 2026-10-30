@@ -7,3 +7,9 @@
 - name: "Run letsencrypt hook for openbao"
   changed_when: false
   ansible.builtin.command: "/etc/letsencrypt/renewal-hooks/post/certbot-deploy-openbao.sh"
+
+- name: "Restart vault-unsealer"
+  ansible.builtin.systemd:
+    name: "vault-unsealer"
+    daemon_reload: true
+    state: "restarted"

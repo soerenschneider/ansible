@@ -12,6 +12,7 @@
         stdin: "{{ vault_unsealer_kms_aws_credentials[inventory_hostname].aws_secret_access_key_encrypted }}"
         stdin_add_newline: false
       register: _openbao_kms_aws_decrypted
+      become: true
       become_user: root
       changed_when: false
       check_mode: false
@@ -53,13 +54,5 @@
     owner: "root"
     group: "root"
     mode: "0644"
-  register: "vault_unsealer_override"
-  tags: [openbao, bao-unsealer, vault-unsealer]
-
-- name: "Restart vault-unsealer to apply systemd override"
-  ansible.builtin.systemd:
-    name: "vault-unsealer"
-    daemon_reload: true
-    state: "restarted"
-  when: "vault_unsealer_override is changed"
+  notify: "Restart vault-unsealer"
   tags: [openbao, bao-unsealer, vault-unsealer]

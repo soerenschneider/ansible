@@ -27,8 +27,6 @@
   with_items:
     - type: deploy
       name: certbot-deploy-haproxy.sh
-#    - type: pre
-#      name: hook-stop-haproxy.sh
   tags: [certbot, certbot-configure, certbot-hooks]
 
 - name: "Retrieve http certs"
