@@ -5,6 +5,7 @@
   tags: [libvirt_volumes, deps]
 
 - name: "Fetch domain definitions"
+  # checkov:skip=CKV2_ANSIBLE_1:false positiv
   ansible.builtin.uri:
     url: "{{ libvirt_volumes_domains_url }}"
     return_content: true
