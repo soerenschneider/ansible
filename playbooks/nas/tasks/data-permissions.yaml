@@ -1,0 +1,160 @@
+---
+# Data on the NAS belongs to a dedicated, non-login owner and group instead of
+# a human/admin user. Services get access via systemd drop-ins
+# (SupplementaryGroups), humans and samba users via group membership.
+#
+# Existing data is migrated once with: --tags nas-data-migrate
+- name: "Set data permission facts"
+  ansible.builtin.set_fact:
+    nas_data_dir: "{{ nas_data_dir | default(nas_storage_disk_mountpoint) }}"
+    # must be identical on all NAS hosts, nas-mirror uses rsync --numeric-ids
+    nas_data_user: "{{ nas_data_user }}"
+    nas_data_uid: "{{ nas_data_uid }}"
+    nas_data_group: "{{ nas_data_group }}"
+    nas_data_gid: "{{ nas_data_gid}}"
+    nas_data_ro_group: "{{ nas_data_ro_group }}"
+    nas_data_ro_gid: "{{ nas_data_ro_gid }}"
+    # 2770 locks out everyone not in one of the groups, only use it once all
+    # consumers (incl. guest samba shares) have been added
+    nas_data_dir_mode: "{{ nas_data_dir_mode | default('2775') }}"
+    # human and samba users, smbd runs as the authenticated user
+    nas_data_rw_members: >-
+      {{ nas_data_rw_members | default(
+           ([nas_media_user] if nas_media_user is defined else [])
+           + (samba_create_users | default([]) | map(attribute='name') | list)) }}
+    nas_data_ro_members: "{{ nas_data_ro_members | default([]) }}"
+    nas_data_rw_units: >-
+      {{ nas_data_rw_units | default(
+           ['filebrowser.service', 'fetcharr.service']
+           + (['syncthing@' ~ syncthing_user ~ '.service'] if syncthing_user is defined else [])) }}
+    nas_data_ro_units: "{{ nas_data_ro_units | default(['nginx.service', 'mpd.service']) }}"
+  tags: [nas-data, nas-data-migrate]
+
+- name: "Install acl"
+  ansible.builtin.package:
+    name: acl
+  tags: [nas-data, nas-data-migrate]
+
+- name: "Create data groups"
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid }}"
+  loop:
+    - name: "{{ nas_data_group }}"
+      gid: "{{ nas_data_gid }}"
+    - name: "{{ nas_data_ro_group }}"
+      gid: "{{ nas_data_ro_gid }}"
+  tags: [nas-data, nas-data-migrate]
+
+- name: "Create data owner"
+  ansible.builtin.user:
+    name: "{{ nas_data_user }}"
+    uid: "{{ nas_data_uid }}"
+    group: "{{ nas_data_group }}"
+    shell: /usr/sbin/nologin
+    create_home: false
+    home: /nonexistent
+    password: "!"
+  tags: [nas-data, nas-data-migrate]
+
+- name: "Add users to data group"
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: ["{{ nas_data_group }}"]
+    append: true
+  loop: "{{ nas_data_rw_members }}"
+  tags: [nas-data]
+
+- name: "Add users to read-only data group"
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: ["{{ nas_data_ro_group }}"]
+    append: true
+  loop: "{{ nas_data_ro_members }}"
+  tags: [nas-data]
+
+- name: "Set data dir ownership"
+  ansible.builtin.file:
+    path: "{{ nas_data_dir }}"
+    state: directory
+    owner: "{{ nas_data_user }}"
+    group: "{{ nas_data_group }}"
+    mode: "{{ nas_data_dir_mode }}"
+  tags: [nas-data]
+
+- name: "Set data dir ACLs"
+  ansible.posix.acl:
+    path: "{{ nas_data_dir }}"
+    etype: group
+    entity: "{{ item.0.group }}"
+    permissions: "{{ item.0.perms }}"
+    default: "{{ item.1 }}"
+    state: present
+  loop: "{{ [{'group': nas_data_group, 'perms': 'rwx'}, {'group': nas_data_ro_group, 'perms': 'rx'}] | product([false, true]) | list }}"
+  loop_control:
+    label: "{{ item.0.group }}{{ ' (default)' if item.1 else '' }}"
+  tags: [nas-data]
+
+- name: "Create drop-in dirs"
+  ansible.builtin.file:
+    path: "/etc/systemd/system/{{ item }}.d"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop: "{{ nas_data_rw_units + nas_data_ro_units }}"
+  tags: [nas-data]
+
+- name: "Add data group drop-ins"
+  ansible.builtin.copy:
+    dest: "/etc/systemd/system/{{ item.unit }}.d/nas-data.conf"
+    content: |
+      # managed by ansible
+      [Service]
+      SupplementaryGroups={{ item.group }}
+      {% if item.rw %}
+      UMask=0002
+      {% endif %}
+    owner: root
+    group: root
+    mode: "0644"
+  loop: >-
+    {{ nas_data_rw_units | map('community.general.dict_kv', 'unit')
+         | map('combine', {'group': nas_data_group, 'rw': true}) | list
+       + nas_data_ro_units | map('community.general.dict_kv', 'unit')
+         | map('combine', {'group': nas_data_ro_group, 'rw': false}) | list }}
+  loop_control:
+    label: "{{ item.unit }}"
+  register: nas_data_dropins
+  tags: [nas-data]
+
+- name: "Restart units with changed drop-ins"
+  ansible.builtin.systemd:
+    name: "{{ item.item.unit }}"
+    state: restarted
+    daemon_reload: true
+  loop: "{{ nas_data_dropins.results | selectattr('changed') | list }}"
+  loop_control:
+    label: "{{ item.item.unit }}"
+  tags: [nas-data]
+
+# one-off migration of existing data, only runs with --tags nas-data-migrate
+- name: "Make sure data disk is mounted"
+  ansible.builtin.assert:
+    that: ansible_facts.mounts | selectattr('mount', 'equalto', nas_data_dir) | list | length > 0
+    fail_msg: "{{ nas_data_dir }} is not a mountpoint, refusing to migrate"
+  when: nas_data_dir == nas_storage_disk_mountpoint
+  tags: [never, nas-data-migrate]
+
+- name: "Migrate existing data"
+  ansible.builtin.command:
+    argv: "{{ item }}"
+  loop:
+    - [chown, -R, "{{ nas_data_user }}:{{ nas_data_group }}", "{{ nas_data_dir }}"]
+    # keeps executable bits, unlike a blanket chmod 0664
+    - [chmod, -R, "g+rwX,o-w", "{{ nas_data_dir }}"]
+    - [find, "{{ nas_data_dir }}", -type, d, -exec, chmod, g+s, "{}", +]
+    - [setfacl, -R, -m, "g:{{ nas_data_group }}:rwX,g:{{ nas_data_ro_group }}:rX", "{{ nas_data_dir }}"]
+    - [find, "{{ nas_data_dir }}", -type, d, -exec, setfacl, -m, "d:g:{{ nas_data_group }}:rwX,d:g:{{ nas_data_ro_group }}:rX", "{}", +]
+  changed_when: true
+  tags: [never, nas-data-migrate]

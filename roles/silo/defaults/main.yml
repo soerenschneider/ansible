@@ -2,7 +2,7 @@
 # Silo (pgsty/silo, formerly pgsty/minio) server binary
 silo_server_bin: /usr/local/bin/silo
 # renovate: datasource=github-releases depName=pgsty/silo versioning=regex:^RELEASE\.(?<major>\d{4})-(?<minor>\d{2})-(?<patch>\d{2})T\d{2}-\d{2}-\d{2}Z$
-silo_server_version: RELEASE.2026-10-15T00-00-00Z
+silo_server_version: RELEASE.2026-10-26T00-00-00Z
 
 silo_group: silo
 silo_user: silo

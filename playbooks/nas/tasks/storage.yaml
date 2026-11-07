@@ -15,11 +15,9 @@
     mode: "0644"
   tags: [media, storage]
 
-- name: Create mountpoint target path
+# ownership and mode are managed in data-permissions.yaml
+- name: Create mountpoint target path  # noqa: risky-file-permissions
   ansible.builtin.file:
     path: "{{ nas_storage_disk_mountpoint }}"
     state: "directory"
-    owner: "root"
-    group: "root"
-    mode: "0755"
   tags: [media, storage]

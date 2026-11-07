@@ -10,6 +10,11 @@
         name: platform
       tags: always
 
+    - name: "Run role nvidia driver"
+      ansible.builtin.include_role:
+        name: "nvidia_driver"
+      tags: always
+
     - name: "Run role k0s"
       ansible.builtin.include_role:
         name: k0s

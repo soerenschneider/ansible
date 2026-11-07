@@ -41,3 +41,121 @@
     name: libvirtd
     enabled: true
   tags: [libvirt]
+
+# The package ships a NAT network "default" (virbr0). VMs attach to a host bridge
+# instead, so it is only clutter.
+- name: Gather active libvirt networks
+  ansible.builtin.command: virsh -c qemu:///system net-list --name
+  register: _libvirt_networks_active
+  changed_when: false
+  check_mode: false
+  when: libvirt_remove_default_network
+  tags: [libvirt]
+
+- name: Gather defined libvirt networks
+  ansible.builtin.command: virsh -c qemu:///system net-list --all --name
+  register: _libvirt_networks_defined
+  changed_when: false
+  check_mode: false
+  when: libvirt_remove_default_network
+  tags: [libvirt]
+
+- name: Stop default NAT network
+  ansible.builtin.command: virsh -c qemu:///system net-destroy default
+  changed_when: true
+  when: libvirt_remove_default_network and 'default' in _libvirt_networks_active.stdout_lines | map('trim')
+  tags: [libvirt]
+
+- name: Remove default NAT network
+  ansible.builtin.command: virsh -c qemu:///system net-undefine default
+  changed_when: true
+  when: libvirt_remove_default_network and 'default' in _libvirt_networks_defined.stdout_lines | map('trim')
+  tags: [libvirt]
+
+- name: Enable IOMMU
+  ansible.builtin.include_tasks:
+    file: iommu.yml
+    # tags of a dynamic include are not inherited by the included tasks
+    apply:
+      tags: [libvirt, iommu]
+  when: libvirt_iommu_enabled | bool
+  tags: [libvirt, iommu]
+
+- name: Validate vfio-pci device IDs
+  ansible.builtin.assert:
+    that:
+      - libvirt_vfio_pci_ids | reject('match', '^[0-9a-fA-F]{4}:[0-9a-fA-F]{4}$') | list | length == 0
+      - libvirt_vfio_pci_ids | length == 0 or libvirt_iommu_enabled | bool
+    fail_msg: >-
+      libvirt_vfio_pci_ids must be PCI vendor:device IDs (e.g. 10de:2484) and requires
+      libvirt_iommu_enabled
+    quiet: true
+  tags: [libvirt, vfio]
+
+# softdep makes sure vfio-pci claims the devices before a regular driver can.
+- name: Configure vfio-pci device IDs
+  ansible.builtin.copy:
+    content: |
+      options vfio-pci ids={{ libvirt_vfio_pci_ids | join(',') }}
+      {% for module in libvirt_vfio_softdep_modules %}
+      softdep {{ module }} pre: vfio-pci
+      {% endfor %}
+    dest: /etc/modprobe.d/libvirt-vfio.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: _libvirt_vfio_modprobe_added
+  when: libvirt_vfio_pci_ids | length > 0
+  tags: [libvirt, vfio]
+
+- name: Remove vfio-pci device IDs
+  ansible.builtin.file:
+    path: /etc/modprobe.d/libvirt-vfio.conf
+    state: absent
+  register: _libvirt_vfio_modprobe_removed
+  when: libvirt_vfio_pci_ids | length == 0
+  tags: [libvirt, vfio]
+
+- name: Load vfio modules from initramfs
+  ansible.builtin.blockinfile:
+    path: /etc/initramfs-tools/modules
+    marker: "# {mark} ANSIBLE MANAGED BLOCK libvirt vfio"
+    block: |
+      vfio
+      vfio_iommu_type1
+      vfio_pci
+    state: "{{ 'present' if libvirt_vfio_pci_ids | length > 0 else 'absent' }}"
+  register: _libvirt_vfio_initramfs_debian
+  when: ansible_os_family == "Debian"
+  tags: [libvirt, vfio]
+
+- name: Load vfio modules from initramfs
+  ansible.builtin.copy:
+    content: |
+      force_drivers+=" vfio vfio_iommu_type1 vfio_pci "
+    dest: /etc/dracut.conf.d/libvirt-vfio.conf
+    owner: root
+    group: root
+    mode: "0644"
+  register: _libvirt_vfio_initramfs_redhat_added
+  when: ansible_os_family | lower == "redhat" and libvirt_vfio_pci_ids | length > 0
+  tags: [libvirt, vfio]
+
+- name: Remove vfio modules from initramfs
+  ansible.builtin.file:
+    path: /etc/dracut.conf.d/libvirt-vfio.conf
+    state: absent
+  register: _libvirt_vfio_initramfs_redhat_removed
+  when: ansible_os_family | lower == "redhat" and libvirt_vfio_pci_ids | length == 0
+  tags: [libvirt, vfio]
+
+- name: Rebuild initramfs
+  ansible.builtin.command: "{{ 'update-initramfs -u -k all' if ansible_os_family == 'Debian' else 'dracut -f --regenerate-all' }}"
+  changed_when: true
+  when: >-
+    _libvirt_vfio_modprobe_added | default({}) is changed
+    or _libvirt_vfio_modprobe_removed | default({}) is changed
+    or _libvirt_vfio_initramfs_debian | default({}) is changed
+    or _libvirt_vfio_initramfs_redhat_added | default({}) is changed
+    or _libvirt_vfio_initramfs_redhat_removed | default({}) is changed
+  tags: [libvirt, vfio]

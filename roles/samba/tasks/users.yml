@@ -1,11 +1,19 @@
 ---
+- name: Gather existing users
+  ansible.builtin.getent:
+    database: passwd
+  tags: [samba, samba-configure, samba-users]
+
+# only create missing users, never modify an existing (e.g. human) user
 - name: Create samba users on system
   ansible.builtin.user:
     name: "{{ item.name }}"
     create_home: false
     shell: /bin/false
     password: "!"
-  when: item.create_user
+  when:
+    - item.create_user
+    - item.name not in ansible_facts.getent_passwd
   with_items: "{{ samba_create_users }}"
   no_log: true
   tags: [samba, samba-configure, samba-users]

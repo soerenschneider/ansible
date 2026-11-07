@@ -1,33 +1,41 @@
 ---
-# Directory that is searched (recursively) for base images. For domains, the newest image whose
-# file name contains the domain's "os" (case-insensitive) is used. "Newest" is determined by an
-# 8-digit date (YYYYMMDD) in the file name.
-libvirt_volumes_base_image_dir: "/var/lib/libvirt/images/base"
+# Directory that is searched (recursively) for base images. For a VM, the newest image whose file
+# name contains the VM's "os" (case-insensitive) is used. "Newest" is determined by an 8-digit date
+# (YYYYMMDD) in the file name.
+libvirt_volumes_base_image_dir: "/var/lib/libvirt/images"
 
-libvirt_volumes_default_size_g: 20
+# Size used for block devices that do not specify "disk_size_g".
+libvirt_volumes_default_size: "20g"
 
-# Optional URL to fetch the domain definitions from. If set, it takes precedence over
-# libvirt_volumes_domains. Example:
-# libvirt_volumes_domains_url: "https://raw.githubusercontent.com/soerenschneider/tf-libvirt/refs/heads/master/envs/{{ ansible_facts['fqdn'] }}/domains.yaml"
-libvirt_volumes_domains_url: ""
+# LVM volume groups, keyed by name. Each volume group lists its physical volumes; devices that are
+# not yet a physical volume are initialized, but only if they carry no signature (filesystem,
+# partition table, ...) - wipe them manually (wipefs -a <dev>) otherwise. Physical volumes added to
+# the list extend the volume group, physical volumes removed from it are removed from the volume
+# group (fails if extents are still allocated on them). Volume groups are never deleted.
+# libvirt_volumes_vgs:
+#   libvirt:
+#     pvs:
+#       - /dev/disk/by-id/nvme-Samsung_SSD_990_PRO_2TB_S7DNNJ0X123456
+#     pesize: "4m"  # optional, only used when the volume group is created
+libvirt_volumes_vgs: {}
 
-# Domain definitions (same format as tf-libvirt's domains.yaml). Only the first block device of
-# the form /dev/mapper/<vg>-<lv> is managed, domains without such a device are skipped.
-# - name: vm1
-#   os: debian-12
-#   disk_size_g: 30
-#   block_devices: ["/dev/mapper/libvirt-vm1"]
-libvirt_volumes_domains: []
-
-# Additional volumes with an explicit base image.
-# - vg: libvirt
-#   lv: scratch
-#   size_g: 10
-#   image: /var/lib/libvirt/images/base/debian-12-20240101.qcow2
-#   domain: scratch  # optional, defaults to lv
-libvirt_volumes_extra: []
-
-# Existing volumes are never touched unless listed here (by "lv" or "vg/lv"). Listed volumes are
-# deleted and re-created from their base image; a running domain is destroyed and started again.
-# Usage: ansible-playbook ... -e '{"libvirt_volumes_recreate": ["vm1"]}'
-libvirt_volumes_recreate: []
+# VM definitions, keyed by domain name. Block devices are either a plain path (left alone) or a
+# mapping of the path to options. Only devices with "managed: true" (default: false) are managed, their path must be
+# a logical volume, i.e. /dev/mapper/<vg>-<lv> (hyphens inside names escaped as "--") or
+# /dev/<vg>/<lv>. The first block device of a VM is its boot disk and receives the base image, all
+# further managed devices are left empty. Existing volumes are never touched unless they set
+# "force_recreation: true" (default: false): after interactive confirmation the volume is deleted and
+# re-created, a running domain is destroyed and started again. Remove it again once the volume has
+# been re-created.
+# libvirt_vms:
+#   nas:
+#     os: debian-13
+#     vcpu: 4
+#     memory_mib: 6144
+#     block_devices:
+#       - "/dev/mapper/libvirt-nas":
+#           managed: true  # optional, default false
+#           force_recreation: false  # optional
+#           disk_size_g: "30g"
+#       - /dev/disk/by-uuid/9a112f02-34f6-491a-83ea-e903d227b745
+libvirt_vms: {}  # noqa: var-naming[no-role-prefix]

@@ -1,17 +1,18 @@
 ---
 - name: Workaround for e1000e bug
-  when: [vserver_has_hw_e1000e_bug | default(false), ansible_os_family | lower == "redhat"]
+  when: vserver_has_hw_e1000e_bug | default(false)
   tags: [fix, hardwarebug]
   block:
     - name: Create dispatcher.d to disable tcp-segment-offloading
       ansible.builtin.copy:
         content: |
           #!/usr/bin/env bash
+          set -eu
           IFACE="$1"
           if [ "${IFACE}" = "br0" ] || [ "${IFACE}" = "eno1" ]; then
             /usr/sbin/ethtool -K eno1 tso off
           fi
-        dest: /etc/NetworkManager/dispatcher.d/pre-up.d/20-ethtool
+        dest: "/etc/networkd-dispatcher/routable.d/20-ethtool{% elif ansible_os_family | lower == 'redhat' %}/etc/NetworkManager/dispatcher.d/pre-up.d/20-ethtool{% endif %}"
         owner: root
         group: root
         mode: "0755"
@@ -21,29 +22,5 @@
         name: ethtool
 
     - name: Disable tcp-segment-offloading now
-      ansible.builtin.command: /usr/sbin/ethtool -K eno1 tso off
-      changed_when: true
-
-- name: Workaround for e1000e bug
-  when: [vserver_has_hw_e1000e_bug | default(false), ansible_os_family | lower == "debian"]
-  tags: [fix, hardwarebug]
-  block:
-    - name: Create dispatcher.d to disable tcp-segment-offloading
-      ansible.builtin.copy:
-        content: |
-          #!/usr/bin/env bash
-          if [ "${IFACE}" = "br0" ] || [ "${IFACE}" = "eno1" ]; then
-            /usr/sbin/ethtool -K eno1 tso off
-          fi
-        dest: "{% if ansible_os_family | lower == 'debian' %}/etc/networkd-dispatcher/routable.d/20-ethtool{% elif ansible_os_family | lower == 'redhat' %}/etc/NetworkManager/dispatcher.d/pre-up.d/20-ethtool{% endif %}"
-        owner: root
-        group: root
-        mode: "0755"
-
-    - name: Install ethtool
-      ansible.builtin.package:
-        name: ethtool
-
-    - name: Disable tcp-segment-offloading now
-      ansible.builtin.command: /usr/sbin/ethtool -K eno1 tso off
+      ansible.builtin.command: "/usr/sbin/ethtool -K eno1 tso off"
       changed_when: true

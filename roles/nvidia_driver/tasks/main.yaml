@@ -1,0 +1,142 @@
+---
+# Installs the headless (compute-only, no X11) NVIDIA driver with open kernel modules
+# from NVIDIA's CUDA repository. Replaces an existing Debian-packaged driver.
+# Requires ansible-core >= 2.15 (deb822_repository).
+
+- name: Install NVIDIA driver
+  when: nvidia_driver_enabled | bool
+  tags: [nvidia]
+  block:
+    - name: Assert supported distribution
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Debian"
+          - ansible_architecture == "x86_64"
+        fail_msg: "Only Debian on x86_64 is supported"
+      tags: [nvidia]
+
+    - name: Install deb822 dependency
+      ansible.builtin.apt:
+        name: python3-debian
+        state: present
+      tags: [nvidia, deps]
+
+    # Overwrites the installer's default /etc/apt/sources.list.d/debian.sources
+    - name: Configure Debian repositories
+      ansible.builtin.deb822_repository:
+        name: debian
+        types: [deb]
+        uris: https://deb.debian.org/debian
+        suites:
+          - "{{ ansible_distribution_release }}"
+          - "{{ ansible_distribution_release }}-updates"
+          - "{{ ansible_distribution_release }}-backports"
+        components: [main, contrib, non-free, non-free-firmware]
+        signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+      tags: [nvidia, repos]
+
+    - name: Configure Debian security repository
+      ansible.builtin.deb822_repository:
+        name: debian-security
+        types: [deb]
+        uris: https://security.debian.org/debian-security
+        suites:
+          - "{{ ansible_distribution_release }}-security"
+        components: [main, contrib, non-free, non-free-firmware]
+        signed_by: /usr/share/keyrings/debian-archive-keyring.gpg
+      tags: [nvidia, repos]
+
+    - name: Check for legacy sources.list
+      ansible.builtin.stat:
+        path: /etc/apt/sources.list
+      register: _nvidia_driver_legacy_sources
+      tags: [nvidia, repos]
+
+    - name: Warn about duplicate sources
+      ansible.builtin.debug:
+        msg: "/etc/apt/sources.list exists and may duplicate the deb822 sources, consider emptying it"
+      when: _nvidia_driver_legacy_sources.stat.exists and _nvidia_driver_legacy_sources.stat.size > 0
+      tags: [nvidia, repos]
+
+    # Installs the signing key and /etc/apt/sources.list.d/cuda-debianXX-x86_64.list
+    - name: Install NVIDIA CUDA repository keyring
+      ansible.builtin.apt:
+        deb: "https://developer.download.nvidia.com/compute/cuda/repos/debian{{ ansible_distribution_major_version }}/x86_64/cuda-keyring_1.1-1_all.deb"
+        state: present
+      tags: [nvidia, repos]
+
+    - name: Block NVIDIA X11 packages
+      ansible.builtin.copy:
+        dest: /etc/apt/preferences.d/nvidia-no-x11
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          Package: xserver-xorg-video-nvidia* nvidia-settings nvidia-xconfig
+          Pin: release *
+          Pin-Priority: -1
+      tags: [nvidia, repos]
+
+    - name: Gather installed packages
+      ansible.builtin.package_facts: {}
+      tags: [nvidia, driver]
+
+    # Migration from Debian's non-free driver: any NVIDIA package without the open kernel
+    # module installed means Debian's packaging. Mixing both breaks the driver, so it's
+    # removed entirely. Skipped once nvidia-kernel-open-dkms is installed.
+    - name: Purge Debian-packaged NVIDIA driver
+      ansible.builtin.apt:
+        name: "{{ ansible_facts.packages.keys() | select('match', _nvidia_driver_debian_pkg_regex) | list }}"
+        state: absent
+        purge: true
+        autoremove: true
+      vars:
+        _nvidia_driver_debian_pkg_regex: "^(nvidia-|libnvidia-|libcuda|firmware-nvidia-|libgl1-nvidia|libegl-nvidia|libglx-nvidia)"
+      when:
+        - "'nvidia-kernel-open-dkms' not in ansible_facts.packages"
+        - ansible_facts.packages.keys() | select('match', _nvidia_driver_debian_pkg_regex) | list | length > 0
+      register: _nvidia_driver_purged
+      tags: [nvidia, driver]
+
+    - name: Pin NVIDIA driver branch
+      ansible.builtin.apt:
+        name: "nvidia-driver-pinning-{{ nvidia_driver_branch }}"
+        state: present
+        update_cache: true
+      when: nvidia_driver_branch | length > 0
+      tags: [nvidia, driver]
+
+    - name: Install NVIDIA driver packages
+      ansible.builtin.apt:
+        name:
+          - linux-headers-amd64  # metapackage, follows kernel upgrades so dkms can rebuild
+          - "linux-headers-{{ ansible_kernel }}"
+          - nvidia-kernel-open-dkms  # open kernel modules, recommended for turing and newer
+          # compute-only userspace incl. libcuda, no X11; ships nvidia-smi and conflicts with the
+          # (now transitional) nvidia-smi package
+          - nvidia-driver-cuda
+          - nvidia-persistenced
+        state: present
+        install_recommends: false
+        # No cache_valid_time: without an apt update-success-stamp the module takes the age of
+        # pkgcache.bin, which every package install refreshes, so a newly added repository (CUDA)
+        # would never be fetched.
+        update_cache: true
+      register: _nvidia_driver_packages
+      tags: [nvidia, driver]
+
+    - name: Reboot to load the NVIDIA kernel module
+      ansible.builtin.reboot:
+        reboot_timeout: 900
+      when:
+        - _nvidia_driver_packages is changed or _nvidia_driver_purged is changed
+        - nvidia_driver_reboot | bool
+      tags: [nvidia, driver, reboot]
+
+    - name: Enable nvidia-persistenced
+      ansible.builtin.systemd_service:
+        name: nvidia-persistenced
+        enabled: true
+        # without a reboot the freshly installed module is not loaded yet
+        state: "{{ 'started' if not (_nvidia_driver_packages is changed and not nvidia_driver_reboot | bool) else omit }}"
+      tags: [nvidia, driver]

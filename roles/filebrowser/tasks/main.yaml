@@ -16,12 +16,21 @@
     system: true
   tags: [filebrowser, filebrowser-install]
 
+- name: Check if user already exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ filebrowser_user }}"
+    fail_key: false
+  tags: [filebrowser, filebrowser-install]
+
+# only create a dedicated service account, never modify an existing (e.g. human) user
 - name: Create user
   ansible.builtin.user:
     name: "{{ filebrowser_user }}"
     group: "{{ filebrowser_group }}"
     shell: /bin/false
     system: true
+  when: ansible_facts.getent_passwd[filebrowser_user] is none
   tags: [filebrowser, filebrowser-install]
 
 - name: Including tasks

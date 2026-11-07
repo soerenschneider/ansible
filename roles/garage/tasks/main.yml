@@ -16,12 +16,21 @@
     system: true
   tags: [garage, garage-install]
 
+- name: Check if user already exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ garage_user }}"
+    fail_key: false
+  tags: [garage, garage-install]
+
+# only create a dedicated service account, never modify an existing (e.g. human) user
 - name: Add user
   ansible.builtin.user:
     name: "{{ garage_user }}"
     shell: /bin/false
     system: true
     group: "{{ garage_group }}"
+  when: ansible_facts.getent_passwd[garage_user] is none
   tags: [garage, garage-install]
 
 - name: Add dir

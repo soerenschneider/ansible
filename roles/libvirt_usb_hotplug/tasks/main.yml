@@ -1,0 +1,102 @@
+---
+- name: "Build watched USB devices from VM definitions"
+  ansible.builtin.set_fact:
+    _libvirt_usb_hotplug_devices: >-
+      {%- set ns = namespace(devices=[]) -%}
+      {%- for vm, spec in libvirt_vms.items() -%}
+      {%-   for dev in spec.usb_devices | default([], true) if dev.watch | default(false) | bool -%}
+      {%-     set ns.devices = ns.devices + [{
+                'vm': vm,
+                'vendor': dev.vendor | default(''),
+                'product': dev.product | default(''),
+              }] -%}
+      {%-   endfor -%}
+      {%- endfor -%}
+      {{ ns.devices }}
+  tags: [libvirt_usb_hotplug]
+
+- name: "Validate watched USB devices"
+  ansible.builtin.assert:
+    that:
+      - item.vendor is string and item.vendor is match('^(0x)?[0-9a-fA-F]{4}$')
+      - item.product is string and item.product is match('^(0x)?[0-9a-fA-F]{4}$')
+    fail_msg: >-
+      Watched USB device of VM {{ item.vm }} needs quoted 4-digit hex "vendor" and "product" ids
+      as shown by lsusb (e.g. vendor: "0658"), got vendor={{ item.vendor }} product={{ item.product }}
+    quiet: true
+  loop: "{{ _libvirt_usb_hotplug_devices }}"
+  loop_control:
+    label: "{{ item.vm }}: {{ item.vendor }}:{{ item.product }}"
+  tags: [libvirt_usb_hotplug]
+
+- name: "Normalize watched USB device ids"
+  ansible.builtin.set_fact:
+    _libvirt_usb_hotplug_devices: >-
+      {%- set ns = namespace(devices=[]) -%}
+      {%- for d in _libvirt_usb_hotplug_devices -%}
+      {%-   set vendor = d.vendor | lower | regex_replace('^0x', '') -%}
+      {%-   set product = d.product | lower | regex_replace('^0x', '') -%}
+      {%-   set ns.devices = ns.devices + [d | combine({
+              'vendor': vendor,
+              'product': product,
+              'xml': libvirt_usb_hotplug_xml_dir ~ '/' ~ d.vm ~ '-' ~ vendor ~ '-' ~ product ~ '.xml',
+            })] -%}
+      {%- endfor -%}
+      {{ ns.devices }}
+  tags: [libvirt_usb_hotplug]
+
+- name: "Create hostdev XML directory"
+  ansible.builtin.file:
+    path: "{{ libvirt_usb_hotplug_xml_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  tags: [libvirt_usb_hotplug]
+
+- name: "Write hostdev XML of watched USB devices"
+  ansible.builtin.template:
+    src: hostdev.xml.j2
+    dest: "{{ item.xml }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ _libvirt_usb_hotplug_devices }}"
+  loop_control:
+    label: "{{ item.vm }}: {{ item.vendor }}:{{ item.product }}"
+  tags: [libvirt_usb_hotplug]
+
+- name: "Find hostdev XML files"
+  ansible.builtin.find:
+    paths: "{{ libvirt_usb_hotplug_xml_dir }}"
+    patterns: ["*.xml"]
+  register: _libvirt_usb_hotplug_xml_files
+  tags: [libvirt_usb_hotplug]
+
+- name: "Remove hostdev XML of devices no longer watched"
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: >-
+    {{ _libvirt_usb_hotplug_xml_files.files | map(attribute='path')
+       | difference(_libvirt_usb_hotplug_devices | map(attribute='xml')) }}
+  tags: [libvirt_usb_hotplug]
+
+- name: "Write udev rules for watched USB devices"
+  ansible.builtin.template:
+    src: udev.rules.j2
+    dest: "{{ libvirt_usb_hotplug_rules_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: _libvirt_usb_hotplug_devices | length > 0
+  notify: Reload udev rules
+  tags: [libvirt_usb_hotplug]
+
+- name: "Remove udev rules, no USB device is watched"
+  ansible.builtin.file:
+    path: "{{ libvirt_usb_hotplug_rules_file }}"
+    state: absent
+  when: _libvirt_usb_hotplug_devices | length == 0
+  notify: Reload udev rules
+  tags: [libvirt_usb_hotplug]

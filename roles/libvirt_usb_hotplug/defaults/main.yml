@@ -1,0 +1,20 @@
+---
+# Directory for the hostdev XML snippets passed to "virsh attach-device" / "virsh detach-device".
+libvirt_usb_hotplug_xml_dir: "/etc/libvirt/usb-hotplug"
+
+# udev rules file attaching / detaching watched USB devices. Removed if no device is watched.
+libvirt_usb_hotplug_rules_file: "/etc/udev/rules.d/90-libvirt-usb-hotplug.rules"
+
+# VM definitions, keyed by domain name (shared with the libvirt_volumes role and Terraform). USB
+# devices with "watch: true" (default: false) are attached to the running domain whenever they are
+# plugged in and detached when they are removed. libvirt only resolves USB devices when a domain
+# starts, so without this a device that is plugged in later, or replugged, stays missing in the
+# guest until the next VM start. Watched devices must be selected by vendor/product id; quote the
+# ids, unquoted 0658 is read as a number.
+# libvirt_vms:
+#   nas:
+#     usb_devices:
+#       - vendor: "0658"
+#         product: "0200"
+#         watch: true  # optional, default false
+libvirt_vms: {}  # noqa: var-naming[no-role-prefix]

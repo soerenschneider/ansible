@@ -81,6 +81,11 @@
       when: nas_mirror_enabled | default(false)
       tags: always
 
+    # runs after all roles so the units it adds drop-ins for exist
+    - name: "Run tasks data-permissions.yaml"
+      ansible.builtin.include_tasks: "tasks/data-permissions.yaml"
+      tags: always
+
     - name: "Add template file"
       ansible.builtin.copy:
         content: "{{ fetcharr_webhook_template }}"

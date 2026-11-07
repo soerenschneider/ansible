@@ -13,4 +13,12 @@
 	read only = {{ share.ro | default("Yes") }}
 	path = {{ share.path }}
 	public = {{ share.public }}
+{% if share.valid_users is defined %}
+	valid users = {{ share.valid_users }}
+{% endif %}
+{% if share.force_group is defined %}
+	force group = {{ share.force_group }}
+	create mask = {{ share.create_mask | default('0664') }}
+	directory mask = {{ share.directory_mask | default('2775') }}
+{% endif %}
 {% endfor %}

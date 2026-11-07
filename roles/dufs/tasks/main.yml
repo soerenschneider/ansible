@@ -16,12 +16,21 @@
     system: true
   tags: [dufs, dufs-install]
 
+- name: Check if user already exists
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ dufs_user }}"
+    fail_key: false
+  tags: [dufs, dufs-install]
+
+# only create a dedicated service account, never modify an existing (e.g. human) user
 - name: Add user
   ansible.builtin.user:
     name: "{{ dufs_user }}"
     shell: /bin/false
     system: true
     group: "{{ dufs_group }}"
+  when: ansible_facts.getent_passwd[dufs_user] is none
   tags: [dufs, dufs-install]
 
 - name: "Run tasks install-github.yml"

@@ -1,0 +1,10 @@
+---
+# Run the role at all. Off by default: it rewrites the apt sources, replaces an existing driver and
+# may reboot the host.
+nvidia_driver_enabled: false
+
+# Pin a driver branch, e.g. "580". Empty follows the latest driver.
+nvidia_driver_branch: ""
+
+# Reboot after driver changes to load the new kernel module.
+nvidia_driver_reboot: true

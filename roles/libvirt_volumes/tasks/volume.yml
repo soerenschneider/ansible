@@ -2,26 +2,43 @@
 - name: "Set facts for volume {{ volume.vg }}/{{ volume.lv }}"
   ansible.builtin.set_fact:
     _libvirt_volumes_lv_exists: "{{ (volume.vg ~ '/' ~ volume.lv) in (_libvirt_volumes_lvs.stdout_lines | map('trim') | list) }}"
-    _libvirt_volumes_lv_recreate: "{{ volume.lv in libvirt_volumes_recreate or (volume.vg ~ '/' ~ volume.lv) in libvirt_volumes_recreate }}"
-    _libvirt_volumes_domain: "{{ volume.domain | default(volume.lv, true) }}"
     _libvirt_volumes_domain_was_running: false
 
-- name: "Remove existing volume {{ volume.vg }}/{{ volume.lv }}"
-  when: _libvirt_volumes_lv_exists | bool and _libvirt_volumes_lv_recreate | bool
+# Without an interactive stdin the prompt returns an empty answer, so the play fails safely.
+- name: "Confirm forced recreation of volume {{ volume.vg }}/{{ volume.lv }}"
+  when: _libvirt_volumes_lv_exists | bool and volume.force_recreation
   block:
-    - name: "Get state of domain {{ _libvirt_volumes_domain }}"
-      ansible.builtin.command: virsh domstate {{ _libvirt_volumes_domain | quote }}
+    - name: "Ask for confirmation to recreate volume {{ volume.vg }}/{{ volume.lv }}"
+      ansible.builtin.pause:
+        prompt: >-
+          {{ inventory_hostname }}: force_recreation is set for {{ volume.path }} of VM {{ volume.vm }}.
+          The volume and all its data will be DELETED and re-created, a running domain is destroyed.
+          Type 'yes' to continue
+      register: _libvirt_volumes_confirm
+
+    - name: "Abort recreation of volume {{ volume.vg }}/{{ volume.lv }}"
+      ansible.builtin.fail:
+        msg: >-
+          Recreation of {{ volume.path }} of VM {{ volume.vm }} not confirmed. Remove
+          "force_recreation" from its block device if the volume should be kept.
+      when: _libvirt_volumes_confirm.user_input | default('') | trim | lower != 'yes'
+
+- name: "Remove existing volume {{ volume.vg }}/{{ volume.lv }}"
+  when: _libvirt_volumes_lv_exists | bool and volume.force_recreation
+  block:
+    - name: "Get state of domain {{ volume.vm }}"
+      ansible.builtin.command: virsh domstate {{ volume.vm | quote }}
       register: _libvirt_volumes_domstate
       changed_when: false
       failed_when: false
       check_mode: false
 
-    - name: "Remember if domain {{ _libvirt_volumes_domain }} was running"
+    - name: "Remember if domain {{ volume.vm }} was running"
       ansible.builtin.set_fact:
         _libvirt_volumes_domain_was_running: "{{ _libvirt_volumes_domstate.rc == 0 and _libvirt_volumes_domstate.stdout | trim == 'running' }}"
 
-    - name: "Stop domain {{ _libvirt_volumes_domain }}"
-      ansible.builtin.command: virsh destroy {{ _libvirt_volumes_domain | quote }}
+    - name: "Stop domain {{ volume.vm }}"
+      ansible.builtin.command: virsh destroy {{ volume.vm | quote }}
       changed_when: true
       when: _libvirt_volumes_domain_was_running | bool
 
@@ -33,21 +50,22 @@
         force: true
 
 - name: "Create volume {{ volume.vg }}/{{ volume.lv }}"
-  when: not (_libvirt_volumes_lv_exists | bool) or _libvirt_volumes_lv_recreate | bool
+  when: not (_libvirt_volumes_lv_exists | bool) or volume.force_recreation
   block:
     - name: "Create logical volume {{ volume.vg }}/{{ volume.lv }}"
       community.general.lvol:
         vg: "{{ volume.vg }}"
         lv: "{{ volume.lv }}"
-        size: "{{ volume.size_g | default(libvirt_volumes_default_size_g, true) }}g"
+        size: "{{ volume.size }}"
 
     - name: "Write base image to volume {{ volume.vg }}/{{ volume.lv }}"
       ansible.builtin.command: >-
         qemu-img convert -O raw {{ volume.image | quote }} {{ ('/dev/' ~ volume.vg ~ '/' ~ volume.lv) | quote }}
       changed_when: true
+      when: volume.image | length > 0
 
   rescue:
-    # Do not leave an empty volume behind, it would not be filled on the next run.
+    # Do not leave an incomplete volume behind, it would not be filled on the next run.
     - name: "Delete incomplete volume {{ volume.vg }}/{{ volume.lv }}"
       community.general.lvol:
         vg: "{{ volume.vg }}"
@@ -57,9 +75,9 @@
 
     - name: "Fail"
       ansible.builtin.fail:
-        msg: "Creating volume {{ volume.vg }}/{{ volume.lv }} from {{ volume.image }} failed"
+        msg: "Creating volume {{ volume.vg }}/{{ volume.lv }} for VM {{ volume.vm }} failed"
 
-- name: "Start domain {{ _libvirt_volumes_domain }}"
-  ansible.builtin.command: virsh start {{ _libvirt_volumes_domain | quote }}
+- name: "Start domain {{ volume.vm }}"
+  ansible.builtin.command: virsh start {{ volume.vm | quote }}
   changed_when: true
   when: _libvirt_volumes_domain_was_running | bool

@@ -1,0 +1,13 @@
+# {{ ansible_managed }}
+#
+# Attach watched USB devices to their running libvirt domain when plugged in, detach them when
+# removed. The kernel's PRODUCT variable ("<vendor>/<product>/<bcdDevice>", hex without leading
+# zeros) is matched since it is also present on remove events. virsh runs via systemd-run so udev
+# is not blocked, and the domain not running only fails that transient unit.
+{% for d in _libvirt_usb_hotplug_devices %}
+{%   set product_env = '%x/%x/*' | format(d.vendor | int(base=16), d.product | int(base=16)) %}
+
+# {{ d.vm }}: {{ d.vendor }}:{{ d.product }}
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="{{ product_env }}", RUN+="/usr/bin/systemd-run --no-block --collect /usr/bin/virsh -c qemu:///system attach-device {{ d.vm }} {{ d.xml }} --live"
+ACTION=="remove", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ENV{PRODUCT}=="{{ product_env }}", RUN+="/usr/bin/systemd-run --no-block --collect /usr/bin/virsh -c qemu:///system detach-device {{ d.vm }} {{ d.xml }} --live"
+{% endfor %}

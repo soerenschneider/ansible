@@ -1,0 +1,59 @@
+---
+# Kernel arguments only take effect after a reboot, which is left to the operator.
+- name: Add IOMMU kernel arguments to GRUB
+  ansible.builtin.copy:
+    content: |
+      GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} {{ libvirt_iommu_kernel_args | join(' ') }}"
+    dest: /etc/default/grub.d/90-libvirt-iommu.cfg
+    owner: root
+    group: root
+    mode: "0644"
+  register: _libvirt_iommu_grub_dropin
+  when: ansible_os_family == "Debian"
+  tags: [libvirt, iommu]
+
+- name: Regenerate GRUB configuration
+  ansible.builtin.command: update-grub
+  changed_when: true
+  when: ansible_os_family == "Debian" and _libvirt_iommu_grub_dropin is changed
+  tags: [libvirt, iommu]
+
+- name: Gather kernel arguments of all boot entries
+  ansible.builtin.command: grubby --info=ALL
+  register: _libvirt_iommu_grubby
+  changed_when: false
+  check_mode: false
+  when: ansible_os_family | lower == "redhat"
+  tags: [libvirt, iommu]
+
+- name: Add IOMMU kernel arguments to all boot entries
+  ansible.builtin.command: grubby --update-kernel=ALL --args={{ libvirt_iommu_kernel_args | join(' ') | quote }}
+  changed_when: true
+  vars:
+    # true if any boot entry lacks one of the arguments
+    _incomplete: >-
+      {%- set ns = namespace(incomplete=false) -%}
+      {%- for line in _libvirt_iommu_grubby.stdout_lines | select('match', '^args=') -%}
+      {%-   if libvirt_iommu_kernel_args | difference(line[5:] | trim('"') | split) | length > 0 -%}
+      {%-     set ns.incomplete = true -%}
+      {%-   endif -%}
+      {%- endfor -%}
+      {{ ns.incomplete }}
+  when: ansible_os_family | lower == "redhat" and _incomplete | bool
+  tags: [libvirt, iommu]
+
+- name: Gather running kernel arguments
+  ansible.builtin.slurp:
+    src: /proc/cmdline
+  register: _libvirt_iommu_cmdline
+  tags: [libvirt, iommu]
+
+- name: Warn about pending reboot for IOMMU
+  ansible.builtin.debug:
+    msg: >-
+      Kernel arguments {{ _missing | join(' ') }} are not active yet, reboot {{ inventory_hostname }}
+      to enable IOMMU.
+  vars:
+    _missing: "{{ libvirt_iommu_kernel_args | difference((_libvirt_iommu_cmdline.content | b64decode).split()) }}"
+  when: _missing | length > 0
+  tags: [libvirt, iommu]

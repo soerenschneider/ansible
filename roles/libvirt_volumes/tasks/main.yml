@@ -4,22 +4,87 @@
     name: "{{ ['lvm2', 'qemu-utils'] if ansible_os_family == 'Debian' else ['lvm2', 'qemu-img'] }}"
   tags: [libvirt_volumes, deps]
 
-- name: "Fetch domain definitions"
-  # checkov:skip=CKV2_ANSIBLE_1:false positiv
-  ansible.builtin.uri:
-    url: "{{ libvirt_volumes_domains_url }}"
-    return_content: true
-  register: _libvirt_volumes_domains_response
-  check_mode: false
-  when: libvirt_volumes_domains_url | length > 0
+- name: "Gather physical volume devices"
+  ansible.builtin.stat:
+    path: "{{ item }}"
+    # /dev/mapper/* and /dev/disk/by-*/* are symlinks
+    follow: true
+  register: _libvirt_volumes_pv_stat
+  loop: "{{ libvirt_volumes_vgs.values() | map(attribute='pvs') | flatten | unique }}"
   tags: [libvirt_volumes]
 
-- name: "Set domain definitions"
-  ansible.builtin.set_fact:
-    _libvirt_volumes_domains: >-
-      {{ (_libvirt_volumes_domains_response.content | from_yaml)
-         if libvirt_volumes_domains_url | length > 0 else libvirt_volumes_domains }}
-    _libvirt_volumes_wanted: []
+- name: "Gather signatures of physical volume devices"
+  ansible.builtin.command: blkid -p -o value -s TYPE {{ item | quote }}
+  register: _libvirt_volumes_pv_blkid
+  changed_when: false
+  # rc 2: no signature found
+  failed_when: _libvirt_volumes_pv_blkid.rc not in [0, 2]
+  check_mode: false
+  loop: "{{ libvirt_volumes_vgs.values() | map(attribute='pvs') | flatten | unique }}"
+  tags: [libvirt_volumes]
+
+- name: "Validate physical volume devices are block devices"
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists and item.stat.isblk
+    fail_msg: >-
+      Physical volume {{ item.item }}
+      {{ 'does not exist' if not item.stat.exists else 'is not a block device' }}
+    quiet: true
+  loop: "{{ _libvirt_volumes_pv_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  tags: [libvirt_volumes]
+
+- name: "Validate physical volume devices carry no foreign signature"
+  ansible.builtin.assert:
+    that:
+      - item.stdout | trim in ['', 'LVM2_member']
+    fail_msg: >-
+      Physical volume {{ item.item }} carries a '{{ item.stdout | trim }}' signature, refusing to
+      initialize it. Wipe it manually (wipefs -a {{ item.item }}) if it is really meant to be used.
+    quiet: true
+  loop: "{{ _libvirt_volumes_pv_blkid.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  tags: [libvirt_volumes]
+
+# community.general.lvg compares symlink-resolved device paths with the names reported by pvs, so
+# it does not notice a /dev/mapper/* or /dev/disk/by-*/* physical volume belonging to another volume
+# group and fails trying to re-initialize it.
+- name: "Gather volume groups of physical volume devices"
+  ansible.builtin.command: pvs --noheadings -o vg_name {{ item.1 | quote }}
+  register: _libvirt_volumes_pv_vg
+  changed_when: false
+  # fails if the device is not a physical volume yet
+  failed_when: false
+  check_mode: false
+  loop: "{{ libvirt_volumes_vgs | dict2items | subelements('value.pvs') }}"
+  loop_control:
+    label: "{{ item.1 }}"
+  tags: [libvirt_volumes]
+
+- name: "Validate physical volume devices do not belong to another volume group"
+  ansible.builtin.assert:
+    that:
+      - item.rc != 0 or item.stdout | trim in ['', item.item.0.key]
+    fail_msg: >-
+      Physical volume {{ item.item.1 }} belongs to volume group '{{ item.stdout | trim }}', not to
+      '{{ item.item.0.key }}'
+    quiet: true
+  loop: "{{ _libvirt_volumes_pv_vg.results }}"
+  loop_control:
+    label: "{{ item.item.1 }}"
+  tags: [libvirt_volumes]
+
+- name: "Manage volume groups"
+  community.general.lvg:
+    vg: "{{ item.key }}"
+    pvs: "{{ item.value.pvs }}"
+    pesize: "{{ item.value.pesize | default(omit) }}"
+  loop: "{{ libvirt_volumes_vgs | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
   tags: [libvirt_volumes]
 
 - name: "Find base images"
@@ -28,49 +93,53 @@
     recurse: true
     file_type: file
   register: _libvirt_volumes_images
-  when: _libvirt_volumes_domains | length > 0
+  when: libvirt_vms | length > 0
   tags: [libvirt_volumes]
 
-- name: "Build volumes from domain definitions"
+- name: "Build volumes from VM definitions"
   ansible.builtin.set_fact:
-    _libvirt_volumes_wanted: "{{ _libvirt_volumes_wanted + [_volume] }}"
-  vars:
-    _device: >-
-      {{ item.block_devices | default([], true)
-         | select('match', '^/dev/mapper/[A-Za-z0-9_]+-[A-Za-z0-9_]+$') | list | first | default('') }}
-    _image: >-
-      {%- set ns = namespace(path='', date='') -%}
-      {%- for f in _libvirt_volumes_images.files | default([]) -%}
-      {%-   set name = f.path | basename | lower -%}
-      {%-   if (item.os | lower) in name -%}
-      {%-     set date = name | regex_search('[0-9]{8}') | default('', true) -%}
-      {%-     if ns.path == '' or date > ns.date -%}
-      {%-       set ns.path = f.path -%}
-      {%-       set ns.date = date -%}
+    _libvirt_volumes_wanted: >-
+      {%- set ns = namespace(volumes=[]) -%}
+      {%- for vm, spec in libvirt_vms.items() -%}
+      {%-   set img = namespace(path='', date='') -%}
+      {%-   for f in _libvirt_volumes_images.files | default([]) -%}
+      {%-     set name = f.path | basename | lower -%}
+      {%-     if spec.os | default('', true) | length > 0 and (spec.os | lower) in name -%}
+      {%-       set date = name | regex_search('[0-9]{8}') | default('', true) -%}
+      {%-       if img.path == '' or date > img.date -%}
+      {%-         set img.path = f.path -%}
+      {%-         set img.date = date -%}
+      {%-       endif -%}
       {%-     endif -%}
-      {%-   endif -%}
+      {%-   endfor -%}
+      {%-   for dev in spec.block_devices | default([], true) -%}
+      {%-     set path = (dev | list | first) if dev is mapping else dev -%}
+      {%-     set opts = (dev[path] | default({}, true)) if dev is mapping else {} -%}
+      {%-     if opts.managed | default(false) | bool -%}
+      {%-       set mapper = path | regex_search('^/dev/mapper/((?:[^-]|--)+)-((?:[^-]|--)+)$', '\\1', '\\2') -%}
+      {%-       set direct = path | regex_search('^/dev/([^/]+)/([^/]+)$', '\\1', '\\2') -%}
+      {%-       set parts = (mapper | map('replace', '--', '-') | list) if mapper
+                            else (direct if direct and direct[0] not in ['mapper', 'disk'] else ['', '']) -%}
+      {%-       set size = (opts.disk_size_g | default(libvirt_volumes_default_size, true)) | string -%}
+      {%-       set ns.volumes = ns.volumes + [{
+                  'vm': vm,
+                  'path': path,
+                  'vg': parts[0],
+                  'lv': parts[1],
+                  'size': size ~ ('g' if size is match('^[0-9]+$') else ''),
+                  'boot': loop.first,
+                  'image': img.path if loop.first else '',
+                  'force_recreation': opts.force_recreation | default(false) | bool,
+                }] -%}
+      {%-     endif -%}
+      {%-   endfor -%}
       {%- endfor -%}
-      {{ ns.path }}
-    _volume:
-      vg: "{{ _device | regex_replace('^/dev/mapper/([^-]+)-.*$', '\\1') }}"
-      lv: "{{ _device | regex_replace('^/dev/mapper/[^-]+-(.*)$', '\\1') }}"
-      size_g: "{{ item.disk_size_g | default(libvirt_volumes_default_size_g, true) }}"
-      image: "{{ _image }}"
-      domain: "{{ item.name }}"
-  loop: "{{ _libvirt_volumes_domains }}"
-  loop_control:
-    label: "{{ item.name }}"
-  when: _device | length > 0
-  tags: [libvirt_volumes]
-
-- name: "Merge volumes"
-  ansible.builtin.set_fact:
-    _libvirt_volumes_wanted: "{{ _libvirt_volumes_wanted + libvirt_volumes_extra }}"
+      {{ ns.volumes }}
   tags: [libvirt_volumes]
 
 - name: "Gather existing volume groups"
   ansible.builtin.command: vgs --noheadings -o vg_name
-  register: _libvirt_volumes_vgs
+  register: _libvirt_volumes_existing_vgs
   changed_when: false
   check_mode: false
   tags: [libvirt_volumes]
@@ -85,23 +154,29 @@
 - name: "Validate volumes"
   ansible.builtin.assert:
     that:
-      - item.vg | default('') | length > 0
-      - item.lv | default('') | length > 0
-      - item.vg in (_libvirt_volumes_vgs.stdout_lines | map('trim') | list)
-      - item.image | default('') | length > 0
+      - item.vg | length > 0
+      - item.lv | length > 0
+      # volume groups defined in libvirt_volumes_vgs only exist in check mode once actually created
+      - item.vg in (_libvirt_volumes_existing_vgs.stdout_lines | map('trim') | list + libvirt_volumes_vgs | list)
+      - not item.boot or item.image | length > 0
     fail_msg: >-
-      Invalid volume {{ item.vg | default('?') }}/{{ item.lv | default('?') }}: volume group must exist
-      and a base image must be found (searched in {{ libvirt_volumes_base_image_dir }})
+      Invalid block device {{ item.path }} of VM {{ item.vm }}: path must be /dev/mapper/<vg>-<lv> or
+      /dev/<vg>/<lv> with an existing or defined volume group, and for the boot disk a base image for os
+      '{{ libvirt_vms[item.vm].os | default('') }}' must be found in {{ libvirt_volumes_base_image_dir }}
     quiet: true
   loop: "{{ _libvirt_volumes_wanted }}"
   loop_control:
-    label: "{{ item.vg | default('?') }}/{{ item.lv | default('?') }}"
+    label: "{{ item.vm }}: {{ item.path }}"
   tags: [libvirt_volumes]
 
 - name: "Manage volumes"
-  ansible.builtin.include_tasks: volume.yml
+  ansible.builtin.include_tasks:
+    file: volume.yml
+    # tags of a dynamic include are not inherited by the included tasks
+    apply:
+      tags: [libvirt_volumes]
   loop: "{{ _libvirt_volumes_wanted }}"
   loop_control:
     loop_var: volume
-    label: "{{ volume.vg }}/{{ volume.lv }}"
+    label: "{{ volume.vm }}: {{ volume.vg }}/{{ volume.lv }}"
   tags: [libvirt_volumes]

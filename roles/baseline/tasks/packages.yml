@@ -21,7 +21,9 @@
 
     - name: Install debian-only packages
       ansible.builtin.package:
-        name: [ufw, signify-openbsd]
+        name:
+          - signify-openbsd
+          - reboot-notifier
 
     - name: Detect binary for signify-openbsd
       ansible.builtin.command: which signify-openbsd

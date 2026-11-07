@@ -1,0 +1,7 @@
+<!-- {{ ansible_managed }} -->
+<hostdev mode='subsystem' type='usb' managed='yes'>
+  <source>
+    <vendor id='0x{{ item.vendor }}'/>
+    <product id='0x{{ item.product }}'/>
+  </source>
+</hostdev>

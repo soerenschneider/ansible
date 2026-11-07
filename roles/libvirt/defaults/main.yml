@@ -1,2 +1,21 @@
 ---
 libvirt_kvm_users: []
+
+# Remove the NAT network "default" (virbr0) that the libvirt package defines.
+libvirt_remove_default_network: true
+
+# Enable the IOMMU via kernel arguments (needed for PCI passthrough). Requires a reboot.
+libvirt_iommu_enabled: false
+# Intel needs intel_iommu=on, AMD enables its IOMMU by default. iommu=pt limits the IOMMU to
+# passthrough devices to avoid overhead for host devices.
+libvirt_iommu_kernel_args: "{{ (['intel_iommu=on'] if 'GenuineIntel' in ansible_facts['processor'] else []) + ['iommu=pt'] }}"
+
+# PCI vendor:device IDs (lspci -nn) of devices bound to vfio-pci at boot, so no host driver claims
+# them and they can be passed through to a VM. List all functions of a device, e.g. the GPU and its
+# HDMI audio. vfio-pci is loaded from the initramfs before the regular drivers; an empty list removes
+# the binding again. Requires libvirt_iommu_enabled and a reboot.
+# libvirt_vfio_pci_ids: ["10de:2484", "10de:228b"]
+libvirt_vfio_pci_ids: []
+
+# Host drivers that could claim the devices; vfio-pci is loaded before them (softdep).
+libvirt_vfio_softdep_modules: [nvidia, nvidia_drm, nvidia_modeset, nvidia_uvm, nouveau, snd_hda_intel]
