@@ -130,8 +130,9 @@ table ip global {
         # allow access to IOT devices
         iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_prometheus oifname {$IF_IOT, $WG_IF_SOEREN_CLOUD } ip daddr { $POOL_IOT_PI_ZERO, $POOL_PT_IOT_PI_ZERO } tcp dport { 9191, 9192, 9194, 9865 } accept
 
-        # allow local nas to fetch data from seedbox
+        # allow local nas to fetch data from seedbox and other nas boxes
         iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname $WG_IF_SOEREN_CLOUD ip daddr $TAG_WG_SOEREN_CLOUD_SEEDBOX tcp dport 22 accept
+        iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname $WG_IF_SOEREN_CLOUD ip daddr @tag_nas tcp dport 22 accept
 
         # allow local nas to talk to remote syncthing
         iifname $IF_SERVERS ip saddr $NET_SERVERS ip saddr @tag_nas oifname { $IF_USERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_syncthing tcp dport 22000 accept
