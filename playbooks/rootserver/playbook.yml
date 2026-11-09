@@ -55,7 +55,7 @@
       tags: always
 
     - name: "Run role tunnelguard"
-      when: [ansible_system == "Linux", "inventory_hostname in wg_nets[wireguard_wg_net_name]"]
+      when: [ansible_system == "Linux", "inventory_hostname in wireguard_networks[wireguard_wg_net_name]"]
       ansible.builtin.include_role:
         name: tunnelguard
       tags: [tunnelguard, wireguard, vpn]
