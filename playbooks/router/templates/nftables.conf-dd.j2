@@ -145,7 +145,7 @@ table ip global {
         iifname $IF_IOT ip saddr $NET_IOT oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_mqtt tcp dport { 1883, 8883 } accept
 
         # allow access for raspberry PIs to openbao
-        iifname $IF_IOT ip saddr $POOL_IOT_PI_ZERO oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        iifname $IF_IOT ip saddr $POOL_IOT_PI_ZERO oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport { 443, 8080, 8200 } accept
 
         ################################################
         # MEDIA
@@ -155,7 +155,7 @@ table ip global {
         iifname $IF_MEDIA ip saddr { $POOL_MEDIA_MPD, $POOL_MEDIA_TVBOXES } oifname $IF_SERVERS ip daddr @tag_nas tcp dport { 80, 443, 6600 } accept
 
         # allow access to openbao for raspberry PIs
-        iifname $IF_MEDIA ip saddr $POOL_MEDIA_MPD oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        iifname $IF_MEDIA ip saddr $POOL_MEDIA_MPD oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport { 443, 8080, 8200 } accept
 
         ################################################
         # GUEST
@@ -163,7 +163,7 @@ table ip global {
         iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_kubernetes tcp dport { 443, 6443 } accept
 
         # allow access to local openbao
-        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport 443 accept
+        iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname $IF_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport { 443, 8080, 8200 } accept
 
         # allow access to syncthing
         iifname $IF_GUEST ip saddr $NET_GUEST ip saddr $POOL_GUEST_WORK ip saddr @tag_soeren oifname { $IF_SERVERS, $WG_IF_SOEREN_CLOUD } ip daddr @tag_nas tcp dport 22000 accept
@@ -198,6 +198,9 @@ table ip global {
 
         # allow seedbox to talk to kubernetes services
         iifname $WG_IF_SOEREN_CLOUD ip saddr $TAG_WG_SOEREN_CLOUD_SEEDBOX oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_kubernetes tcp dport 443 accept
+
+        # allow datacenter ez to talk to openbao
+        iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $NET_EZ_DEFAULT, $IP_WG_SOEREN_CLOUD_RS, $IP_WG_SOEREN_CLOUD_PT, $NET_EZ, $IP_WG_SOEREN_CLOUD_CH } oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr $POOL_SERVERS_OPENBAO_PRD tcp dport { 443, 8080, 8200 } accept
 
         # allow routers over wireguard to access nas
         iifname $WG_IF_SOEREN_CLOUD ip saddr { $IP_WG_SOEREN_CLOUD_EZ, $IP_WG_SOEREN_CLOUD_PT } oifname $IF_SERVERS ip daddr $NET_SERVERS ip daddr @tag_nas tcp dport { 80, 443, 445, 6600 } accept
