@@ -20,7 +20,7 @@
 # keys, since their peers reference them.
 - name: "Install wireguard"
   when: [ansible_system == "Linux"]
-  tags: [wireguard, vpn]
+  tags: [wireguard, wg, vpn]
   block:
     - name: Install wireguard
       ansible.builtin.package:
@@ -46,6 +46,7 @@
       when: wireguard_wg_timer is changed  # noqa: no-handler
 
 - name: Mesh data is present
+  tags: [wireguard, wg]
   ansible.builtin.assert:
     that:
       - wireguard_networks is defined
@@ -57,6 +58,7 @@
     quiet: true
 
 - name: Find every mesh membership for this host
+  tags: [wireguard, wg]
   ansible.builtin.set_fact:
     _wireguard_memberships_json: >-
       {%- set out = [] -%}
@@ -78,10 +80,12 @@
       {{ out | to_json }}
 
 - name: Decode memberships
+  tags: [wireguard, wg]
   ansible.builtin.set_fact:
     wireguard_memberships: "{{ _wireguard_memberships_json | from_json }}"
 
 - name: This host belongs to at least one mesh
+  tags: [wireguard, wg]
   ansible.builtin.assert:
     that:
       - wireguard_memberships | length > 0
@@ -93,6 +97,7 @@
     quiet: true
 
 - name: Interface names are unique across meshes
+  tags: [wireguard, wg]
   ansible.builtin.assert:
     that:
       - wireguard_memberships | map(attribute='device') | list | length
@@ -103,15 +108,24 @@
       Set a distinct `device` on each mesh (or on this member).
     quiet: true
 
+# Tags on an include only select the include itself; `apply` is what
+# passes them down to the tasks inside the file.
 - name: "Run tasks wireguard_secrets_check.yaml"
-  ansible.builtin.include_tasks: wireguard_secrets_check.yaml
-  tags: [wireguard]
+  ansible.builtin.include_tasks:
+    file: wireguard_secrets_check.yaml
+    apply:
+      tags: [wireguard, wg]
+  tags: [wireguard, wg]
 
 # `loop_var` is not optional here. include_tasks vars are resolved lazily,
 # inside the included file -- by then any loop in mesh.yaml has rebound
 # `item` to its own value, and `item.mesh` resolves against a string.
 - name: Configure each mesh
-  ansible.builtin.include_tasks: mesh.yaml
+  ansible.builtin.include_tasks:
+    file: mesh.yaml
+    apply:
+      tags: [wireguard, wg]
+  tags: [wireguard, wg]
   vars:
     wireguard_mesh_name: "{{ wireguard_membership.mesh }}"
     wireguard_mesh: "{{ wireguard_networks[wireguard_membership.mesh] }}"
