@@ -11,7 +11,7 @@
     nas_data_user: "{{ nas_data_user }}"
     nas_data_uid: "{{ nas_data_uid }}"
     nas_data_group: "{{ nas_data_group }}"
-    nas_data_gid: "{{ nas_data_gid}}"
+    nas_data_gid: "{{ nas_data_gid }}"
     nas_data_ro_group: "{{ nas_data_ro_group }}"
     nas_data_ro_gid: "{{ nas_data_ro_gid }}"
     # 2770 locks out everyone not in one of the groups, only use it once all

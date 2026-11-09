@@ -12,7 +12,7 @@
           if [ "${IFACE}" = "br0" ] || [ "${IFACE}" = "eno1" ]; then
             /usr/sbin/ethtool -K eno1 tso off
           fi
-        dest: "/etc/networkd-dispatcher/routable.d/20-ethtool{% elif ansible_os_family | lower == 'redhat' %}/etc/NetworkManager/dispatcher.d/pre-up.d/20-ethtool{% endif %}"
+        dest: "{% if ansible_os_family | lower == 'debian' %}/etc/networkd-dispatcher/routable.d/20-ethtool{% elif ansible_os_family | lower == 'redhat' %}/etc/NetworkManager/dispatcher.d/pre-up.d/20-ethtool{% endif %}"
         owner: root
         group: root
         mode: "0755"
