@@ -20,7 +20,7 @@
     path: /etc/haproxy/haproxy.cfg
     block: |
       listen stats
-          bind *:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:8405 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_srn_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
@@ -32,7 +32,7 @@
           stats realm Haproxy\ Statistics
 
       frontend https_front
-          bind *:443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify optional
+          bind *:443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_srn_ca_file }} verify optional
           mode http
           # only allow the following CNs
           # http-request deny if !{ ssl_c_s_dn(cn) -f /etc/haproxy/allowed_users_cn.txt }
@@ -68,7 +68,7 @@
           default_backend silo
 
       frontend directory_exporter
-          bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:2443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_srn_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
@@ -76,7 +76,7 @@
           default_backend prom_directory_exporter
 
       frontend prom_node_exporter
-          bind *:9443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:9443 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_srn_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
@@ -84,7 +84,7 @@
           default_backend prom_node_exporter
 
       frontend prom_sc_agent
-          bind *:9823 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_soerenschneider_ca_file }} verify required
+          bind *:9823 ssl crt /etc/haproxy/cert_{{ inventory_hostname }}.pem ca-file {{ pki_srn_ca_file }} verify required
           mode http
           # only allow the following CNs
           http-request deny if !{ ssl_c_s_dn(cn) -f {{ haproxy_allowed_scrapers_cns_file }} }
