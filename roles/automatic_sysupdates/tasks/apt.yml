@@ -25,6 +25,19 @@
     mode: "0644"
   tags: [automatic-sysupdates]
 
+- name: Unmask and enable Debian APT timers for DietPi compatibility
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    masked: no
+    enabled: yes
+    state: started
+  loop:
+    - apt-daily.timer
+    - apt-daily.service
+    - apt-daily-upgrade.timer
+    - apt-daily-upgrade.service
+  tags: [automatic-sysupdates, dietpi] 
+
 - name: Create override directory for update timer
   ansible.builtin.file:
     path: /etc/systemd/system/apt-daily.timer.d
